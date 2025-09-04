@@ -1,0 +1,25 @@
+# IDE
+.idea/
+
+# Node modules
+node_modules/
+
+# Build outputs
+.next/
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+.env.production.local
+.env.development.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# OS generated files
+.DS_Store
+Thumbs.db
