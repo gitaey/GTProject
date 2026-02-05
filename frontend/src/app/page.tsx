@@ -1,109 +1,134 @@
 'use client'
 
-import Counter from '@/components/Counter'
-import UserProfile from '@/components/UserProfile'
-import TodoList from '@/components/TodoList'
+import { useState } from 'react'
+import Sidebar from '@/components/layout/Sidebar'
+import Header from '@/components/layout/Header'
+import StatCard from '@/components/dashboard/StatCard'
 
 export default function Home() {
+  const [isMapOpen, setIsMapOpen] = useState(false)
+
+  const handleMapOpen = () => {
+    setIsMapOpen(true)
+    // TODO: 지도 팝업 구현
+    console.log('지도 팝업 열기')
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* 🎯 메인 타이틀 */}
-        <header className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-800 mb-4">
-            🚀 Next.js + React + OpenLayers + Zustand
-          </h1>
-          <p className="text-xl text-gray-600">
-            처음부터 차근차근 배워보는 웹 개발 스택!
-          </p>
-        </header>
+    <div className="flex min-h-screen bg-gray-50">
+      {/* Sidebar */}
+      <Sidebar onMapOpen={handleMapOpen} />
 
-        {/* 📚 학습 진행 상황 */}
-        <div className="mb-8 p-6 bg-white rounded-lg shadow-md">
-          <h2 className="text-2xl font-semibold mb-4 text-gray-800">학습 로드맵</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-4 bg-green-100 rounded-lg border-l-4 border-green-500">
-              <div className="flex items-center mb-2">
-                <span className="w-3 h-3 bg-green-500 rounded-full mr-2"></span>
-                <span className="font-semibold">1단계: React 기초</span>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <Header title="대시보드" />
+
+        {/* Content */}
+        <main className="flex-1 p-6">
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <StatCard
+              title="총 마커"
+              value="128"
+              icon="📍"
+              color="blue"
+              change={{ value: 12, isPositive: true }}
+            />
+            <StatCard
+              title="저장된 위치"
+              value="45"
+              icon="⭐"
+              color="yellow"
+              change={{ value: 8, isPositive: true }}
+            />
+            <StatCard
+              title="레이어"
+              value="7"
+              icon="🗂️"
+              color="purple"
+            />
+            <StatCard
+              title="공유됨"
+              value="23"
+              icon="🔗"
+              color="green"
+              change={{ value: 3, isPositive: false }}
+            />
+          </div>
+
+          {/* Main Content Area */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Recent Activity */}
+            <div className="lg:col-span-2 bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">최근 활동</h3>
+              <div className="space-y-4">
+                {[
+                  { action: '새 마커 추가', location: '서울시 강남구', time: '5분 전', icon: '📍' },
+                  { action: '레이어 생성', location: '교통 레이어', time: '1시간 전', icon: '🗂️' },
+                  { action: '위치 저장', location: '부산시 해운대구', time: '2시간 전', icon: '⭐' },
+                  { action: '지도 공유', location: '프로젝트 A', time: '어제', icon: '🔗' },
+                ].map((item, index) => (
+                  <div key={index} className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+                    <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl">
+                      {item.icon}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-800">{item.action}</p>
+                      <p className="text-sm text-gray-500">{item.location}</p>
+                    </div>
+                    <span className="text-sm text-gray-400">{item.time}</span>
+                  </div>
+                ))}
               </div>
-              <p className="text-sm text-gray-600">컴포넌트, State, Props</p>
             </div>
 
-            <div className="p-4 bg-yellow-100 rounded-lg border-l-4 border-yellow-500">
-              <div className="flex items-center mb-2">
-                <span className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></span>
-                <span className="font-semibold">2단계: Next.js</span>
+            {/* Quick Actions */}
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">빠른 실행</h3>
+              <div className="space-y-3">
+                <button
+                  onClick={handleMapOpen}
+                  className="w-full flex items-center gap-3 p-4 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors"
+                >
+                  <span className="text-2xl">🗺️</span>
+                  <span className="font-medium">지도 열기</span>
+                </button>
+                <button className="w-full flex items-center gap-3 p-4 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg transition-colors">
+                  <span className="text-2xl">📍</span>
+                  <span className="font-medium">새 마커 추가</span>
+                </button>
+                <button className="w-full flex items-center gap-3 p-4 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors">
+                  <span className="text-2xl">🗂️</span>
+                  <span className="font-medium">레이어 관리</span>
+                </button>
+                <button className="w-full flex items-center gap-3 p-4 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded-lg transition-colors">
+                  <span className="text-2xl">📤</span>
+                  <span className="font-medium">데이터 내보내기</span>
+                </button>
               </div>
-              <p className="text-sm text-gray-600">App Router, 라우팅</p>
-            </div>
-
-            <div className="p-4 bg-blue-100 rounded-lg border-l-4 border-blue-500">
-              <div className="flex items-center mb-2">
-                <span className="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>
-                <span className="font-semibold">3단계: Zustand</span>
-              </div>
-              <p className="text-sm text-gray-600">상태 관리</p>
-            </div>
-
-            <div className="p-4 bg-purple-100 rounded-lg border-l-4 border-purple-500">
-              <div className="flex items-center mb-2">
-                <span className="w-3 h-3 bg-purple-500 rounded-full mr-2"></span>
-                <span className="font-semibold">4단계: OpenLayers</span>
-              </div>
-              <p className="text-sm text-gray-600">지도 통합</p>
             </div>
           </div>
-        </div>
 
-        {/* 🎯 React 기초 실습 */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-6 text-gray-800">
-            🎯 1단계: React 기초 실습
-          </h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* React 컴포넌트들이 여기 들어갑니다 */}
-            <Counter />
-            <UserProfile />
-            <TodoList />
-          </div>
-        </div>
-
-        {/* 📖 학습 안내 */}
-        <div className="p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
-          <h3 className="text-xl font-semibold mb-3 text-gray-800">🧠 지금 배우고 있는 것들</h3>
-          <div className="grid md:grid-cols-3 gap-4">
-            <div>
-              <h4 className="font-semibold text-green-600 mb-2">⚛️ React 핵심</h4>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>• 컴포넌트 만들기</li>
-                <li>• useState로 상태 관리</li>
-                <li>• Props로 데이터 전달</li>
-                <li>• 이벤트 핸들링</li>
-              </ul>
+          {/* Map Preview Placeholder */}
+          <div className="mt-6 bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">지도 미리보기</h3>
+              <button
+                onClick={handleMapOpen}
+                className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+              >
+                전체 화면으로 보기 →
+              </button>
             </div>
-
-            <div>
-              <h4 className="font-semibold text-blue-600 mb-2">🚀 Next.js 특징</h4>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>• 'use client' 지시어</li>
-                <li>• 컴포넌트 기반 구조</li>
-                <li>• TypeScript 지원</li>
-                <li>• Tailwind CSS 스타일링</li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-semibold text-purple-600 mb-2">🎨 개발 도구</h4>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>• IntelliJ IDEA</li>
-                <li>• Hot Reload</li>
-                <li>• ESLint</li>
-                <li>• TypeScript</li>
-              </ul>
+            <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+              <div className="text-center">
+                <span className="text-4xl block mb-2">🗺️</span>
+                <p>지도를 불러오려면 클릭하세요</p>
+              </div>
             </div>
           </div>
-        </div>
+        </main>
       </div>
     </div>
   )
