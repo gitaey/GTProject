@@ -2,12 +2,18 @@
 
 import { useState } from 'react'
 
+interface SubMenuItem {
+  id: string
+  label: string
+  href?: string
+}
+
 interface MenuItem {
   id: string
   label: string
-  icon: string
   href?: string
   onClick?: () => void
+  children?: SubMenuItem[]
 }
 
 interface SidebarProps {
@@ -16,19 +22,36 @@ interface SidebarProps {
 
 export default function Sidebar({ onMapOpen }: SidebarProps) {
   const [activeMenu, setActiveMenu] = useState('home')
+  const [openSubMenu, setOpenSubMenu] = useState<string | null>(null)
 
   const menuItems: MenuItem[] = [
-    { id: 'home', label: '홈', icon: '🏠' },
-    { id: 'map', label: '지도', icon: '🗺️', onClick: onMapOpen },
-    { id: 'data', label: '데이터', icon: '📊' },
-    { id: 'settings', label: '설정', icon: '⚙️' },
+    { id: 'home', label: '홈' },
+    {
+      id: 'admin',
+      label: '관리자',
+      children: [
+        { id: 'admin-user', label: '사용자 관리' },
+        { id: 'admin-menu', label: '메뉴 관리' },
+        { id: 'admin-permission', label: '권한 관리' },
+      ],
+    },
+    { id: 'map', label: '지도', onClick: onMapOpen },
+    { id: 'blog', label: '블로그' },
   ]
 
   const handleMenuClick = (item: MenuItem) => {
-    setActiveMenu(item.id)
-    if (item.onClick) {
-      item.onClick()
+    if (item.children) {
+      setOpenSubMenu(openSubMenu === item.id ? null : item.id)
+    } else {
+      setActiveMenu(item.id)
+      if (item.onClick) {
+        item.onClick()
+      }
     }
+  }
+
+  const handleSubMenuClick = (subItem: SubMenuItem) => {
+    setActiveMenu(subItem.id)
   }
 
   return (
@@ -41,20 +64,44 @@ export default function Sidebar({ onMapOpen }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 p-4">
-        <ul className="space-y-2">
+        <ul className="space-y-1">
           {menuItems.map((item) => (
             <li key={item.id}>
               <button
                 onClick={() => handleMenuClick(item)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  activeMenu === item.id
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors ${
+                  activeMenu === item.id || (item.children && openSubMenu === item.id)
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-300 hover:bg-gray-800'
                 }`}
               >
-                <span className="text-xl">{item.icon}</span>
                 <span>{item.label}</span>
+                {item.children && (
+                  <span className={`transition-transform ${openSubMenu === item.id ? 'rotate-180' : ''}`}>
+                    ▼
+                  </span>
+                )}
               </button>
+
+              {/* Submenu */}
+              {item.children && openSubMenu === item.id && (
+                <ul className="mt-1 ml-4 space-y-1">
+                  {item.children.map((subItem) => (
+                    <li key={subItem.id}>
+                      <button
+                        onClick={() => handleSubMenuClick(subItem)}
+                        className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+                          activeMenu === subItem.id
+                            ? 'bg-gray-700 text-white'
+                            : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                        }`}
+                      >
+                        {subItem.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
         </ul>
