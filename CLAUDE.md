@@ -1,7 +1,7 @@
 # GT Project 작업 지침서
 
 ## 프로젝트 개요
-Next.js + React + OpenLayers + Zustand 기반의 지도 대시보드 프로젝트
+Next.js + React + OpenLayers + Zustand 기반의 지도 및 대시보드 프로젝트
 
 ## 기술 스택
 - **Frontend**: Next.js 15.4.4, React 19.1.0
