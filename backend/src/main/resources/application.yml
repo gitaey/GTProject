@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://sisnet.iptime.org:9091/gtp
+    username: postgres
+    password: sis3047!@
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+server:
+  port: 8080
+
+lostark:
+  api:
+    key: eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsIng1dCI6IktYMk40TkRDSTJ5NTA5NWpjTWk5TllqY2lyZyIsImtpZCI6IktYMk40TkRDSTJ5NTA5NWpjTWk5TllqY2lyZyJ9.eyJpc3MiOiJodHRwczovL2x1ZHkuZ2FtZS5vbnN0b3ZlLmNvbSIsImF1ZCI6Imh0dHBzOi8vbHVkeS5nYW1lLm9uc3RvdmUuY29tL3Jlc291cmNlcyIsImNsaWVudF9pZCI6IjEwMDAwMDAwMDAwMDAwODMifQ.EFIrCV_HKQpYEiIy1j0G_BYWJ4cBYNzhoHlREj43mOYJXW-2Qiqrhl9jgI8fQXLAL62LhxkgQEUf6cB9gwJZejG2sgu3p92Wv8XAGZJRE9pJqs4bRa91q4M-lfFoSTrREoopBhrwcKYAu--y7xyBcpnkAdDAYD3Yj4HLEcMKlVpD5zasX2C_mxZDZmkgIp7F1aJHzbkbtyMbeCkBI_39pS-lTiF1ReVnq4GQ5CtaUPV0uOqDamyasAi0x8slk5n2wCVUKIX7oYpAK2K5Qa8EbMo3AsuhPnmleZsZTWq34xhD6G8fytAk9DJKaNII5P5SDVByKoBGTc5gjgPB0KzCSA
