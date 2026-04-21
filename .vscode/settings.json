@@ -1,0 +1,11 @@
+{
+    "java.compile.nullAnalysis.mode": "automatic",
+    "workbench.tree.indent": 16,
+    "files.autoSave": "onFocusChange",
+    "files.autoSaveDelay": 1000,
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "terminal.integrated.defaultProfile.windows": "Git Bash",
+    "terminal.integrated.env.windows": {
+        "JAVA_TOOL_OPTIONS": "-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"
+    }
+}

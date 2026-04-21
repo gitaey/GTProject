@@ -1,0 +1,34 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "GTP Backend",
+            "request": "launch",
+            "mainClass": "com.gtp.GtpApplication",
+            "projectName": "gtp",
+            "cwd": "${workspaceFolder}/backend",
+            "vmArgs": "-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"
+        },
+        {
+            "type": "node",
+            "name": "GTP Frontend",
+            "request": "launch",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": ["run", "dev"],
+            "cwd": "${workspaceFolder}/frontend",
+            "console": "integratedTerminal",
+            "serverReadyAction": {
+                "pattern": "Local:\\s+(https?://\\S+)",
+                "uriFormat": "%s",
+                "action": "openExternally"
+            }
+        }
+    ],
+    "compounds": [
+        {
+            "name": "GTP Full Stack",
+            "configurations": ["GTP Backend", "GTP Frontend"]
+        }
+    ]
+}
