@@ -13,8 +13,6 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
             if (!json.success) { replier.reply("캐릭터를 찾을 수 없습니다."); return; }
             var d = json.data;
 
-            replier.reply(SERVER_URL + "/preview/character/" + java.net.URLEncoder.encode(name, "UTF-8"));
-
             // 치명 / 특화 / 신속만 추출
             var stats = d.Stats || [];
             var statTargets = ["치명", "특화", "신속"];
@@ -36,8 +34,6 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
             msg += "📖 원정대  Lv." + d.ExpeditionLevel + "  |  스킬포인트 " + d.UsingSkillPoint + "/" + d.TotalSkillPoint + "\n";
             if (statParts.length > 0) msg += "📊 " + statParts.join(" · ") + "\n";
 
-            replier.reply(msg.trim());
-
             // 각인 정보
             try {
                 var engRes = org.jsoup.Jsoup.connect(SERVER_URL + "/api/lostark/character/" + java.net.URLEncoder.encode(name, "UTF-8") + "/engravings")
@@ -46,11 +42,11 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                 if (engJson.success) {
                     var engEffects = (engJson.data && engJson.data.Effects) ? engJson.data.Effects : [];
                     if (engEffects.length > 0) {
-                        var engMsg = "【 각인 】\n─────────────────\n";
+                        msg += "─────────────────\n";
+                        msg += "【 각인 】\n";
                         for (var ei = 0; ei < engEffects.length; ei++) {
-                            engMsg += "◆ " + engEffects[ei].Name + "\n";
+                            msg += "◆ " + engEffects[ei].Name + "\n";
                         }
-                        replier.reply(engMsg.trim());
                     }
                 }
             } catch(engErr) {}
@@ -69,12 +65,12 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                     if (activePreset) {
                         var gridCells = activePreset.Cells || [];
                         if (gridCells.length > 0) {
-                            var gridMsg = "【 아크그리드 】\n─────────────────\n";
+                            msg += "─────────────────\n";
+                            msg += "【 아크그리드 】\n";
                             for (var ci = 0; ci < gridCells.length; ci++) {
                                 var gc = gridCells[ci];
-                                gridMsg += "◆ " + gc.Name + "  Lv." + gc.Level + "/" + gc.MaxLevel + "\n";
+                                msg += "◆ " + gc.Name + "  Lv." + gc.Level + "/" + gc.MaxLevel + "\n";
                             }
-                            replier.reply(gridMsg.trim());
                         }
                     }
                 }
@@ -89,23 +85,25 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                     var gemList = gemJson.data.Gems || [];
                     var gemEffects = (gemJson.data.Effects && gemJson.data.Effects.Skills) ? gemJson.data.Effects.Skills : [];
                     if (gemList.length > 0) {
-                        var gemMsg = "【 보석 】\n─────────────────\n";
+                        msg += "─────────────────\n";
+                        msg += "【 보석 】\n";
                         for (var gi = 0; gi < gemList.length; gi++) {
                             var gm = gemList[gi];
                             var geff = null;
                             for (var gj = 0; gj < gemEffects.length; gj++) {
                                 if (gemEffects[gj].GemSlot === gm.Slot) { geff = gemEffects[gj]; break; }
                             }
-                            gemMsg += gm.Name;
+                            msg += gm.Name;
                             if (geff && geff.Description && geff.Description.length > 0) {
-                                gemMsg += "\n   └ " + geff.Description[0];
+                                msg += "\n   └ " + geff.Description[0];
                             }
-                            gemMsg += "\n";
+                            msg += "\n";
                         }
-                        replier.reply(gemMsg.trim());
                     }
                 }
             } catch(gemErr) {}
+
+            replier.reply(msg.trim());
 
         } catch(e) { replier.reply("오류: " + e.message); }
 
