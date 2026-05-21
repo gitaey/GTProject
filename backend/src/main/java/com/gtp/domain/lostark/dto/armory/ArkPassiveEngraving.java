@@ -6,18 +6,20 @@ import lombok.Getter;
 
 @Getter
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class ArkPassivePoint {
+public class ArkPassiveEngraving {
+
+    @JsonProperty("AbilityStoneLevel")
+    private Integer abilityStoneLevel;
+
+    @JsonProperty("Grade")
+    private String grade;
+
+    @JsonProperty("Level")
+    private int level;
 
     @JsonProperty("Name")
     private String name;
 
-    @JsonProperty("Value")
-    private int value;
-
-    @JsonProperty("Tooltip")
-    private String tooltip;
-
-    // 랭크 설명 (예: "6랭크 21레벨")
     @JsonProperty("Description")
     private String description;
 }

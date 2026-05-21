@@ -15,4 +15,8 @@ public class ArmoryEngraving {
 
     @JsonProperty("Effects")
     private List<EngravingEffect> effects;
+
+    // 아크패시브 캐릭터의 각인 정보
+    @JsonProperty("ArkPassiveEffects")
+    private List<ArkPassiveEngraving> arkPassiveEffects;
 }

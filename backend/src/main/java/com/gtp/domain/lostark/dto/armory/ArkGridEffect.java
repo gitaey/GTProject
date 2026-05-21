@@ -6,18 +6,14 @@ import lombok.Getter;
 
 @Getter
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class ArkPassivePoint {
+public class ArkGridEffect {
 
     @JsonProperty("Name")
     private String name;
 
-    @JsonProperty("Value")
-    private int value;
+    @JsonProperty("Level")
+    private int level;
 
     @JsonProperty("Tooltip")
     private String tooltip;
-
-    // 랭크 설명 (예: "6랭크 21레벨")
-    @JsonProperty("Description")
-    private String description;
 }
