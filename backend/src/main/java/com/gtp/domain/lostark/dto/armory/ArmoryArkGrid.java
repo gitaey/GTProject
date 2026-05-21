@@ -10,9 +10,11 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ArmoryArkGrid {
 
-    @JsonProperty("IsUnlocked")
-    private boolean isUnlocked;
+    // 슬롯 목록 (장착된 아크그리드 아이템)
+    @JsonProperty("Slots")
+    private List<ArkGridSlot> slots;
 
-    @JsonProperty("Presets")
-    private List<ArkGridPreset> presets;
+    // 발동 중인 효과 목록 (Name + Level)
+    @JsonProperty("Effects")
+    private List<ArkGridEffect> effects;
 }

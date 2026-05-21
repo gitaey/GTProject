@@ -1,5 +1,11 @@
 var SERVER_URL = "http://sisnet2.iptime.org:48080";
 
+// HTML 태그 제거 헬퍼 (각인/아크패시브 Description에 포함된 FONT 태그 등 제거)
+function stripHtml(str) {
+    if (!str) return "";
+    return str.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+}
+
 function response(room, msg, sender, isGroupChat, replier, imageDB, packageName) {
     var text = msg.trim();
 
@@ -34,43 +40,44 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
             msg += "📖 원정대  Lv." + d.ExpeditionLevel + "  |  스킬포인트 " + d.UsingSkillPoint + "/" + d.TotalSkillPoint + "\n";
             if (statParts.length > 0) msg += "📊 " + statParts.join(" · ") + "\n";
 
-            // 각인 정보
+            // 각인 정보 (아크패시브 캐릭터 → ArkPassiveEffects, 구형 → Effects)
             try {
                 var engRes = org.jsoup.Jsoup.connect(SERVER_URL + "/api/lostark/character/" + java.net.URLEncoder.encode(name, "UTF-8") + "/engravings")
                     .ignoreContentType(true).get().body().text();
                 var engJson = JSON.parse(engRes);
-                if (engJson.success) {
-                    var engEffects = (engJson.data && engJson.data.Effects) ? engJson.data.Effects : [];
+                if (engJson.success && engJson.data) {
+                    var engEffects = [];
+                    if (engJson.data.ArkPassiveEffects && engJson.data.ArkPassiveEffects.length > 0) {
+                        engEffects = engJson.data.ArkPassiveEffects;
+                    } else if (engJson.data.Effects && engJson.data.Effects.length > 0) {
+                        engEffects = engJson.data.Effects;
+                    }
                     if (engEffects.length > 0) {
                         msg += "─────────────────\n";
                         msg += "【 각인 】\n";
                         for (var ei = 0; ei < engEffects.length; ei++) {
-                            msg += "◆ " + engEffects[ei].Name + "\n";
+                            var ef = engEffects[ei];
+                            msg += "◆ " + ef.Name;
+                            if (ef.Level !== undefined && ef.Level !== null) msg += " Lv." + ef.Level;
+                            msg += "\n";
                         }
                     }
                 }
             } catch(engErr) {}
 
-            // 아크그리드 정보
+            // 아크그리드 정보 (Slots + Effects 구조)
             try {
                 var gridRes = org.jsoup.Jsoup.connect(SERVER_URL + "/api/lostark/character/" + java.net.URLEncoder.encode(name, "UTF-8") + "/arkgrid")
                     .ignoreContentType(true).get().body().text();
                 var gridJson = JSON.parse(gridRes);
-                if (gridJson.success && gridJson.data && gridJson.data.IsUnlocked) {
-                    var gridPresets = gridJson.data.Presets || [];
-                    var activePreset = null;
-                    for (var pi = 0; pi < gridPresets.length; pi++) {
-                        if (gridPresets[pi].IsActive) { activePreset = gridPresets[pi]; break; }
-                    }
-                    if (activePreset) {
-                        var gridCells = activePreset.Cells || [];
-                        if (gridCells.length > 0) {
-                            msg += "─────────────────\n";
-                            msg += "【 아크그리드 】\n";
-                            for (var ci = 0; ci < gridCells.length; ci++) {
-                                var gc = gridCells[ci];
-                                msg += "◆ " + gc.Name + "  Lv." + gc.Level + "/" + gc.MaxLevel + "\n";
-                            }
+                if (gridJson.success && gridJson.data) {
+                    var gridEffects = gridJson.data.Effects || [];
+                    if (gridEffects.length > 0) {
+                        msg += "─────────────────\n";
+                        msg += "【 아크그리드 】\n";
+                        for (var ci = 0; ci < gridEffects.length; ci++) {
+                            var ge = gridEffects[ci];
+                            msg += "◆ " + ge.Name + "  Lv." + ge.Level + "\n";
                         }
                     }
                 }
@@ -115,14 +122,22 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                 .ignoreContentType(true).get().body().text();
             var json = JSON.parse(res);
             if (!json.success) { replier.reply("각인 정보를 찾을 수 없습니다."); return; }
-            var effects = (json.data && json.data.Effects) ? json.data.Effects : [];
+            // 아크패시브 캐릭터 → ArkPassiveEffects, 구형 → Effects
+            var effects = [];
+            if (json.data && json.data.ArkPassiveEffects && json.data.ArkPassiveEffects.length > 0) {
+                effects = json.data.ArkPassiveEffects;
+            } else if (json.data && json.data.Effects && json.data.Effects.length > 0) {
+                effects = json.data.Effects;
+            }
             if (effects.length === 0) { replier.reply(name + "의 각인 정보가 없습니다."); return; }
             var msg = "【 " + name + " 각인 】\n";
             msg += "─────────────────\n";
             for (var i = 0; i < effects.length; i++) {
                 var e = effects[i];
-                msg += "◆ " + e.Name + "\n";
-                if (e.Description) msg += "   " + e.Description + "\n";
+                msg += "◆ " + e.Name;
+                if (e.Level !== undefined && e.Level !== null) msg += " Lv." + e.Level;
+                msg += "\n";
+                if (e.Description) msg += "   " + stripHtml(e.Description) + "\n";
             }
             replier.reply(msg.trim());
         } catch(e) { replier.reply("오류: " + e.message); }
@@ -136,37 +151,46 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
             var json = JSON.parse(res);
             if (!json.success) { replier.reply("아크패시브 정보를 찾을 수 없습니다."); return; }
             var d = json.data;
-            if (!d || !d.IsUnlocked) { replier.reply(name + "의 아크패시브가 해금되지 않았습니다."); return; }
+            if (!d || !d.IsArkPassive) { replier.reply(name + "의 아크패시브가 해금되지 않았습니다."); return; }
 
             var msg = "【 " + name + " 아크패시브 】\n";
+            if (d.Title) msg += "  " + d.Title + "\n";
             msg += "─────────────────\n";
 
+            // 진화 / 깨달음 / 도약 포인트 (Description에 랭크 정보 포함)
             var points = d.Points || [];
             if (points.length > 0) {
                 var ptList = [];
-                for (var i = 0; i < points.length; i++) ptList.push(points[i].Name + " " + points[i].Value);
+                for (var i = 0; i < points.length; i++) {
+                    var pt = points[i];
+                    var ptStr = pt.Name + " " + pt.Value;
+                    if (pt.Description) ptStr += " (" + pt.Description + ")";
+                    ptList.push(ptStr);
+                }
                 msg += "✦ " + ptList.join("  /  ") + "\n";
                 msg += "─────────────────\n";
             }
 
-            var nodes = d.Nodes || [];
-            var typeMap = {};
-            for (var i = 0; i < nodes.length; i++) {
-                var n = nodes[i];
-                if (n.Level < 1) continue;
-                var t = n.Type || "기타";
-                if (!typeMap[t]) typeMap[t] = [];
-                typeMap[t].push(n.Name + " Lv." + n.Level);
+            // Effects를 카테고리(Name)별로 그룹화 (깨달음 / 진화 / 도약)
+            var effects = d.Effects || [];
+            var categoryMap = {};
+            var categoryOrder = [];
+            for (var i = 0; i < effects.length; i++) {
+                var ef = effects[i];
+                var cat = ef.Name || "기타";
+                if (!categoryMap[cat]) {
+                    categoryMap[cat] = [];
+                    categoryOrder.push(cat);
+                }
+                categoryMap[cat].push(stripHtml(ef.Description));
             }
-            var typeIcons = { "점화": "🔴", "진화": "🟢", "회귀": "🔵" };
-            var types = ["점화", "진화", "회귀"];
-            for (var ti = 0; ti < types.length; ti++) {
-                var t = types[ti];
-                if (typeMap[t] && typeMap[t].length > 0) {
-                    msg += (typeIcons[t] || "▸") + " [" + t + "]\n";
-                    for (var ni = 0; ni < typeMap[t].length; ni++) {
-                        msg += "   · " + typeMap[t][ni] + "\n";
-                    }
+            var catIcons = { "깨달음": "🔵", "진화": "🟡", "도약": "🟢" };
+            for (var ci = 0; ci < categoryOrder.length; ci++) {
+                var cat = categoryOrder[ci];
+                msg += (catIcons[cat] || "▸") + " [" + cat + "]\n";
+                var catItems = categoryMap[cat];
+                for (var ni = 0; ni < catItems.length; ni++) {
+                    msg += "   · " + catItems[ni] + "\n";
                 }
             }
 
@@ -182,22 +206,35 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
             var json = JSON.parse(res);
             if (!json.success) { replier.reply("아크그리드 정보를 찾을 수 없습니다."); return; }
             var d = json.data;
-            if (!d || !d.IsUnlocked) { replier.reply(name + "의 아크그리드가 해금되지 않았습니다."); return; }
+            if (!d) { replier.reply(name + "의 아크그리드 정보가 없습니다."); return; }
 
-            var presets = d.Presets || [];
-            var activePreset = null;
-            for (var i = 0; i < presets.length; i++) {
-                if (presets[i].IsActive) { activePreset = presets[i]; break; }
+            var slots = d.Slots || [];
+            var gridEffects = d.Effects || [];
+            if (slots.length === 0 && gridEffects.length === 0) {
+                replier.reply(name + "의 아크그리드 정보가 없습니다.");
+                return;
             }
-            if (!activePreset) { replier.reply(name + "의 활성화된 아크그리드 프리셋이 없습니다."); return; }
 
             var msg = "【 " + name + " 아크그리드 】\n";
             msg += "─────────────────\n";
-            var cells = activePreset.Cells || [];
-            for (var i = 0; i < cells.length; i++) {
-                var c = cells[i];
-                msg += "◆ " + c.Name + "  Lv." + c.Level + "/" + c.MaxLevel + "\n";
-                if (c.Description) msg += "   " + c.Description + "\n";
+
+            // 장착 슬롯 (아이템명 + 포인트 + 등급)
+            if (slots.length > 0) {
+                msg += "【 장착 슬롯 】\n";
+                for (var i = 0; i < slots.length; i++) {
+                    var s = slots[i];
+                    msg += "◆ " + s.Name + "  " + s.Point + "pt  [" + s.Grade + "]\n";
+                }
+                msg += "─────────────────\n";
+            }
+
+            // 발동 효과
+            if (gridEffects.length > 0) {
+                msg += "【 발동 효과 】\n";
+                for (var i = 0; i < gridEffects.length; i++) {
+                    var ge = gridEffects[i];
+                    msg += "◆ " + ge.Name + "  Lv." + ge.Level + "\n";
+                }
             }
 
             replier.reply(msg.trim());

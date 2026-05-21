@@ -6,18 +6,19 @@ import lombok.Getter;
 
 @Getter
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class ArkPassivePoint {
+public class ArkPassiveEffect {
 
+    // 카테고리: "깨달음", "진화", "도약"
     @JsonProperty("Name")
     private String name;
 
-    @JsonProperty("Value")
-    private int value;
-
-    @JsonProperty("Tooltip")
-    private String tooltip;
-
-    // 랭크 설명 (예: "6랭크 21레벨")
+    // HTML 태그 포함 설명 (예: "<FONT color='#83E9FF'>깨달음</FONT> 1티어 ...")
     @JsonProperty("Description")
     private String description;
+
+    @JsonProperty("Icon")
+    private String icon;
+
+    @JsonProperty("ToolTip")
+    private String toolTip;
 }
