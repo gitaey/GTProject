@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__dbeaver__list_connections",
+      "mcp__jetbrains-ide__get_project_modules",
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)",
+      "Bash(rm -rf .next)",
+      "Bash(npx next:*)",
+      "Read(//tmp/**)",
+      "Bash(ls /tmp/)",
+      "Bash(netstat -ano)",
+      "mcp__dbeaver__list_tables",
+      "mcp__dbeaver__alter_table",
+      "Bash(curl -s -X POST http://localhost:8080/api/users -H 'Content-Type: application/json' -d '{\"username\":\"testuser1\",\"nickname\":\"테스트1\",\"password\":\"test1234!\",\"role\":\"USER\",\"permission\":\"USER_PERMISSION_1\"}')",
+      "mcp__dbeaver__execute_query",
+      "mcp__dbeaver__get_table_schema",
+      "Bash(curl -s http://localhost:8080/api/users)",
+      "mcp__jetbrains-ide__execute_terminal_command",
+      "Bash(java -XshowSettings:all)",
+      "WebSearch",
+      "Bash(chcp)",
+      "Bash(git add *)"
+    ]
+  }
+}

@@ -1,0 +1,50 @@
+{
+    "folders": [
+        {
+            "name": "Backend",
+            "path": "backend"
+        },
+        {
+            "name": "Frontend",
+            "path": "frontend"
+        },
+        {
+            "name": "Kakaobot",
+            "path": "kakaobot"
+        }
+    ],
+    "settings": {},
+    "launch": {
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "type": "java",
+                "name": "GTP Backend",
+                "request": "launch",
+                "mainClass": "com.gtp.GtpApplication",
+                "projectName": "gtp",
+                "cwd": "${workspaceFolder:Backend}"
+            },
+            {
+                "type": "node",
+                "name": "GTP Frontend",
+                "request": "launch",
+                "runtimeExecutable": "npm",
+                "runtimeArgs": ["run", "dev"],
+                "cwd": "${workspaceFolder:Frontend}",
+                "console": "integratedTerminal",
+                "serverReadyAction": {
+                    "pattern": "Local:\\s+(https?://\\S+)",
+                    "uriFormat": "%s",
+                    "action": "openExternally"
+                }
+            }
+        ],
+        "compounds": [
+            {
+                "name": "GTP Full Stack",
+                "configurations": ["GTP Backend", "GTP Frontend"]
+            }
+        ]
+    }
+}
