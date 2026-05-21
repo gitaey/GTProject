@@ -1,14 +1,18 @@
 package com.gtp.domain.lostark.service;
 
-import com.gtp.domain.lostark.dto.CharacterResponse;
+import com.gtp.domain.lostark.dto.armory.*;
 import com.gtp.global.exception.CustomException;
 import com.gtp.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.*;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -20,25 +24,144 @@ public class LostarkService {
 
     private static final String BASE_URL = "https://developer-lostark.game.onstove.com";
 
-    public CharacterResponse getCharacter(String name) {
-        RestTemplate restTemplate = new RestTemplate();
-
+    private HttpEntity<Void> authEntity() {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "bearer " + apiKey);
         headers.setContentType(MediaType.APPLICATION_JSON);
+        return new HttpEntity<>(headers);
+    }
 
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-
+    // !캐릭터 - 기본 프로필
+    public ArmoryProfile getCharacter(String name) {
+        RestTemplate restTemplate = new RestTemplate();
         try {
-            ResponseEntity<CharacterResponse> response = restTemplate.exchange(
+            ResponseEntity<ArmoryProfile> response = restTemplate.exchange(
                 BASE_URL + "/armories/characters/" + name + "/profiles",
-                HttpMethod.GET,
-                entity,
-                CharacterResponse.class
+                HttpMethod.GET, authEntity(), ArmoryProfile.class
             );
             return response.getBody();
         } catch (Exception e) {
-            log.error("LostArk API error: {}", e.getMessage());
+            log.error("LostArk 프로필 조회 오류: {}", e.getMessage());
+            throw new CustomException(ErrorCode.LOSTARK_API_ERROR);
+        }
+    }
+
+    // !보석 - 보석 정보
+    public ArmoryGem getGems(String name) {
+        RestTemplate restTemplate = new RestTemplate();
+        try {
+            ResponseEntity<ArmoryGem> response = restTemplate.exchange(
+                BASE_URL + "/armories/characters/" + name + "/gems",
+                HttpMethod.GET, authEntity(), ArmoryGem.class
+            );
+            return response.getBody();
+        } catch (Exception e) {
+            log.error("LostArk 보석 조회 오류: {}", e.getMessage());
+            throw new CustomException(ErrorCode.LOSTARK_API_ERROR);
+        }
+    }
+
+    // !스킬 - 스킬 정보
+    public List<SkillItem> getSkills(String name) {
+        RestTemplate restTemplate = new RestTemplate();
+        try {
+            ResponseEntity<List<SkillItem>> response = restTemplate.exchange(
+                BASE_URL + "/armories/characters/" + name + "/combat-skills",
+                HttpMethod.GET, authEntity(), new ParameterizedTypeReference<List<SkillItem>>() {}
+            );
+            return response.getBody() != null ? response.getBody() : new ArrayList<>();
+        } catch (Exception e) {
+            log.error("LostArk 스킬 조회 오류: {}", e.getMessage());
+            throw new CustomException(ErrorCode.LOSTARK_API_ERROR);
+        }
+    }
+
+    // !악세 - 장비 전체 (악세는 봇에서 필터링)
+    public List<EquipmentItem> getEquipment(String name) {
+        RestTemplate restTemplate = new RestTemplate();
+        try {
+            ResponseEntity<List<EquipmentItem>> response = restTemplate.exchange(
+                BASE_URL + "/armories/characters/" + name + "/equipment",
+                HttpMethod.GET, authEntity(), new ParameterizedTypeReference<List<EquipmentItem>>() {}
+            );
+            return response.getBody() != null ? response.getBody() : new ArrayList<>();
+        } catch (Exception e) {
+            log.error("LostArk 장비 조회 오류: {}", e.getMessage());
+            throw new CustomException(ErrorCode.LOSTARK_API_ERROR);
+        }
+    }
+
+    // !내실 - 내실 수집품
+    public List<CollectibleItem> getCollectibles(String name) {
+        RestTemplate restTemplate = new RestTemplate();
+        try {
+            ResponseEntity<List<CollectibleItem>> response = restTemplate.exchange(
+                BASE_URL + "/armories/characters/" + name + "/collectibles",
+                HttpMethod.GET, authEntity(), new ParameterizedTypeReference<List<CollectibleItem>>() {}
+            );
+            return response.getBody() != null ? response.getBody() : new ArrayList<>();
+        } catch (Exception e) {
+            log.error("LostArk 내실 조회 오류: {}", e.getMessage());
+            throw new CustomException(ErrorCode.LOSTARK_API_ERROR);
+        }
+    }
+
+    // !원정대 - 원정대 캐릭터 목록
+    public List<SiblingCharacter> getSiblings(String name) {
+        RestTemplate restTemplate = new RestTemplate();
+        try {
+            ResponseEntity<List<SiblingCharacter>> response = restTemplate.exchange(
+                BASE_URL + "/characters/" + name + "/siblings",
+                HttpMethod.GET, authEntity(), new ParameterizedTypeReference<List<SiblingCharacter>>() {}
+            );
+            return response.getBody() != null ? response.getBody() : new ArrayList<>();
+        } catch (Exception e) {
+            log.error("LostArk 원정대 조회 오류: {}", e.getMessage());
+            throw new CustomException(ErrorCode.LOSTARK_API_ERROR);
+        }
+    }
+
+    // !각인 - 각인 정보
+    public ArmoryEngraving getEngravings(String name) {
+        RestTemplate restTemplate = new RestTemplate();
+        try {
+            ResponseEntity<ArmoryEngraving> response = restTemplate.exchange(
+                BASE_URL + "/armories/characters/" + name + "/engravings",
+                HttpMethod.GET, authEntity(), ArmoryEngraving.class
+            );
+            return response.getBody();
+        } catch (Exception e) {
+            log.error("LostArk 각인 조회 오류: {}", e.getMessage());
+            throw new CustomException(ErrorCode.LOSTARK_API_ERROR);
+        }
+    }
+
+    // !아크패시브 - 아크 패시브 노드
+    public ArmoryArkPassive getArkPassive(String name) {
+        RestTemplate restTemplate = new RestTemplate();
+        try {
+            ResponseEntity<ArmoryArkPassive> response = restTemplate.exchange(
+                BASE_URL + "/armories/characters/" + name + "/arkpassive",
+                HttpMethod.GET, authEntity(), ArmoryArkPassive.class
+            );
+            return response.getBody();
+        } catch (Exception e) {
+            log.error("LostArk 아크패시브 조회 오류: {}", e.getMessage());
+            throw new CustomException(ErrorCode.LOSTARK_API_ERROR);
+        }
+    }
+
+    // !아크그리드 - 아크 그리드
+    public ArmoryArkGrid getArkGrid(String name) {
+        RestTemplate restTemplate = new RestTemplate();
+        try {
+            ResponseEntity<ArmoryArkGrid> response = restTemplate.exchange(
+                BASE_URL + "/armories/characters/" + name + "/arkgrid",
+                HttpMethod.GET, authEntity(), ArmoryArkGrid.class
+            );
+            return response.getBody();
+        } catch (Exception e) {
+            log.error("LostArk 아크그리드 조회 오류: {}", e.getMessage());
             throw new CustomException(ErrorCode.LOSTARK_API_ERROR);
         }
     }

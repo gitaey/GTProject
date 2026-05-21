@@ -1,16 +1,21 @@
-package com.gtp.domain.lostark.dto;
+package com.gtp.domain.lostark.dto.armory;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 
 @Getter
-public class CharacterResponse {
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class SiblingCharacter {
+
+    @JsonProperty("ServerName")
+    private String serverName;
 
     @JsonProperty("CharacterName")
     private String characterName;
 
-    @JsonProperty("ServerName")
-    private String serverName;
+    @JsonProperty("CharacterLevel")
+    private int characterLevel;
 
     @JsonProperty("CharacterClassName")
     private String characterClassName;
