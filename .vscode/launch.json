@@ -24,9 +24,9 @@
             "cwd": "${workspaceFolder}/backend",
             "vmArgs": "-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8",
             "shortenCommandLine": "jarmanifest",
-            // "env": {
-            //     "SPRING_DEVTOOLS_RESTART_ENABLED": "false"
-            // }
+            "env": {
+                "SPRING_DEVTOOLS_RESTART_ENABLED": "false"
+            }
         }
     ],
     "compounds": [

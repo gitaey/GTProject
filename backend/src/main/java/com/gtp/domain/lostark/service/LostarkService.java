@@ -10,9 +10,11 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.*;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +26,14 @@ public class LostarkService {
 
     private static final String BASE_URL = "https://developer-lostark.game.onstove.com";
 
+    // 연결 5초, 읽기 8초 타임아웃 설정
+    private RestTemplate restTemplate() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5_000);
+        factory.setReadTimeout(8_000);
+        return new RestTemplate(factory);
+    }
+
     private HttpEntity<Void> authEntity() {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "bearer " + apiKey);
@@ -33,7 +43,7 @@ public class LostarkService {
 
     // !캐릭터 - 기본 프로필
     public ArmoryProfile getCharacter(String name) {
-        RestTemplate restTemplate = new RestTemplate();
+        RestTemplate restTemplate = restTemplate();
         try {
             ResponseEntity<ArmoryProfile> response = restTemplate.exchange(
                 BASE_URL + "/armories/characters/" + name + "/profiles",
@@ -48,7 +58,7 @@ public class LostarkService {
 
     // !보석 - 보석 정보
     public ArmoryGem getGems(String name) {
-        RestTemplate restTemplate = new RestTemplate();
+        RestTemplate restTemplate = restTemplate();
         try {
             ResponseEntity<ArmoryGem> response = restTemplate.exchange(
                 BASE_URL + "/armories/characters/" + name + "/gems",
@@ -63,7 +73,7 @@ public class LostarkService {
 
     // !스킬 - 스킬 정보
     public List<SkillItem> getSkills(String name) {
-        RestTemplate restTemplate = new RestTemplate();
+        RestTemplate restTemplate = restTemplate();
         try {
             ResponseEntity<List<SkillItem>> response = restTemplate.exchange(
                 BASE_URL + "/armories/characters/" + name + "/combat-skills",
@@ -78,7 +88,7 @@ public class LostarkService {
 
     // !악세 - 장비 전체 (악세는 봇에서 필터링)
     public List<EquipmentItem> getEquipment(String name) {
-        RestTemplate restTemplate = new RestTemplate();
+        RestTemplate restTemplate = restTemplate();
         try {
             ResponseEntity<List<EquipmentItem>> response = restTemplate.exchange(
                 BASE_URL + "/armories/characters/" + name + "/equipment",
@@ -93,7 +103,7 @@ public class LostarkService {
 
     // !내실 - 내실 수집품
     public List<CollectibleItem> getCollectibles(String name) {
-        RestTemplate restTemplate = new RestTemplate();
+        RestTemplate restTemplate = restTemplate();
         try {
             ResponseEntity<List<CollectibleItem>> response = restTemplate.exchange(
                 BASE_URL + "/armories/characters/" + name + "/collectibles",
@@ -108,7 +118,7 @@ public class LostarkService {
 
     // !원정대 - 원정대 캐릭터 목록
     public List<SiblingCharacter> getSiblings(String name) {
-        RestTemplate restTemplate = new RestTemplate();
+        RestTemplate restTemplate = restTemplate();
         try {
             ResponseEntity<List<SiblingCharacter>> response = restTemplate.exchange(
                 BASE_URL + "/characters/" + name + "/siblings",
@@ -123,7 +133,7 @@ public class LostarkService {
 
     // !각인 - 각인 정보
     public ArmoryEngraving getEngravings(String name) {
-        RestTemplate restTemplate = new RestTemplate();
+        RestTemplate restTemplate = restTemplate();
         try {
             ResponseEntity<ArmoryEngraving> response = restTemplate.exchange(
                 BASE_URL + "/armories/characters/" + name + "/engravings",
@@ -138,7 +148,7 @@ public class LostarkService {
 
     // !아크패시브 - 아크 패시브 노드
     public ArmoryArkPassive getArkPassive(String name) {
-        RestTemplate restTemplate = new RestTemplate();
+        RestTemplate restTemplate = restTemplate();
         try {
             ResponseEntity<ArmoryArkPassive> response = restTemplate.exchange(
                 BASE_URL + "/armories/characters/" + name + "/arkpassive",
@@ -153,7 +163,7 @@ public class LostarkService {
 
     // !아크그리드 - 아크 그리드
     public ArmoryArkGrid getArkGrid(String name) {
-        RestTemplate restTemplate = new RestTemplate();
+        RestTemplate restTemplate = restTemplate();
         try {
             ResponseEntity<ArmoryArkGrid> response = restTemplate.exchange(
                 BASE_URL + "/armories/characters/" + name + "/arkgrid",
@@ -164,5 +174,67 @@ public class LostarkService {
             log.error("LostArk 아크그리드 조회 오류: {}", e.getMessage());
             throw new CustomException(ErrorCode.LOSTARK_API_ERROR);
         }
+    }
+
+    // /정보 통합 조회 (프로필 + 아크패시브 + 각인 + 아크그리드) - 병렬 호출
+    public CharacterInfoResponse getCharacterInfo(String name) {
+        long total = System.currentTimeMillis();
+
+        CompletableFuture<ArmoryProfile> profileFuture =
+            CompletableFuture.supplyAsync(() -> {
+                long t = System.currentTimeMillis();
+                ArmoryProfile r = getCharacter(name);
+                log.info("[TIMING] profile: {}ms", System.currentTimeMillis() - t);
+                return r;
+            });
+
+        CompletableFuture<ArmoryArkPassive> arkPassiveFuture =
+            CompletableFuture.supplyAsync(() -> {
+                long t = System.currentTimeMillis();
+                try {
+                    ArmoryArkPassive r = getArkPassive(name);
+                    log.info("[TIMING] arkPassive: {}ms", System.currentTimeMillis() - t);
+                    return r;
+                } catch (Exception e) {
+                    log.warn("[TIMING] arkPassive 실패 {}ms: {}", System.currentTimeMillis() - t, e.getMessage());
+                    return null;
+                }
+            });
+
+        CompletableFuture<ArmoryEngraving> engravingFuture =
+            CompletableFuture.supplyAsync(() -> {
+                long t = System.currentTimeMillis();
+                try {
+                    ArmoryEngraving r = getEngravings(name);
+                    log.info("[TIMING] engraving: {}ms", System.currentTimeMillis() - t);
+                    return r;
+                } catch (Exception e) {
+                    log.warn("[TIMING] engraving 실패 {}ms: {}", System.currentTimeMillis() - t, e.getMessage());
+                    return null;
+                }
+            });
+
+        CompletableFuture<ArmoryArkGrid> arkGridFuture =
+            CompletableFuture.supplyAsync(() -> {
+                long t = System.currentTimeMillis();
+                try {
+                    ArmoryArkGrid r = getArkGrid(name);
+                    log.info("[TIMING] arkGrid: {}ms", System.currentTimeMillis() - t);
+                    return r;
+                } catch (Exception e) {
+                    log.warn("[TIMING] arkGrid 실패 {}ms: {}", System.currentTimeMillis() - t, e.getMessage());
+                    return null;
+                }
+            });
+
+        CompletableFuture.allOf(profileFuture, arkPassiveFuture, engravingFuture, arkGridFuture).join();
+        log.info("[TIMING] getCharacterInfo 전체: {}ms", System.currentTimeMillis() - total);
+
+        return new CharacterInfoResponse(
+            profileFuture.join(),
+            arkPassiveFuture.join(),
+            engravingFuture.join(),
+            arkGridFuture.join()
+        );
     }
 }

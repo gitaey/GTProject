@@ -6,23 +6,11 @@ import lombok.Getter;
 
 @Getter
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class EquipmentItem {
-
-    @JsonProperty("Slot")
-    private String slot;
+public class SkillRune {
 
     @JsonProperty("Name")
     private String name;
 
-    @JsonProperty("Icon")
-    private String icon;
-
     @JsonProperty("Grade")
     private String grade;
-
-    @JsonProperty("Type")
-    private String type;
-
-    @JsonProperty("Tooltip")
-    private String tooltip;
 }

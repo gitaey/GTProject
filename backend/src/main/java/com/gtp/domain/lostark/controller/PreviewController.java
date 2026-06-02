@@ -17,7 +17,7 @@ public class PreviewController {
             ArmoryProfile p = lostarkService.getCharacter(name);
             if (p == null) return errorHtml(name);
 
-            String title = p.getCharacterName() + " (" + p.getCharacterClassName() + ")";
+            String title = p.getCharacterName();
             String desc = p.getServerName()
                 + " | 아이템 " + p.getItemAvgLevel()
                 + " | 전투력 " + p.getCombatPower()
@@ -28,7 +28,7 @@ public class PreviewController {
                 + "<meta charset=\"UTF-8\">"
                 + "<meta property=\"og:type\" content=\"website\">"
                 + "<meta property=\"og:title\" content=\"" + escapeHtml(title) + "\">"
-                + "<meta property=\"og:description\" content=\"" + escapeHtml(desc) + "\">"
+                // + "<meta property=\"og:description\" content=\"" + escapeHtml(desc) + "\">"
                 + "<meta property=\"og:image\" content=\"" + escapeHtml(image) + "\">"
                 + "<meta property=\"og:image:width\" content=\"300\">"
                 + "<meta property=\"og:image:height\" content=\"400\">"
@@ -36,7 +36,7 @@ public class PreviewController {
                 + "</head><body>"
                 + "<img src=\"" + escapeHtml(image) + "\" style=\"max-width:300px\">"
                 + "<h2>" + escapeHtml(title) + "</h2>"
-                + "<p>" + escapeHtml(desc) + "</p>"
+                // + "<p>" + escapeHtml(desc) + "</p>"
                 + "</body></html>";
         } catch (Exception e) {
             return errorHtml(name);

@@ -1,0 +1,27 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Frontend (Next.js)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000,
+      "autoPort": true,
+      "cwd": "frontend"
+    },
+    {
+      "name": "Backend (Spring Boot)",
+      "runtimeExecutable": "mvnw",
+      "runtimeArgs": ["spring-boot:run"],
+      "port": 8080,
+      "cwd": "backend"
+    },
+    {
+      "name": "Kakaobot (Node.js)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": null,
+      "cwd": "kakaobot"
+    }
+  ]
+}

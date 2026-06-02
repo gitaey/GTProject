@@ -68,4 +68,10 @@ public class LostarkController {
     public ApiResponse<ArmoryArkGrid> getArkGrid(@PathVariable String name) {
         return ApiResponse.ok(lostarkService.getArkGrid(name));
     }
+
+    // /정보 통합 조회 (프로필 + 아크패시브 + 각인 + 아크그리드)
+    @GetMapping("/character/{name}/info")
+    public ApiResponse<CharacterInfoResponse> getCharacterInfo(@PathVariable String name) {
+        return ApiResponse.ok(lostarkService.getCharacterInfo(name));
+    }
 }

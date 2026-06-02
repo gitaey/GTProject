@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 
+import java.util.List;
+
 @Getter
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SkillItem {
@@ -22,4 +24,10 @@ public class SkillItem {
 
     @JsonProperty("IsAwakening")
     private boolean isAwakening;
+
+    @JsonProperty("Tripods")
+    private List<SkillTripod> tripods;
+
+    @JsonProperty("Rune")
+    private SkillRune rune;
 }
