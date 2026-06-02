@@ -20,7 +20,8 @@
       "Bash(java -XshowSettings:all)",
       "WebSearch",
       "Bash(chcp)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "WebFetch(domain:m.lopec.kr)"
     ]
   }
 }
