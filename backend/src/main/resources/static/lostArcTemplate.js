@@ -605,6 +605,26 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
             replier.reply(msg);
         } catch(e) { replier.reply("오류: " + e.message); }
 
+    // /일정 캐릭명
+    } else if (text.startsWith("/일정 ")) {
+        var name = text.substring(4).trim();
+        try {
+            var res = org.jsoup.Jsoup.connect(SERVER_URL + "/api/schedule/character/" + java.net.URLEncoder.encode(name, "UTF-8"))
+                .ignoreContentType(true).timeout(30000).get().body().text();
+            var json = JSON.parse(res);
+            if (!json.success || !json.data || json.data.length === 0) {
+                replier.reply(name + "의 이번 주 레이드 일정이 없습니다.");
+                return;
+            }
+            var msg = "【 " + name + " 이번주 일정 】\n";
+            msg += "───────────────\n";
+            for (var i = 0; i < json.data.length; i++) {
+                var item = json.data[i];
+                msg += "◆ " + item.raidName + "  " + item.schedule + "\n";
+            }
+            replier.reply(msg.trim());
+        } catch(e) { replier.reply("오류: " + e.message); }
+
     // /기빵봇
     } else if (text === "/기빵봇") {
         var help = "";
@@ -627,6 +647,9 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
         help += "◆ 아크\n";
         help += "  /아크패시브 캐릭명\n";
         help += "  /아크그리드 캐릭명\n";
+        help += "───────────────\n";
+        help += "◆ 길드\n";
+        help += "  /일정 캐릭명\n";
         help += "───────────────\n";
         help += "◆ 경매\n";
         help += "  /분배금 금액";

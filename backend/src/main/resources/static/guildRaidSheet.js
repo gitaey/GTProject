@@ -8,7 +8,7 @@ const RAID_CATEGORIES = [
 ];
 
 // ========== 상수 ==========
-const CHAR_COL_COUNT  = 6;  // 길드원, 닉네임, 클래스, 아이템레벨, 전투력, 로벡
+const CHAR_COL_COUNT  = 6;  // 길드원, 닉네임, 클래스, 아이템레벨, 전투력, 로펙
 const RAID_COL_SPAN   = 1;  // 레이드당 컬럼 수
 const HEADER_ROWS     = 3;  // 헤더 행 수
 const DATA_START_ROW  = 4;  // 데이터 시작 행
@@ -26,9 +26,18 @@ const TOTAL_SLOTS     = 8;
 const ROW_COMPLETE    = 49;
 
 // 완료 색상
+const COLOR_DEFAULT_TEXT   = '#ffffff';
 const COLOR_DONE_BG   = '#1a4a2a';
 const COLOR_DONE_TEXT = '#2ecc71';
 const GROUP_COLORS    = ['#333333', '#3d3d3d'];
+
+// 캐릭터 시트 컬럼 (1-based)
+const CHAR_GUILD_COL = 9;   // I열: 길드원
+const CHAR_NICK_COL  = 10;  // J열: 닉네임
+const CHAR_CLS_COL   = 11;  // K열: 클래스
+const CHAR_LV_COL    = 12;  // L열: 아이템레벨
+const CHAR_POW_COL   = 13;  // M열: 전투력
+const CHAR_ROB_COL   = 14;  // N열: 로펙
 
 // 레이드일정 시트에서 안전하게 읽을 실제 열 수 반환
 function getSchedCols(sheet) {
@@ -95,7 +104,7 @@ function setupRaidBoard() {
   });
 
   // ── Row 3: 컬럼명 헤더 ──
-  ['길드원', '닉네임', '클래스', '아이템레벨', '전투력', '로벡'].forEach((h, i) => {
+  ['길드원', '닉네임', '클래스', '아이템레벨', '전투력', '로펙'].forEach((h, i) => {
     boardSheet.getRange(3, i + 1).setValue(h);
   });
   allRaids.forEach((raid, i) => {
@@ -112,12 +121,8 @@ function setupRaidBoard() {
   const groupRanges = [];
 
   charData.forEach(char => {
-    const guild  = char[0];
-    const nick   = char[1];
-    const cls    = char[2];
-    const itemLv = char[3];
-    const power  = char[4];
-    const robic  = char[5];
+    const guild  = char[CHAR_GUILD_COL - 1];
+    const nick   = char[CHAR_NICK_COL  - 1];
 
     if (!nick) return;
 
@@ -133,11 +138,17 @@ function setupRaidBoard() {
       boardSheet.getRange(row, 1).setValue(guild);
     }
 
+    const nickCol = colToLetter(CHAR_NICK_COL);
+    const clsCol  = colToLetter(CHAR_CLS_COL);
+    const lvCol   = colToLetter(CHAR_LV_COL);
+    const powCol  = colToLetter(CHAR_POW_COL);
+    const robCol  = colToLetter(CHAR_ROB_COL);
+
     boardSheet.getRange(row, 2).setValue(nick);
-    boardSheet.getRange(row, 3).setValue(cls);
-    boardSheet.getRange(row, 4).setValue(itemLv);
-    boardSheet.getRange(row, 5).setValue(power);
-    boardSheet.getRange(row, 6).setValue(robic);
+    boardSheet.getRange(row, 3).setFormula(`=IFERROR(INDEX('캐릭터'!$${clsCol}:$${clsCol}, MATCH(B${row}, '캐릭터'!$${nickCol}:$${nickCol}, 0)), "")`);
+    boardSheet.getRange(row, 4).setFormula(`=IFERROR(INDEX('캐릭터'!$${lvCol}:$${lvCol},  MATCH(B${row}, '캐릭터'!$${nickCol}:$${nickCol}, 0)), "")`);
+    boardSheet.getRange(row, 5).setFormula(`=IFERROR(INDEX('캐릭터'!$${powCol}:$${powCol}, MATCH(B${row}, '캐릭터'!$${nickCol}:$${nickCol}, 0)), "")`);
+    boardSheet.getRange(row, 6).setFormula(`=IFERROR(INDEX('캐릭터'!$${robCol}:$${robCol}, MATCH(B${row}, '캐릭터'!$${nickCol}:$${nickCol}, 0)), "")`);
     row++;
   });
 
@@ -152,8 +163,9 @@ function setupRaidBoard() {
   const lastDataRow = row - 1;
 
   applyBoardStyling(boardSheet, totalCols, lastDataRow, groupRanges);
-
-  SpreadsheetApp.getUi().alert('✅ 레이드현황판 구조 생성 완료!');
+  applyRaidCellValidation(boardSheet, lastDataRow);
+  boardSheet.setFrozenRows(HEADER_ROWS);
+  setupLegend(boardSheet);
 }
 
 
@@ -226,30 +238,28 @@ function applyBoardStyling(boardSheet, totalCols, lastDataRow, groupRanges) {
 
   // 데이터 행
   if (lastDataRow >= DATA_START_ROW) {
-    groupRanges.forEach((group, idx) => {
-      const bg       = idx % 2 === 0 ? C.rowDark : C.rowLight;
-      const rowCount = group.end - group.start + 1;
+    const rowCount = lastDataRow - DATA_START_ROW + 1;
 
-      boardSheet.getRange(group.start, 1, rowCount, 1)
-        .setBackground(C.guildCol)
-        .setFontColor(C.white)
-        .setFontWeight('bold')
-        .setHorizontalAlignment('center')
-        .setVerticalAlignment('middle');
+    // 캐릭터 정보 열 (A~F) 단일 색상으로 통일
+    boardSheet.getRange(DATA_START_ROW, 1, rowCount, CHAR_COL_COUNT)
+      .setBackground(C.rowDark)
+      .setFontColor(C.white)
+      .setHorizontalAlignment('center')
+      .setVerticalAlignment('middle');
 
-      boardSheet.getRange(group.start, 2, rowCount, CHAR_COL_COUNT - 1)
-        .setBackground(bg)
-        .setFontColor(C.white)
-        .setHorizontalAlignment('center')
-        .setVerticalAlignment('middle');
-
-      boardSheet.getRange(group.start, CHAR_COL_COUNT + 1, rowCount, allRaids.length * RAID_COL_SPAN)
-        .setBackground(bg)
-        .setFontColor(C.white)
-        .setHorizontalAlignment('center')
-        .setVerticalAlignment('middle')
-        .setWrap(true);
+    // 길드원 열 (A) 굵게
+    groupRanges.forEach(group => {
+      boardSheet.getRange(group.start, 1, group.end - group.start + 1, 1)
+        .setFontWeight('bold');
     });
+
+    // 레이드 현황 열 흰색 배경, 글자는 흰색 유지
+    boardSheet.getRange(DATA_START_ROW, CHAR_COL_COUNT + 1, rowCount, allRaids.length * RAID_COL_SPAN)
+      .setBackground(C.white)
+      .setFontColor(C.white)
+      .setHorizontalAlignment('center')
+      .setVerticalAlignment('middle')
+      .setWrap(true);
   }
 
   // 열 너비
@@ -260,8 +270,10 @@ function applyBoardStyling(boardSheet, totalCols, lastDataRow, groupRanges) {
   boardSheet.setColumnWidth(5, 80);
   boardSheet.setColumnWidth(6, 80);
   for (let c = CHAR_COL_COUNT + 1; c <= totalCols; c++) {
-    boardSheet.setColumnWidth(c, 75);
+    boardSheet.setColumnWidth(c, 112); // G~N열
   }
+  boardSheet.setColumnWidth(16, 112); // P열
+  boardSheet.setColumnWidth(17, 112); // Q열
 
   // 전체 기본 테두리
   boardSheet.getRange(1, 1, lastDataRow, totalCols)
@@ -273,13 +285,19 @@ function applyBoardStyling(boardSheet, totalCols, lastDataRow, groupRanges) {
     .setBorder(true, true, true, true, null, null,
       '#888888', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
 
-  // 길드 그룹 간 구분 굵은 테두리 (그룹 시작행 위, 끝행 아래)
+  // 길드 그룹 간 구분선 (전체 열 동일하게 적용)
   groupRanges.forEach(group => {
-    // 그룹 전체 행에 굵은 외곽 테두리
-    boardSheet.getRange(group.start, 1, group.end - group.start + 1, totalCols)
-      .setBorder(true, true, true, true, null, null,
-        '#aaaaaa', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+    const rowCount = group.end - group.start + 1;
+    boardSheet.getRange(group.start, 1, rowCount, totalCols)
+      .setBorder(true, null, true, null, null, null,
+        '#aaaaaa', SpreadsheetApp.BorderStyle.SOLID_THICK);
   });
+
+  // 3행~4행 사이 테두리 완전 제거 (3행 하단 + 4행 상단)
+  boardSheet.getRange(HEADER_ROWS, 1, 1, totalCols)
+    .setBorder(null, null, false, null, null, null);
+  boardSheet.getRange(DATA_START_ROW, 1, 1, totalCols)
+    .setBorder(false, null, null, null, null, null);
 }
 
 
@@ -321,8 +339,8 @@ function updateRaidColumn(ss, col) {
   const nickColorMap = {};
   let groupIdx = -1, currentGuild = '';
   charData.forEach(char => {
-    if (char[0] && char[0] !== currentGuild) { currentGuild = char[0]; groupIdx++; }
-    if (char[1]) nickColorMap[char[1]] = GROUP_COLORS[groupIdx % 2];
+    if (char[CHAR_GUILD_COL - 1] && char[CHAR_GUILD_COL - 1] !== currentGuild) { currentGuild = char[CHAR_GUILD_COL - 1]; groupIdx++; }
+    if (char[CHAR_NICK_COL - 1]) nickColorMap[char[CHAR_NICK_COL - 1]] = GROUP_COLORS[groupIdx % 2];
   });
 
   for (let slot = 0; slot < TOTAL_SLOTS; slot++) {
@@ -344,6 +362,7 @@ function updateRaidColumn(ss, col) {
 
 // ============================================================
 // 레이드일정 → 현황판 자동 반영
+// 수동 입력값(✓ ✗ ► ❚❚ ★) 유지, 일정 데이터만 덮어씀
 // ============================================================
 function updateRaidBoard() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -355,78 +374,73 @@ function updateRaidBoard() {
   const boardData = boardSheet.getDataRange().getValues();
   const allRaids  = getAllRaids();
 
-  // 닉네임 → {boardRow, groupColor} 매핑
+  // 닉네임 → {boardRow} 매핑
   const nickInfoMap = {};
   const charData = charSheet.getDataRange().getValues();
   charData.shift();
-  let groupIdx = -1;
-  let currentGuild = '';
+  let groupIdx = -1, currentGuild = '';
   charData.forEach(char => {
-    const guild = char[0];
-    const nick  = char[1];
+    const guild = char[CHAR_GUILD_COL - 1];
+    const nick  = char[CHAR_NICK_COL  - 1];
     if (!nick) return;
-    if (guild && guild !== currentGuild) {
-      currentGuild = guild;
-      groupIdx++;
-    }
+    if (guild && guild !== currentGuild) { currentGuild = guild; groupIdx++; }
     nickInfoMap[nick] = { groupColor: GROUP_COLORS[groupIdx % 2] };
   });
-
   boardData.forEach((row, i) => {
     if (i < HEADER_ROWS) return;
-    if (row[1] && nickInfoMap[row[1]]) {
-      nickInfoMap[row[1]].boardRow = i + 1;
-    }
+    if (row[1] && nickInfoMap[row[1]]) nickInfoMap[row[1]].boardRow = i + 1;
   });
 
   // 레이드명 → 기준 열 번호 매핑
   const raidBaseColMap = {};
-  allRaids.forEach((raid, i) => {
-    raidBaseColMap[raid] = getRaidBaseCol(i);
-  });
+  allRaids.forEach((raid, i) => { raidBaseColMap[raid] = getRaidBaseCol(i); });
 
-  // 현황판 레이드 셀 초기화
+  // HYPERLINK 수식 셀만 초기화 (수동 입력값 유지)
   const lastRow = boardSheet.getLastRow();
-  const lastCol = boardSheet.getLastColumn();
-  if (lastRow >= DATA_START_ROW && lastCol > CHAR_COL_COUNT) {
-    const raidRange = boardSheet.getRange(
-      DATA_START_ROW, CHAR_COL_COUNT + 1,
-      lastRow - HEADER_ROWS, allRaids.length * RAID_COL_SPAN
-    );
-    raidRange.clearContent();
-    raidRange.setBackground('#333333');
-    raidRange.setFontColor('#ffffff');
-    raidRange.setFontWeight('normal');
+  if (lastRow >= DATA_START_ROW) {
+    const raidRange  = boardSheet.getRange(DATA_START_ROW, CHAR_COL_COUNT + 1, lastRow - HEADER_ROWS, allRaids.length * RAID_COL_SPAN);
+    const formulas   = raidRange.getFormulas();
+    const outValues  = raidRange.getValues();
+    const outBgs     = raidRange.getBackgrounds();
+
+    for (let r = 0; r < formulas.length; r++) {
+      for (let c = 0; c < formulas[r].length; c++) {
+        if (formulas[r][c].toUpperCase().startsWith('=HYPERLINK')) {
+          outValues[r][c] = '';
+          outBgs[r][c]    = '#ffffff';
+        }
+      }
+    }
+    raidRange.setValues(outValues);
+    raidRange.setBackgrounds(outBgs);
   }
 
   // 오늘 요일 계산
-  const DAY_NAMES  = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
-  const todayDay   = DAY_NAMES[new Date().getDay()];
+  const DAY_NAMES    = ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];
+  const todayDay     = DAY_NAMES[new Date().getDay()];
   const schedSheetId = scheduleSheet.getSheetId();
-
-  const COLOR_RAID_DEFAULT = '#1a3a5c'; // 일반 레이드 배경색
-  const COLOR_RAID_TODAY   = '#b8860b'; // 오늘 레이드 강조색
-
-  // 레이드일정 열 순회
+  const COLOR_RAID_DEFAULT = '#1a3a5c';
+  const COLOR_RAID_TODAY   = '#b8860b';
   const totalCols = schedData[0].length;
 
   for (let col = 0; col < totalCols; col++) {
     if (col + 1 < 8) continue;
-    const raidName = schedData[ROW_RAID - 1][col];
-    if (!raidName) continue;
+    const raidCell = schedData[ROW_RAID - 1][col];
+    if (!raidCell) continue;
+
+    // 다중 선택 지원: 콤마로 구분된 레이드명 분리
+    const raidNames = String(raidCell).split(',').map(r => r.trim()).filter(r => r);
 
     const day        = schedData[ROW_DAY      - 1][col] || '';
     const isComplete = schedData[ROW_COMPLETE - 1][col] === true;
     let   time       = schedData[ROW_TIME     - 1][col] || '';
-
-    if (time instanceof Date) {
-      time = Utilities.formatDate(time, Session.getScriptTimeZone(), 'HH:mm');
-    }
-
-    const baseCol = raidBaseColMap[raidName];
-    if (!baseCol) continue;
+    if (time instanceof Date) time = Utilities.formatDate(time, Session.getScriptTimeZone(), 'HH:mm');
 
     const isToday = !isComplete && day === todayDay;
+
+    for (const raidName of raidNames) {
+      const baseCol = raidBaseColMap[raidName];
+      if (!baseCol) continue;
 
     for (let slot = 0; slot < TOTAL_SLOTS; slot++) {
       const nickRowIdx = (NICK_START_ROW - 1) + (slot * ROWS_PER_SLOT);
@@ -438,10 +452,11 @@ function updateRaidBoard() {
       const info = nickInfoMap[nick];
       if (!info || !info.boardRow) continue;
 
-      const cell = boardSheet.getRange(info.boardRow, baseCol);
-
+      const cell      = boardSheet.getRange(info.boardRow, baseCol);
       const colLetter = colToLetter(col + 1);
       const link      = '#gid=' + schedSheetId + '&range=' + colLetter + ROW_DAY + ':' + colLetter + ROW_COMPLETE;
+
+      cell.setDataValidation(null);
 
       if (isComplete) {
         cell.setFormula('=HYPERLINK("' + link + '","✓ 완료")');
@@ -451,15 +466,12 @@ function updateRaidBoard() {
       } else {
         const text = day && time ? day + '(' + time + ')' : day || time || '';
         cell.setFormula('=HYPERLINK("' + link + '","' + text + '")');
-        if (isToday) {
-          cell.setBackground(COLOR_RAID_TODAY);
-          cell.setFontWeight('bold');
-        } else {
-          cell.setBackground(COLOR_RAID_DEFAULT);
-          cell.setFontWeight('normal');
-        }
+        cell.setBackground(isToday ? COLOR_RAID_TODAY : COLOR_RAID_DEFAULT);
+        cell.setFontColor(COLOR_DEFAULT_TEXT);
+        cell.setFontWeight(isToday ? 'bold' : 'normal');
       }
     }
+    } // end raidNames loop
   }
 }
 
@@ -473,94 +485,6 @@ function onEdit(e) {
     updateRaidBoard();
   }
 }
-
-
-// ============================================================
-// 레이드일정 H열 기준으로 전체 열 형식 동기화
-// H열 4~8행의 드롭다운/형식을 I열 이후 모든 열에 복사
-// ============================================================
-function syncColumnFormat(silent) {
-  const ss            = SpreadsheetApp.getActiveSpreadsheet();
-  const scheduleSheet = ss.getSheetByName('레이드일정');
-  const TEMPLATE_COL  = 8;  // H열
-  const HEADER_START  = 4;  // 4행 (요일)
-  const HEADER_END    = 8;  // 8행 (단계)
-  const lastCol       = getSchedCols(scheduleSheet);
-
-  if (lastCol <= TEMPLATE_COL) {
-    SpreadsheetApp.getUi().alert('⚠️ H열 이후 열이 없습니다.');
-    return;
-  }
-
-  // H열 4~8행을 템플릿으로 각 열에 복사
-  for (let row = HEADER_START; row <= HEADER_END; row++) {
-    const templateCell       = scheduleSheet.getRange(row, TEMPLATE_COL);
-    const templateValidation = templateCell.getDataValidation();
-    const templateFormat     = templateCell.getNumberFormat();
-    const templateBg         = templateCell.getBackground();
-    const templateFontColor  = templateCell.getFontColor();
-    const templateAlign      = templateCell.getHorizontalAlignment();
-
-    for (let col = TEMPLATE_COL + 1; col <= lastCol; col++) {
-      const cell = scheduleSheet.getRange(row, col);
-      if (templateValidation) cell.setDataValidation(templateValidation);
-      else                     cell.setDataValidation(null);
-      cell.setNumberFormat(templateFormat);
-      cell.setBackground(templateBg);
-      cell.setFontColor(templateFontColor);
-      cell.setHorizontalAlignment(templateAlign);
-    }
-  }
-
-  if (!silent) SpreadsheetApp.getUi().alert('✅ 열 형식 동기화 완료! (H열 기준 → ' + (lastCol - TEMPLATE_COL) + '개 열 적용)');
-}
-
-
-// ============================================================
-// 레이드일정 F열 라벨 세팅
-// 닉네임 / 클래스 / 아이템레벨 / 전투력 반복 고정
-// ============================================================
-function setupScheduleLabels(silent) {
-  const ss            = SpreadsheetApp.getActiveSpreadsheet();
-  const scheduleSheet = ss.getSheetByName('레이드일정');
-  const LABEL_COL     = 6; // F열
-  const rowLabels     = ['닉네임', '클래스', '아이템레벨', '전투력'];
-  const lastRow       = scheduleSheet.getLastRow();
-
-  // F열 전체 유효성 검사 제거 (드롭다운 완전 차단)
-  if (lastRow > 0) {
-    scheduleSheet.getRange(1, LABEL_COL, lastRow, 1).setDataValidation(null);
-  }
-
-  // F열 라벨 작성
-  for (let slot = 0; slot < TOTAL_SLOTS; slot++) {
-    const startRow = NICK_START_ROW + slot * ROWS_PER_SLOT;
-    rowLabels.forEach((label, i) => {
-      scheduleSheet.getRange(startRow + i, LABEL_COL).setValue(label);
-    });
-  }
-
-  if (!silent) SpreadsheetApp.getUi().alert('✅ 레이드일정 라벨 세팅 완료!');
-}
-
-
-// ============================================================
-// 완료 체크박스 삽입
-// ============================================================
-function insertCompletionCheckboxes(silent) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const scheduleSheet = ss.getSheetByName('레이드일정');
-  const schedCols = getSchedCols(scheduleSheet);
-  const schedData = scheduleSheet.getRange(1, 1, ROW_COMPLETE, schedCols).getValues();
-
-  for (let col = 0; col < schedCols; col++) {
-    if (col + 1 < 8) continue;
-    if (!schedData[ROW_RAID - 1][col]) continue;
-    scheduleSheet.getRange(ROW_COMPLETE, col + 1).insertCheckboxes();
-  }
-  if (!silent) SpreadsheetApp.getUi().alert('✅ 완료 체크박스 삽입 완료!');
-}
-
 
 // ============================================================
 // 주차 리셋
@@ -635,160 +559,129 @@ function lopec(characterName) {
   return match ? match[1].trim() : '';
 }
 
-
 // ============================================================
-// 캐릭터 정보 통합 조회
-// - 직업, 레벨, 전투력: 로스트아크 공식 사이트 (Cheerio)
-// - 달성 최고 점수: 로펙 크롤링
-// return: { job, level, combatPower, specPoint }
+// 레이드현황판 P4 범례 생성
 // ============================================================
-function getRaidCharacterInfo(nickname) {
-  if (!nickname) return null;
+function setupLegend(boardSheet) {
+  const COL_S = 16; // P열
+  const COL_D = 17; // Q열
+  const START = 4;  // 4행부터
 
-  var url = 'https://lostark.game.onstove.com/Profile/Character/' + encodeURIComponent(nickname);
-  var response = UrlFetchApp.fetch(url, { method: 'GET', muteHttpExceptions: true, 'Content-Type': 'text/html' });
-  var html = response.getContentText('UTF-8');
-  var $ = Cheerio.load(html);
+  const legends = [
+    { symbol: '✓',  bg: '#1a4a2a', text: '#2ecc71', desc: '완료' },
+    { symbol: '✗',  bg: '#4a1a1a', text: '#e74c3c', desc: '미진행/유기' },
+    { symbol: '►',  bg: '#1a2a4a', text: '#3498db', desc: '진행중' },
+    { symbol: '❚❚', bg: '#2a1a4a', text: '#9b59b6', desc: '일정 대기중' },
+    { symbol: '★',  bg: '#4a3800', text: '#f1c40f', desc: '오늘 할 예정' },
+  ];
 
-  var job   = $('#lostark-wrapper > div > main > div > div.profile-character-infoWrap > div.profile-character-info > span.profile-character-info__img > img').attr('alt') || '';
-  var level = $('#lostark-wrapper > div > main > div > div.profile-ingame > div.profile-info > div.level-info2 > div.level-info2__expedition > span:nth-child(2)').text();
-  var power = $('#lostark-wrapper > div > main > div > div.profile-ingame > div.profile-info > div.level-info2 > div.level-info2__item > span:nth-child(2)').text();
+  // 범례 영역 유효성 검사 먼저 제거
+  boardSheet.getRange(START, COL_S, 2 + legends.length, 2).setDataValidation(null);
 
-  // 레벨 숫자만 추출
-  level = level.replace(/[^0-9]/g, '');
-  level = level.substring(0, level.length - 2);
+  // P3~Q3 하단 테두리 제거, P4~Q4 상단 테두리 제거
+  boardSheet.getRange(3, COL_S, 1, 2).setBorder(null, null, false, null, null, null);
+  boardSheet.getRange(START, COL_S, 1, 2).setBorder(false, null, null, null, null, null);
 
-  return {
-    job:        job,
-    level:      level,
-    combatPower: power,
-    specPoint:  lopec(nickname)
-  };
-}
+  // 헤더 (P4:Q4 병합) - 채우기 없음
+  boardSheet.getRange(START, COL_S, 1, 2).merge()
+    .setValue('더블 클릭하여 상태 변경 하시면 됩니다.')
+    .setBackground(null)
+    .setFontColor('#333333')
+    .setFontWeight('bold')
+    .setFontSize(9)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle')
+    .setBorder(null, true, true, true, null, null, '#aaaaaa', SpreadsheetApp.BorderStyle.SOLID);
 
+  // 컬럼명 (P5: 상태, Q5: 설명)
+  boardSheet.getRange(START + 1, COL_S)
+    .setValue('상태')
+    .setBackground('#dddddd')
+    .setFontColor('#333333')
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center')
+    .setBorder(true, true, true, true, null, null, '#aaaaaa', SpreadsheetApp.BorderStyle.SOLID);
+  boardSheet.getRange(START + 1, COL_D)
+    .setValue('설명')
+    .setBackground('#dddddd')
+    .setFontColor('#333333')
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center')
+    .setBorder(true, true, true, true, null, null, '#aaaaaa', SpreadsheetApp.BorderStyle.SOLID);
 
-// ============================================================
-// 캐릭터 시트 전체 정보 갱신
-// 컬럼: A=길드원, B=닉네임, C=직업, D=레벨, E=전투력, F=달성 최고 점수(로벡)
-// ============================================================
-function updateLopecStats() {
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('캐릭터');
-  const data  = sheet.getDataRange().getValues();
+  // 각 상태 행
+  legends.forEach((legend, i) => {
+    const row = START + 2 + i;
 
-  for (let i = 1; i < data.length; i++) {
-    const nick = data[i][1]; // B열: 닉네임
-    if (!nick) continue;
+    boardSheet.getRange(row, COL_S)
+      .setValue(legend.symbol)
+      .setBackground(legend.bg)
+      .setFontColor(legend.text)
+      .setFontWeight('bold')
+      .setFontSize(11)
+      .setHorizontalAlignment('center')
+      .setVerticalAlignment('middle')
+      .setBorder(true, true, true, true, null, null, '#aaaaaa', SpreadsheetApp.BorderStyle.SOLID);
 
-    Utilities.sleep(300); // 요청 간격
-
-    const info = getRaidCharacterInfo(nick);
-    if (!info) continue;
-
-    if (info.job)         sheet.getRange(i + 1, 3).setValue(info.job);         // C열: 직업
-    if (info.level)       sheet.getRange(i + 1, 4).setValue(info.level);       // D열: 레벨
-    if (info.combatPower) sheet.getRange(i + 1, 5).setValue(info.combatPower); // E열: 전투력
-    if (info.specPoint)   sheet.getRange(i + 1, 6).setValue(info.specPoint);   // F열: 달성 최고 점수
-  }
-
-  // 마지막 갱신 시간 기록 (H1셀)
-  sheet.getRange(1, 8).setValue(
-    '마지막 갱신: ' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'MM/dd HH:mm:ss')
-  );
-}
-
-
-// ============================================================
-// 레이드일정 요일 드롭다운 설정 (ROW_DAY 행, H열 이후)
-// ============================================================
-function setupDayValidation(silent) {
-  const ss            = SpreadsheetApp.getActiveSpreadsheet();
-  const scheduleSheet = ss.getSheetByName('레이드일정');
-  const days          = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
-
-  const rule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(days, false)
-    .setAllowInvalid(false)
-    .build();
-
-  const schedCols = getSchedCols(scheduleSheet);
-  const schedData = scheduleSheet.getRange(1, 1, ROW_RAID, schedCols).getValues();
-
-  for (let col = 0; col < schedCols; col++) {
-    if (col + 1 < 8) continue; // H열 이전 스킵
-    if (!schedData[ROW_RAID - 1][col]) continue;
-    scheduleSheet.getRange(ROW_DAY, col + 1).setDataValidation(rule);
-  }
-
-  if (!silent) SpreadsheetApp.getUi().alert('✅ 요일 드롭다운 설정 완료!');
-}
-
-
-// ============================================================
-// 레이드일정 닉네임 셀 드롭다운 유효성 검사 설정
-// 캐릭터 시트 B열의 닉네임만 입력 가능하도록 제한
-// ============================================================
-function setupNicknameValidation(silent) {
-  const ss            = SpreadsheetApp.getActiveSpreadsheet();
-  const scheduleSheet = ss.getSheetByName('레이드일정');
-  const charSheet     = ss.getSheetByName('캐릭터');
-
-  // 캐릭터 시트에서 닉네임 목록 수집 (B열, 헤더 제외)
-  const charData  = charSheet.getDataRange().getValues();
-  const nicknames = charData.slice(1).map(row => row[1]).filter(nick => nick !== '');
-
-  if (nicknames.length === 0) {
-    if (!silent) SpreadsheetApp.getUi().alert('⚠️ 캐릭터 시트에 닉네임이 없습니다.');
-    return;
-  }
-
-  // 드롭다운 유효성 검사 규칙 생성
-  const rule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(nicknames, false)
-    .setAllowInvalid(false)
-    .build();
-
-  // 레이드일정 열 순회 - 레이드명이 있는 컬럼의 닉네임 행에만 적용
-  const schedCols = getSchedCols(scheduleSheet);
-  const schedData = scheduleSheet.getRange(1, 1, ROW_RAID, schedCols).getValues();
-
-  for (let col = 0; col < schedCols; col++) {
-    if (col + 1 < 8) continue; // H열 이전 스킵
-    if (!schedData[ROW_RAID - 1][col]) continue;
-
-    for (let slot = 0; slot < TOTAL_SLOTS; slot++) {
-      const nickRow = NICK_START_ROW + slot * ROWS_PER_SLOT;
-      scheduleSheet.getRange(nickRow, col + 1).setDataValidation(rule);
-    }
-  }
-
-  if (!silent) SpreadsheetApp.getUi().alert('✅ 닉네임 드롭다운 설정 완료! (' + nicknames.length + '명)');
-}
-
-
-// ============================================================
-// 자동 갱신 트리거 (5분마다)
-// ============================================================
-function createAutoUpdateTrigger() {
-  deleteAutoUpdateTrigger(); // 중복 방지
-
-  ScriptApp.newTrigger('updateLopecStats')
-    .timeBased()
-    .everyMinutes(5)
-    .create();
-
-  SpreadsheetApp.getUi().alert('✅ 5분마다 자동 갱신이 설정되었습니다.');
-}
-
-function deleteAutoUpdateTrigger() {
-  ScriptApp.getProjectTriggers().forEach(trigger => {
-    if (trigger.getHandlerFunction() === 'updateLopecStats') {
-      ScriptApp.deleteTrigger(trigger);
-    }
+    boardSheet.getRange(row, COL_D)
+      .setValue(legend.desc)
+      .setBackground('#ffffff')
+      .setFontColor('#333333')
+      .setHorizontalAlignment('left')
+      .setVerticalAlignment('middle')
+      .setBorder(true, true, true, true, null, null, '#aaaaaa', SpreadsheetApp.BorderStyle.SOLID);
   });
-  SpreadsheetApp.getUi().alert('⏹️ 자동 갱신이 중지되었습니다.');
+
+  // 열 너비
+  boardSheet.setColumnWidth(COL_S, 112);
+  boardSheet.setColumnWidth(COL_D, 112);
 }
 
+
+// ============================================================
+// 레이드 셀 드롭다운 + 조건부 서식 적용
+// ============================================================
+function applyRaidCellValidation(boardSheet, lastDataRow) {
+  if (lastDataRow < DATA_START_ROW) return;
+
+  const allRaids     = getAllRaids();
+  const raidStartCol = CHAR_COL_COUNT + 1;
+  const raidColCount = allRaids.length * RAID_COL_SPAN;
+  const rowCount     = lastDataRow - DATA_START_ROW + 1;
+
+  const raidRange = boardSheet.getRange(DATA_START_ROW, raidStartCol, rowCount, raidColCount);
+
+  // ── 드롭다운 유효성 검사 ──
+  const statuses = ['✓', '✗', '►', '❚❚', '★'];
+  const rule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(statuses, false) // false = 드롭다운 화살표 숨김
+    .setAllowInvalid(true)
+    .build();
+  raidRange.setDataValidation(rule);
+
+  // ── 조건부 서식 (값에 따라 셀 색상 변경) ──
+  const conditions = [
+    { value: '✓',  bg: '#1a4a2a', text: '#2ecc71' }, // 완료        - 진한 초록
+    { value: '✗',  bg: '#4a1a1a', text: '#e74c3c' }, // 미진행/유기  - 진한 빨강
+    { value: '►',  bg: '#1a2a4a', text: '#3498db' }, // 진행중       - 진한 파랑
+    { value: '❚❚', bg: '#2a1a4a', text: '#9b59b6' }, // 일정 대기중  - 진한 보라
+    { value: '★',  bg: '#4a3800', text: '#f1c40f' }, // 오늘 할 예정 - 진한 노랑
+  ];
+
+  const existingRules = boardSheet.getConditionalFormatRules();
+
+  const newRules = conditions.map(c =>
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo(c.value)
+      .setBackground(c.bg)
+      .setFontColor(c.text)
+      .setBold(true)
+      .setRanges([raidRange])
+      .build()
+  );
+
+  boardSheet.setConditionalFormatRules([...existingRules, ...newRules]);
+}
 
 // ============================================================
 // 상단 메뉴
@@ -800,9 +693,5 @@ function onOpen() {
     .addItem('현황판 수동 갱신', 'updateRaidBoard')
     .addSeparator()
     .addItem('🔄 주차 리셋', 'resetWeek')
-    .addSeparator()
-    .addItem('📡 로펙 정보 수동 갱신', 'updateLopecStats')
-    .addItem('⏱️ 자동 갱신 시작 (5분)', 'createAutoUpdateTrigger')
-    .addItem('⏹️ 자동 갱신 중지', 'deleteAutoUpdateTrigger')
     .addToUi();
 }
