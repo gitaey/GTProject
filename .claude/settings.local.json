@@ -22,7 +22,11 @@
       "Bash(chcp)",
       "Bash(git add *)",
       "WebFetch(domain:m.lopec.kr)",
-      "Bash(git -C \"D:/git/GTProject\" log --oneline -5)"
+      "Bash(git -C \"D:/git/GTProject\" log --oneline -5)",
+      "Bash(git -C \"D:/git/GTProject\" for-each-ref --format=\"delete %\\(refname\\)\" refs/original/)",
+      "Bash(git -C \"D:/git/GTProject\" update-ref --stdin)",
+      "Bash(git -C \"D:/git/GTProject\" reflog expire --expire=now --all)",
+      "Bash(git -C \"D:/git/GTProject\" gc --prune=now --aggressive)"
     ]
   }
 }

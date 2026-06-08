@@ -1,3 +1,6 @@
+// ========== 로스트아크 Open API 설정 ==========
+const LOSTARK_API_KEY = 'bearer YOUR_API_KEY_HERE'; // API 키 입력
+
 // ========== 레이드 카테고리 설정 ==========
 const RAID_CATEGORIES = [
   { category: '익스',     raids: ['익스트림'] },
@@ -29,7 +32,6 @@ const ROW_COMPLETE    = 49;
 const COLOR_DEFAULT_TEXT   = '#ffffff';
 const COLOR_DONE_BG   = '#1a4a2a';
 const COLOR_DONE_TEXT = '#2ecc71';
-const GROUP_COLORS    = ['#333333', '#3d3d3d'];
 
 // 캐릭터 시트 컬럼 (1-based)
 const CHAR_GUILD_COL = 9;   // I열: 길드원
@@ -302,106 +304,34 @@ function applyBoardStyling(boardSheet, totalCols, lastDataRow, groupRanges) {
 
 
 // ============================================================
-// 현황판 단일 열만 업데이트 (체크박스 전용 - 빠른 처리)
-// ============================================================
-function updateRaidColumn(ss, col) {
-  const scheduleSheet = ss.getSheetByName('레이드일정');
-  const boardSheet    = ss.getSheetByName('레이드현황판');
-  const charSheet     = ss.getSheetByName('캐릭터');
-  const allRaids      = getAllRaids();
-
-  const schedData = scheduleSheet.getRange(1, col, ROW_COMPLETE, 1).getValues();
-  const raidName  = schedData[ROW_RAID - 1][0];
-  if (!raidName) return;
-
-  const raidIndex = allRaids.indexOf(raidName);
-  if (raidIndex === -1) return;
-  const baseCol = getRaidBaseCol(raidIndex);
-
-  const isComplete = schedData[ROW_COMPLETE - 1][0] === true;
-  const day        = schedData[ROW_DAY  - 1][0] || '';
-  const difficulty = schedData[ROW_DIFFICULTY - 1][0] || '';
-  let   time       = schedData[ROW_TIME - 1][0] || '';
-  if (time instanceof Date) {
-    time = Utilities.formatDate(time, Session.getScriptTimeZone(), 'HH:mm');
-  }
-
-  // 닉네임 → 현황판 행 매핑
-  const boardData = boardSheet.getDataRange().getValues();
-  const nickRowMap = {};
-  boardData.forEach((row, i) => {
-    if (i >= HEADER_ROWS && row[1]) nickRowMap[row[1]] = i + 1;
-  });
-
-  // 캐릭터 그룹 색상 매핑
-  const charData = charSheet.getDataRange().getValues();
-  charData.shift();
-  const nickColorMap = {};
-  let groupIdx = -1, currentGuild = '';
-  charData.forEach(char => {
-    if (char[CHAR_GUILD_COL - 1] && char[CHAR_GUILD_COL - 1] !== currentGuild) { currentGuild = char[CHAR_GUILD_COL - 1]; groupIdx++; }
-    if (char[CHAR_NICK_COL - 1]) nickColorMap[char[CHAR_NICK_COL - 1]] = GROUP_COLORS[groupIdx % 2];
-  });
-
-  for (let slot = 0; slot < TOTAL_SLOTS; slot++) {
-    const nick = schedData[(NICK_START_ROW - 1) + slot * ROWS_PER_SLOT][0];
-    if (!nick) continue;
-    const boardRow = nickRowMap[nick];
-    if (!boardRow) continue;
-
-    const cell = boardSheet.getRange(boardRow, baseCol);
-    if (isComplete) {
-      cell.setValue('✓ 완료').setBackground(COLOR_DONE_BG).setFontColor(COLOR_DONE_TEXT).setFontWeight('bold');
-    } else {
-      const text = [difficulty, day, time].filter(v => v).join('\n');
-      cell.setValue(text).setBackground(nickColorMap[nick] || GROUP_COLORS[0]).setFontColor('#ffffff').setFontWeight('normal');
-    }
-  }
-}
-
-
-// ============================================================
-// 레이드일정 → 현황판 자동 반영
+// 레이드일정 → 현황판 갱신
 // 수동 입력값(✓ ✗ ► ❚❚ ★) 유지, 일정 데이터만 덮어씀
 // ============================================================
 function updateRaidBoard() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss            = SpreadsheetApp.getActiveSpreadsheet();
   const scheduleSheet = ss.getSheetByName('레이드일정');
   const boardSheet    = ss.getSheetByName('레이드현황판');
-  const charSheet     = ss.getSheetByName('캐릭터');
+  const allRaids      = getAllRaids();
 
   const schedData = scheduleSheet.getRange(1, 1, scheduleSheet.getLastRow() || ROW_COMPLETE, getSchedCols(scheduleSheet)).getValues();
-  const boardData = boardSheet.getDataRange().getValues();
-  const allRaids  = getAllRaids();
 
-  // 닉네임 → {boardRow} 매핑
-  const nickInfoMap = {};
-  const charData = charSheet.getDataRange().getValues();
-  charData.shift();
-  let groupIdx = -1, currentGuild = '';
-  charData.forEach(char => {
-    const guild = char[CHAR_GUILD_COL - 1];
-    const nick  = char[CHAR_NICK_COL  - 1];
-    if (!nick) return;
-    if (guild && guild !== currentGuild) { currentGuild = guild; groupIdx++; }
-    nickInfoMap[nick] = { groupColor: GROUP_COLORS[groupIdx % 2] };
-  });
-  boardData.forEach((row, i) => {
-    if (i < HEADER_ROWS) return;
-    if (row[1] && nickInfoMap[row[1]]) nickInfoMap[row[1]].boardRow = i + 1;
+  // 현황판 닉네임 → 행 번호 맵
+  const nickRowMap = {};
+  boardSheet.getDataRange().getValues().forEach((row, i) => {
+    if (i >= HEADER_ROWS && row[1]) nickRowMap[row[1]] = i + 1;
   });
 
-  // 레이드명 → 기준 열 번호 매핑
+  // 레이드명 → 기준 열 번호 맵
   const raidBaseColMap = {};
   allRaids.forEach((raid, i) => { raidBaseColMap[raid] = getRaidBaseCol(i); });
 
-  // HYPERLINK 수식 셀만 초기화 (수동 입력값 유지)
+  // HYPERLINK 수식 셀 초기화 (수동 입력값 유지)
   const lastRow = boardSheet.getLastRow();
   if (lastRow >= DATA_START_ROW) {
-    const raidRange  = boardSheet.getRange(DATA_START_ROW, CHAR_COL_COUNT + 1, lastRow - HEADER_ROWS, allRaids.length * RAID_COL_SPAN);
-    const formulas   = raidRange.getFormulas();
-    const outValues  = raidRange.getValues();
-    const outBgs     = raidRange.getBackgrounds();
+    const raidRange = boardSheet.getRange(DATA_START_ROW, CHAR_COL_COUNT + 1, lastRow - HEADER_ROWS, allRaids.length * RAID_COL_SPAN);
+    const formulas  = raidRange.getFormulas();
+    const outValues = raidRange.getValues();
+    const outBgs    = raidRange.getBackgrounds();
 
     for (let r = 0; r < formulas.length; r++) {
       for (let c = 0; c < formulas[r].length; c++) {
@@ -413,65 +343,67 @@ function updateRaidBoard() {
     }
     raidRange.setValues(outValues);
     raidRange.setBackgrounds(outBgs);
+
+    // 드롭다운 validation 복구
+    raidRange.setDataValidation(
+      SpreadsheetApp.newDataValidation()
+        .requireValueInList(['✓', '✗', '►', '❚❚', '★'], false)
+        .setAllowInvalid(true)
+        .build()
+    );
   }
 
-  // 오늘 요일 계산
   const DAY_NAMES    = ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];
   const todayDay     = DAY_NAMES[new Date().getDay()];
   const schedSheetId = scheduleSheet.getSheetId();
   const COLOR_RAID_DEFAULT = '#1a3a5c';
   const COLOR_RAID_TODAY   = '#b8860b';
-  const totalCols = schedData[0].length;
+  const totalCols    = schedData[0].length;
 
   for (let col = 0; col < totalCols; col++) {
     if (col + 1 < 8) continue;
     const raidCell = schedData[ROW_RAID - 1][col];
     if (!raidCell) continue;
 
-    // 다중 선택 지원: 콤마로 구분된 레이드명 분리
-    const raidNames = String(raidCell).split(',').map(r => r.trim()).filter(r => r);
-
+    const raidNames  = String(raidCell).split(',').map(r => r.trim()).filter(r => r);
     const day        = schedData[ROW_DAY      - 1][col] || '';
     const isComplete = schedData[ROW_COMPLETE - 1][col] === true;
     let   time       = schedData[ROW_TIME     - 1][col] || '';
     if (time instanceof Date) time = Utilities.formatDate(time, Session.getScriptTimeZone(), 'HH:mm');
+    const isToday    = !isComplete && day === todayDay;
 
-    const isToday = !isComplete && day === todayDay;
+    const colLetter = colToLetter(col + 1);
+    const link      = '#gid=' + schedSheetId + '&range=' + colLetter + ROW_DAY + ':' + colLetter + ROW_COMPLETE;
 
     for (const raidName of raidNames) {
       const baseCol = raidBaseColMap[raidName];
       if (!baseCol) continue;
 
-    for (let slot = 0; slot < TOTAL_SLOTS; slot++) {
-      const nickRowIdx = (NICK_START_ROW - 1) + (slot * ROWS_PER_SLOT);
-      if (nickRowIdx >= schedData.length) break;
+      for (let slot = 0; slot < TOTAL_SLOTS; slot++) {
+        const nickRowIdx = (NICK_START_ROW - 1) + slot * ROWS_PER_SLOT;
+        if (nickRowIdx >= schedData.length) break;
 
-      const nick = schedData[nickRowIdx][col];
-      if (!nick) continue;
+        const nick     = schedData[nickRowIdx][col];
+        const boardRow = nick ? nickRowMap[nick] : null;
+        if (!boardRow) continue;
 
-      const info = nickInfoMap[nick];
-      if (!info || !info.boardRow) continue;
+        const cell = boardSheet.getRange(boardRow, baseCol);
+        cell.setDataValidation(null);
 
-      const cell      = boardSheet.getRange(info.boardRow, baseCol);
-      const colLetter = colToLetter(col + 1);
-      const link      = '#gid=' + schedSheetId + '&range=' + colLetter + ROW_DAY + ':' + colLetter + ROW_COMPLETE;
-
-      cell.setDataValidation(null);
-
-      if (isComplete) {
-        cell.setFormula('=HYPERLINK("' + link + '","✓ 완료")');
-        cell.setBackground(COLOR_DONE_BG);
-        cell.setFontColor(COLOR_DONE_TEXT);
-        cell.setFontWeight('bold');
-      } else {
-        const text = day && time ? day + '(' + time + ')' : day || time || '';
-        cell.setFormula('=HYPERLINK("' + link + '","' + text + '")');
-        cell.setBackground(isToday ? COLOR_RAID_TODAY : COLOR_RAID_DEFAULT);
-        cell.setFontColor(COLOR_DEFAULT_TEXT);
-        cell.setFontWeight(isToday ? 'bold' : 'normal');
+        if (isComplete) {
+          cell.setFormula('=HYPERLINK("' + link + '","✓ 완료")');
+          cell.setBackground(COLOR_DONE_BG);
+          cell.setFontColor(COLOR_DONE_TEXT);
+          cell.setFontWeight('bold');
+        } else {
+          const text = day && time ? day + '(' + time + ')' : day || time || '';
+          cell.setFormula('=HYPERLINK("' + link + '","' + text + '")');
+          cell.setBackground(isToday ? COLOR_RAID_TODAY : COLOR_RAID_DEFAULT);
+          cell.setFontColor(COLOR_DEFAULT_TEXT);
+          cell.setFontWeight(isToday ? 'bold' : 'normal');
+        }
       }
     }
-    } // end raidNames loop
   }
 }
 
@@ -481,34 +413,37 @@ function updateRaidBoard() {
 // ============================================================
 function onEdit(e) {
   if (!e) return;
-  if (e.source.getActiveSheet().getName() === '레이드일정') {
-    updateRaidBoard();
-  }
+  if (e.source.getActiveSheet().getName() !== '레이드일정') return;
+  updateRaidBoard();
 }
 
 // ============================================================
-// 주차 리셋
+// 주차 리셋 - 실제 로직
 // ============================================================
-function resetWeek() {
-  const ui = SpreadsheetApp.getUi();
-  const answer = ui.alert(
-    '⚠️ 주차 리셋',
-    '레이드일정과 현황판의 일정을 모두 초기화합니다.\n계속하시겠습니까?',
-    ui.ButtonSet.YES_NO
-  );
-  if (answer !== ui.Button.YES) return;
-
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+function _doResetWeek() {
+  const ss       = SpreadsheetApp.getActiveSpreadsheet();
   const allRaids = getAllRaids();
 
-  // 현황판 레이드 셀 초기화
+  // 현황판 레이드 셀 초기화 (내용 + 배경색 + validation + 조건부서식 복구)
   const boardSheet = ss.getSheetByName('레이드현황판');
-  const lastRow = boardSheet.getLastRow();
+  const lastRow    = boardSheet.getLastRow();
   if (lastRow >= DATA_START_ROW) {
-    boardSheet.getRange(
-      DATA_START_ROW, CHAR_COL_COUNT + 1,
-      lastRow - HEADER_ROWS, allRaids.length * RAID_COL_SPAN
-    ).clearContent();
+    const rowCount  = lastRow - HEADER_ROWS;
+    const raidRange = boardSheet.getRange(DATA_START_ROW, CHAR_COL_COUNT + 1, rowCount, allRaids.length * RAID_COL_SPAN);
+
+    raidRange.clearContent();
+    raidRange.setBackground('#ffffff');
+    raidRange.setFontColor('#ffffff');
+    raidRange.setFontWeight('normal');
+
+    raidRange.setDataValidation(
+      SpreadsheetApp.newDataValidation()
+        .requireValueInList(['✓', '✗', '►', '❚❚', '★'], false)
+        .setAllowInvalid(true)
+        .build()
+    );
+
+    applyRaidCellValidation(boardSheet, lastRow);
   }
 
   // 레이드일정 H열 이후 초기화 (클래스/아이템레벨/전투력 제외)
@@ -517,24 +452,42 @@ function resetWeek() {
   if (lastCol >= 8) {
     const colCount = lastCol - 7;
 
-    // 헤더 행 (요일/시간/숙련도/레이드/단계)
     scheduleSheet.getRange(ROW_DAY,        8, 1, colCount).clearContent();
     scheduleSheet.getRange(ROW_TIME,       8, 1, colCount).clearContent();
     scheduleSheet.getRange(ROW_SKILL,      8, 1, colCount).clearContent();
     scheduleSheet.getRange(ROW_RAID,       8, 1, colCount).clearContent();
     scheduleSheet.getRange(ROW_DIFFICULTY, 8, 1, colCount).clearContent();
 
-    // 닉네임 행만 (클래스/아이템레벨/전투력은 유지)
     for (let slot = 0; slot < TOTAL_SLOTS; slot++) {
       const nickRow = NICK_START_ROW + slot * ROWS_PER_SLOT;
       scheduleSheet.getRange(nickRow, 8, 1, colCount).clearContent();
     }
 
-    // 완료 체크박스 리셋
     scheduleSheet.getRange(ROW_COMPLETE, 8, 1, colCount).setValue(false);
   }
+}
 
+// ============================================================
+// 주차 리셋 - 메뉴용 (확인창 있음)
+// ============================================================
+function resetWeek() {
+  const ui     = SpreadsheetApp.getUi();
+  const answer = ui.alert(
+    '⚠️ 주차 리셋',
+    '레이드일정과 현황판의 일정을 모두 초기화합니다.\n계속하시겠습니까?',
+    ui.ButtonSet.YES_NO
+  );
+  if (answer !== ui.Button.YES) return;
+
+  _doResetWeek();
   ui.alert('✅ 주차 리셋 완료!');
+}
+
+// ============================================================
+// 주차 리셋 - 트리거용 (확인창 없음)
+// ============================================================
+function resetWeekAuto() {
+  _doResetWeek();
 }
 
 
@@ -684,6 +637,80 @@ function applyRaidCellValidation(boardSheet, lastDataRow) {
 }
 
 // ============================================================
+// 캐릭터 정보 갱신 - 공통 로직
+// ============================================================
+function _doUpdateCharacterStats() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('캐릭터');
+  const data  = sheet.getDataRange().getValues();
+
+  // 닉네임 있는 행 수집 (1행 헤더 제외)
+  const targets = [];
+  for (let i = 1; i < data.length; i++) {
+    const nick = data[i][CHAR_NICK_COL - 1];
+    if (!nick) continue;
+    targets.push({ rowIndex: i, nick });
+  }
+  if (targets.length === 0) return 0;
+
+  // fetchAll로 병렬 요청
+  const requests = targets.map(t => ({
+    url    : 'https://developer-lostark.game.onstove.com/armories/characters/'
+             + encodeURIComponent(t.nick) + '/profiles',
+    headers: { 'Authorization': LOSTARK_API_KEY },
+    muteHttpExceptions: true
+  }));
+
+  const responses = UrlFetchApp.fetchAll(requests);
+
+  responses.forEach((res, idx) => {
+    if (res.getResponseCode() !== 200) return;
+    try {
+      const json = JSON.parse(res.getContentText());
+      const row  = targets[idx].rowIndex + 1;
+      sheet.getRange(row, CHAR_CLS_COL).setValue(json.CharacterClassName || '');
+      sheet.getRange(row, CHAR_LV_COL).setValue(json.ItemAvgLevel        || '');
+      sheet.getRange(row, CHAR_POW_COL).setValue(json.CombatPower        || '');
+    } catch(e) {
+      Logger.log('캐릭터 파싱 오류: ' + targets[idx].nick + ' / ' + e.message);
+    }
+  });
+
+  return targets.length;
+}
+
+// ============================================================
+// 캐릭터 정보 갱신 - 수동 버튼용 (완료 알림 있음)
+// ============================================================
+function updateCharacterStats() {
+  const count = _doUpdateCharacterStats();
+  SpreadsheetApp.getUi().alert('✅ 캐릭터 정보 갱신 완료! (' + count + '명)');
+}
+
+// ============================================================
+// 캐릭터 정보 갱신 - 트리거용 (알림 없음)
+// ============================================================
+function updateCharacterStatsAuto() {
+  _doUpdateCharacterStats();
+}
+
+// ============================================================
+// 10분 트리거 등록 (최초 1회 실행)
+// ============================================================
+function createCharacterUpdateTrigger() {
+  // 기존 동일 트리거 삭제
+  ScriptApp.getProjectTriggers()
+    .filter(t => t.getHandlerFunction() === 'updateCharacterStatsAuto')
+    .forEach(t => ScriptApp.deleteTrigger(t));
+
+  ScriptApp.newTrigger('updateCharacterStatsAuto')
+    .timeBased()
+    .everyMinutes(10)
+    .create();
+
+  SpreadsheetApp.getUi().alert('✅ 10분마다 자동 갱신 트리거 설정 완료!');
+}
+
+// ============================================================
 // 상단 메뉴
 // ============================================================
 function onOpen() {
@@ -691,6 +718,9 @@ function onOpen() {
     .createMenu('🗡️ 길드 레이드')
     .addItem('현황판 구조 생성 / 재생성', 'setupRaidBoard')
     .addItem('현황판 수동 갱신', 'updateRaidBoard')
+    .addSeparator()
+    .addItem('👤 캐릭터 정보 수동 갱신', 'updateCharacterStats')
+    .addItem('⏱️ 10분 자동 갱신 트리거 설정', 'createCharacterUpdateTrigger')
     .addSeparator()
     .addItem('🔄 주차 리셋', 'resetWeek')
     .addToUi();
