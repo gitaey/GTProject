@@ -21,7 +21,8 @@
       "WebSearch",
       "Bash(chcp)",
       "Bash(git add *)",
-      "WebFetch(domain:m.lopec.kr)"
+      "WebFetch(domain:m.lopec.kr)",
+      "Bash(git -C \"D:/git/GTProject\" log --oneline -5)"
     ]
   }
 }
