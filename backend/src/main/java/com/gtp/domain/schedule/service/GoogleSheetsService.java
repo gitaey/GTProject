@@ -45,7 +45,7 @@ public class GoogleSheetsService {
     private static final int ROW_DAY        = 0;  // 요일
     private static final int ROW_TIME       = 1;  // 시간
     private static final int ROW_RAID       = 3;  // 레이드명
-    private static final int DATA_START_ROW = 4;  // 첫 번째 슬롯 닉네임 행
+    private static final int DATA_START_ROW = 5;  // 첫 번째 슬롯 닉네임 행 (index 4는 단계 행)
     private static final int DATA_START_COL = 7;  // H열 (0-indexed)
     private static final int SLOT_SIZE      = 4;  // 슬롯당 행 수
     private static final int SLOT_CLASS     = 1;  // 슬롯 내 클래스 offset
@@ -119,7 +119,9 @@ public class GoogleSheetsService {
         String tag = isSupport ? "[S]" : "[D]";
         StringBuilder sb = new StringBuilder(tag).append(" ").append(nick);
         if (!powerCell.isEmpty()) {
-            sb.append(" | ").append(powerCell);
+            // "7156.97 / L7044.36" 형식에서 앞부분(전투력)만 추출
+            String power = powerCell.contains(" / ") ? powerCell.split(" / ")[0] : powerCell;
+            sb.append(" | ").append(power);
         }
         return sb.toString();
     }
@@ -168,6 +170,8 @@ public class GoogleSheetsService {
                 for (int slotRow = DATA_START_ROW; slotRow < values.size(); slotRow += SLOT_SIZE) {
                     String nick  = cell(row(values, slotRow), col);
                     if (nick.isEmpty()) continue;
+                    // 체크박스 값(TRUE/FALSE) 건너뜀
+                    if (nick.equalsIgnoreCase("TRUE") || nick.equalsIgnoreCase("FALSE")) continue;
 
                     String cls   = cell(row(values, slotRow + SLOT_CLASS), col);
                     String power = cell(row(values, slotRow + SLOT_POWER), col);
