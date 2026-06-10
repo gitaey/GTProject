@@ -30,4 +30,10 @@ public class ScheduleController {
     public ApiResponse<List<List<Object>>> debug() {
         return ApiResponse.ok(googleSheetsService.getRawData());
     }
+
+    @PostMapping("/refresh")
+    public ApiResponse<String> refresh() {
+        googleSheetsService.clearCache();
+        return ApiResponse.ok("캐시가 초기화되었습니다.");
+    }
 }

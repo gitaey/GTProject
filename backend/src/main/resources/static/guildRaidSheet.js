@@ -1,5 +1,6 @@
 // ========== 로스트아크 Open API 설정 ==========
-const LOSTARK_API_KEY = 'bearer YOUR_API_KEY_HERE'; // API 키 입력
+// API 키는 PropertiesService에 저장 (최초 1회 saveApiKey() 실행 필요)
+// 메뉴 → [🗝️ API 키 설정]으로 저장
 
 // ========== 레이드 카테고리 설정 ==========
 const RAID_CATEGORIES = [
@@ -11,7 +12,7 @@ const RAID_CATEGORIES = [
 ];
 
 // ========== 상수 ==========
-const CHAR_COL_COUNT  = 6;  // 길드원, 닉네임, 클래스, 아이템레벨, 전투력, 로펙
+const CHAR_COL_COUNT  = 7;  // 길드원, 닉네임, 클래스, 아크패시브, 아이템레벨, 전투력, 로펙
 const RAID_COL_SPAN   = 1;  // 레이드당 컬럼 수
 const HEADER_ROWS     = 3;  // 헤더 행 수
 const DATA_START_ROW  = 4;  // 데이터 시작 행
@@ -34,12 +35,13 @@ const COLOR_DONE_BG   = '#1a4a2a';
 const COLOR_DONE_TEXT = '#2ecc71';
 
 // 캐릭터 시트 컬럼 (1-based)
-const CHAR_GUILD_COL = 9;   // I열: 길드원
-const CHAR_NICK_COL  = 10;  // J열: 닉네임
-const CHAR_CLS_COL   = 11;  // K열: 클래스
-const CHAR_LV_COL    = 12;  // L열: 아이템레벨
-const CHAR_POW_COL   = 13;  // M열: 전투력
-const CHAR_ROB_COL   = 14;  // N열: 로펙
+const CHAR_GUILD_COL = 1;   // A열: 길드원
+const CHAR_NICK_COL  = 2;   // B열: 닉네임
+const CHAR_CLS_COL   = 3;   // C열: 클래스
+const CHAR_ARC_COL   = 4;   // D열: 아크패시브
+const CHAR_LV_COL    = 5;   // E열: 아이템레벨
+const CHAR_POW_COL   = 6;   // F열: 전투력
+const CHAR_ROB_COL   = 7;   // G열: 로펙
 
 // 레이드일정 시트에서 안전하게 읽을 실제 열 수 반환
 function getSchedCols(sheet) {
@@ -106,7 +108,7 @@ function setupRaidBoard() {
   });
 
   // ── Row 3: 컬럼명 헤더 ──
-  ['길드원', '닉네임', '클래스', '아이템레벨', '전투력', '로펙'].forEach((h, i) => {
+  ['길드원', '닉네임', '클래스', '아크패시브', '아이템레벨', '전투력', '로펙'].forEach((h, i) => {
     boardSheet.getRange(3, i + 1).setValue(h);
   });
   allRaids.forEach((raid, i) => {
@@ -142,15 +144,17 @@ function setupRaidBoard() {
 
     const nickCol = colToLetter(CHAR_NICK_COL);
     const clsCol  = colToLetter(CHAR_CLS_COL);
+    const arcCol  = colToLetter(CHAR_ARC_COL);
     const lvCol   = colToLetter(CHAR_LV_COL);
     const powCol  = colToLetter(CHAR_POW_COL);
     const robCol  = colToLetter(CHAR_ROB_COL);
 
     boardSheet.getRange(row, 2).setValue(nick);
-    boardSheet.getRange(row, 3).setFormula(`=IFERROR(INDEX('캐릭터'!$${clsCol}:$${clsCol}, MATCH(B${row}, '캐릭터'!$${nickCol}:$${nickCol}, 0)), "")`);
-    boardSheet.getRange(row, 4).setFormula(`=IFERROR(INDEX('캐릭터'!$${lvCol}:$${lvCol},  MATCH(B${row}, '캐릭터'!$${nickCol}:$${nickCol}, 0)), "")`);
-    boardSheet.getRange(row, 5).setFormula(`=IFERROR(INDEX('캐릭터'!$${powCol}:$${powCol}, MATCH(B${row}, '캐릭터'!$${nickCol}:$${nickCol}, 0)), "")`);
-    boardSheet.getRange(row, 6).setFormula(`=IFERROR(INDEX('캐릭터'!$${robCol}:$${robCol}, MATCH(B${row}, '캐릭터'!$${nickCol}:$${nickCol}, 0)), "")`);
+    boardSheet.getRange(row, 3).setFormula(`=IFERROR(INDEX('캐릭터'!$${clsCol}:$${clsCol},  MATCH(B${row}, '캐릭터'!$${nickCol}:$${nickCol}, 0)), "")`);
+    boardSheet.getRange(row, 4).setFormula(`=IFERROR(INDEX('캐릭터'!$${arcCol}:$${arcCol},  MATCH(B${row}, '캐릭터'!$${nickCol}:$${nickCol}, 0)), "")`);
+    boardSheet.getRange(row, 5).setFormula(`=IFERROR(INDEX('캐릭터'!$${lvCol}:$${lvCol},   MATCH(B${row}, '캐릭터'!$${nickCol}:$${nickCol}, 0)), "")`);
+    boardSheet.getRange(row, 6).setFormula(`=IFERROR(INDEX('캐릭터'!$${powCol}:$${powCol}, MATCH(B${row}, '캐릭터'!$${nickCol}:$${nickCol}, 0)), "")`);
+    boardSheet.getRange(row, 7).setFormula(`=IFERROR(INDEX('캐릭터'!$${robCol}:$${robCol}, MATCH(B${row}, '캐릭터'!$${nickCol}:$${nickCol}, 0)), "")`);
     row++;
   });
 
@@ -164,19 +168,8 @@ function setupRaidBoard() {
 
   const lastDataRow = row - 1;
 
-  applyBoardStyling(boardSheet, totalCols, lastDataRow, groupRanges);
-  applyRaidCellValidation(boardSheet, lastDataRow);
-  boardSheet.setFrozenRows(HEADER_ROWS);
-  setupLegend(boardSheet);
-}
-
-
-// ============================================================
-// 레이드현황판 스타일 적용
-// ============================================================
-function applyBoardStyling(boardSheet, totalCols, lastDataRow, groupRanges) {
-  const allRaids = getAllRaids();
-
+  // ── 스타일 적용 ──
+  const allRaidsForStyle = getAllRaids();
   const C = {
     black:    '#111111',
     darkGray: '#1e1e1e',
@@ -215,13 +208,13 @@ function applyBoardStyling(boardSheet, totalCols, lastDataRow, groupRanges) {
     .setVerticalAlignment('middle');
 
   // 카테고리별 색상
-  let catCol = CHAR_COL_COUNT + 1;
+  let catStyleCol = CHAR_COL_COUNT + 1;
   RAID_CATEGORIES.forEach(cat => {
     const span  = cat.raids.length * RAID_COL_SPAN;
     const color = C.cat[cat.category] || C.midGray;
-    boardSheet.getRange(2, catCol, 1, span).setBackground(color);
-    boardSheet.getRange(3, catCol, 1, span).setBackground(color);
-    catCol += span;
+    boardSheet.getRange(2, catStyleCol, 1, span).setBackground(color);
+    boardSheet.getRange(3, catStyleCol, 1, span).setBackground(color);
+    catStyleCol += span;
   });
 
   // Row 3: 컬럼명
@@ -232,7 +225,7 @@ function applyBoardStyling(boardSheet, totalCols, lastDataRow, groupRanges) {
     .setFontWeight('bold')
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle');
-  boardSheet.getRange(3, CHAR_COL_COUNT + 1, 1, allRaids.length * RAID_COL_SPAN)
+  boardSheet.getRange(3, CHAR_COL_COUNT + 1, 1, allRaidsForStyle.length * RAID_COL_SPAN)
     .setFontColor(C.white)
     .setFontWeight('bold')
     .setHorizontalAlignment('center')
@@ -240,23 +233,20 @@ function applyBoardStyling(boardSheet, totalCols, lastDataRow, groupRanges) {
 
   // 데이터 행
   if (lastDataRow >= DATA_START_ROW) {
-    const rowCount = lastDataRow - DATA_START_ROW + 1;
+    const styleRowCount = lastDataRow - DATA_START_ROW + 1;
 
-    // 캐릭터 정보 열 (A~F) 단일 색상으로 통일
-    boardSheet.getRange(DATA_START_ROW, 1, rowCount, CHAR_COL_COUNT)
+    boardSheet.getRange(DATA_START_ROW, 1, styleRowCount, CHAR_COL_COUNT)
       .setBackground(C.rowDark)
       .setFontColor(C.white)
       .setHorizontalAlignment('center')
       .setVerticalAlignment('middle');
 
-    // 길드원 열 (A) 굵게
     groupRanges.forEach(group => {
       boardSheet.getRange(group.start, 1, group.end - group.start + 1, 1)
         .setFontWeight('bold');
     });
 
-    // 레이드 현황 열 흰색 배경, 글자는 흰색 유지
-    boardSheet.getRange(DATA_START_ROW, CHAR_COL_COUNT + 1, rowCount, allRaids.length * RAID_COL_SPAN)
+    boardSheet.getRange(DATA_START_ROW, CHAR_COL_COUNT + 1, styleRowCount, allRaidsForStyle.length * RAID_COL_SPAN)
       .setBackground(C.white)
       .setFontColor(C.white)
       .setHorizontalAlignment('center')
@@ -268,14 +258,18 @@ function applyBoardStyling(boardSheet, totalCols, lastDataRow, groupRanges) {
   boardSheet.setColumnWidth(1, 70);
   boardSheet.setColumnWidth(2, 130);
   boardSheet.setColumnWidth(3, 90);
-  boardSheet.setColumnWidth(4, 80);
+  boardSheet.setColumnWidth(4, 90);
   boardSheet.setColumnWidth(5, 80);
   boardSheet.setColumnWidth(6, 80);
+  boardSheet.setColumnWidth(7, 80);
   for (let c = CHAR_COL_COUNT + 1; c <= totalCols; c++) {
-    boardSheet.setColumnWidth(c, 112); // G~N열
+    boardSheet.setColumnWidth(c, 112);
   }
   boardSheet.setColumnWidth(16, 112); // P열
   boardSheet.setColumnWidth(17, 112); // Q열
+
+  // D열(아크패시브) 숨김
+  boardSheet.hideColumns(CHAR_ARC_COL);
 
   // 전체 기본 테두리
   boardSheet.getRange(1, 1, lastDataRow, totalCols)
@@ -287,19 +281,88 @@ function applyBoardStyling(boardSheet, totalCols, lastDataRow, groupRanges) {
     .setBorder(true, true, true, true, null, null,
       '#888888', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
 
-  // 길드 그룹 간 구분선 (전체 열 동일하게 적용)
+  // 길드 그룹 간 구분선
   groupRanges.forEach(group => {
-    const rowCount = group.end - group.start + 1;
-    boardSheet.getRange(group.start, 1, rowCount, totalCols)
+    const grpCount = group.end - group.start + 1;
+    boardSheet.getRange(group.start, 1, grpCount, totalCols)
       .setBorder(true, null, true, null, null, null,
         '#aaaaaa', SpreadsheetApp.BorderStyle.SOLID_THICK);
   });
 
-  // 3행~4행 사이 테두리 완전 제거 (3행 하단 + 4행 상단)
+  // 3행~4행 사이 테두리 제거
   boardSheet.getRange(HEADER_ROWS, 1, 1, totalCols)
     .setBorder(null, null, false, null, null, null);
   boardSheet.getRange(DATA_START_ROW, 1, 1, totalCols)
     .setBorder(false, null, null, null, null, null);
+
+  applyRaidCellValidation(boardSheet, lastDataRow);
+  boardSheet.setFrozenRows(HEADER_ROWS);
+
+  // ── 범례 생성 ──
+  const COL_S = 17; // P열
+  const COL_D = 18; // Q열
+  const LEG_START = 4;
+
+  const legends = [
+    { symbol: '✓',  bg: '#1a4a2a', text: '#2ecc71', desc: '완료' },
+    { symbol: '✗',  bg: '#4a1a1a', text: '#e74c3c', desc: '미진행/유기' },
+    { symbol: '►',  bg: '#1a2a4a', text: '#3498db', desc: '진행중' },
+    { symbol: '❚❚', bg: '#2a1a4a', text: '#9b59b6', desc: '일정 대기중' },
+    { symbol: '★',  bg: '#4a3800', text: '#f1c40f', desc: '오늘 할 예정' },
+  ];
+
+  boardSheet.getRange(LEG_START, COL_S, 2 + legends.length, 2).setDataValidation(null);
+  boardSheet.getRange(3, COL_S, 1, 2).setBorder(null, null, false, null, null, null);
+  boardSheet.getRange(LEG_START, COL_S, 1, 2).setBorder(false, null, null, null, null, null);
+
+  boardSheet.getRange(LEG_START, COL_S, 1, 2).merge()
+    .setValue('더블 클릭하여 상태 변경 하시면 됩니다.')
+    .setBackground(null)
+    .setFontColor('#333333')
+    .setFontWeight('bold')
+    .setFontSize(9)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle')
+    .setBorder(null, true, true, true, null, null, '#aaaaaa', SpreadsheetApp.BorderStyle.SOLID);
+
+  boardSheet.getRange(LEG_START + 1, COL_S)
+    .setValue('상태')
+    .setBackground('#dddddd')
+    .setFontColor('#333333')
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center')
+    .setBorder(true, true, true, true, null, null, '#aaaaaa', SpreadsheetApp.BorderStyle.SOLID);
+  boardSheet.getRange(LEG_START + 1, COL_D)
+    .setValue('설명')
+    .setBackground('#dddddd')
+    .setFontColor('#333333')
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center')
+    .setBorder(true, true, true, true, null, null, '#aaaaaa', SpreadsheetApp.BorderStyle.SOLID);
+
+  legends.forEach((legend, i) => {
+    const legRow = LEG_START + 2 + i;
+    boardSheet.getRange(legRow, COL_S)
+      .setValue(legend.symbol)
+      .setBackground(legend.bg)
+      .setFontColor(legend.text)
+      .setFontWeight('bold')
+      .setFontSize(11)
+      .setHorizontalAlignment('center')
+      .setVerticalAlignment('middle')
+      .setBorder(true, true, true, true, null, null, '#aaaaaa', SpreadsheetApp.BorderStyle.SOLID);
+    boardSheet.getRange(legRow, COL_D)
+      .setValue(legend.desc)
+      .setBackground('#ffffff')
+      .setFontColor('#333333')
+      .setHorizontalAlignment('left')
+      .setVerticalAlignment('middle')
+      .setBorder(true, true, true, true, null, null, '#aaaaaa', SpreadsheetApp.BorderStyle.SOLID);
+  });
+
+  boardSheet.setColumnWidth(COL_S, 112);
+  boardSheet.setColumnWidth(COL_D, 112);
+  boardSheet.setColumnWidth(16, 45);
 }
 
 
@@ -418,40 +481,36 @@ function onEdit(e) {
 }
 
 // ============================================================
-// 주차 리셋 - 실제 로직
+// 주차 리셋 (수동 버튼 + 트리거 공용)
 // ============================================================
-function _doResetWeek() {
+function resetWeek() {
   const ss       = SpreadsheetApp.getActiveSpreadsheet();
   const allRaids = getAllRaids();
 
-  // 현황판 레이드 셀 초기화 (내용 + 배경색 + validation + 조건부서식 복구)
+  // 현황판 레이드 셀 초기화
   const boardSheet = ss.getSheetByName('레이드현황판');
   const lastRow    = boardSheet.getLastRow();
   if (lastRow >= DATA_START_ROW) {
-    const rowCount  = lastRow - HEADER_ROWS;
-    const raidRange = boardSheet.getRange(DATA_START_ROW, CHAR_COL_COUNT + 1, rowCount, allRaids.length * RAID_COL_SPAN);
+    const raidRange = boardSheet.getRange(DATA_START_ROW, CHAR_COL_COUNT + 1, lastRow - HEADER_ROWS, allRaids.length * RAID_COL_SPAN);
 
     raidRange.clearContent();
     raidRange.setBackground('#ffffff');
     raidRange.setFontColor('#ffffff');
     raidRange.setFontWeight('normal');
-
     raidRange.setDataValidation(
       SpreadsheetApp.newDataValidation()
         .requireValueInList(['✓', '✗', '►', '❚❚', '★'], false)
         .setAllowInvalid(true)
         .build()
     );
-
     applyRaidCellValidation(boardSheet, lastRow);
   }
 
-  // 레이드일정 H열 이후 초기화 (클래스/아이템레벨/전투력 제외)
+  // 레이드일정 H열 이후 초기화
   const scheduleSheet = ss.getSheetByName('레이드일정');
   const lastCol       = scheduleSheet.getLastColumn();
   if (lastCol >= 8) {
     const colCount = lastCol - 7;
-
     scheduleSheet.getRange(ROW_DAY,        8, 1, colCount).clearContent();
     scheduleSheet.getRange(ROW_TIME,       8, 1, colCount).clearContent();
     scheduleSheet.getRange(ROW_SKILL,      8, 1, colCount).clearContent();
@@ -459,135 +518,10 @@ function _doResetWeek() {
     scheduleSheet.getRange(ROW_DIFFICULTY, 8, 1, colCount).clearContent();
 
     for (let slot = 0; slot < TOTAL_SLOTS; slot++) {
-      const nickRow = NICK_START_ROW + slot * ROWS_PER_SLOT;
-      scheduleSheet.getRange(nickRow, 8, 1, colCount).clearContent();
+      scheduleSheet.getRange(NICK_START_ROW + slot * ROWS_PER_SLOT, 8, 1, colCount).clearContent();
     }
-
     scheduleSheet.getRange(ROW_COMPLETE, 8, 1, colCount).setValue(false);
   }
-}
-
-// ============================================================
-// 주차 리셋 - 메뉴용 (확인창 있음)
-// ============================================================
-function resetWeek() {
-  const ui     = SpreadsheetApp.getUi();
-  const answer = ui.alert(
-    '⚠️ 주차 리셋',
-    '레이드일정과 현황판의 일정을 모두 초기화합니다.\n계속하시겠습니까?',
-    ui.ButtonSet.YES_NO
-  );
-  if (answer !== ui.Button.YES) return;
-
-  _doResetWeek();
-  ui.alert('✅ 주차 리셋 완료!');
-}
-
-// ============================================================
-// 주차 리셋 - 트리거용 (확인창 없음)
-// ============================================================
-function resetWeekAuto() {
-  _doResetWeek();
-}
-
-
-
-// ============================================================
-// 로펙 크롤링 - 달성 최고 점수만
-// ============================================================
-function lopec(characterName) {
-  if (!characterName) return '';
-
-  var url = 'https://m.lopec.kr/character/specPoint/' + encodeURIComponent(characterName);
-
-  var response = UrlFetchApp.fetch(url, {
-    muteHttpExceptions: true,
-    followRedirects: true,
-    headers: { 'User-Agent': 'Mozilla/5.0' }
-  });
-
-  var html = response.getContentText('UTF-8').replace(/\n|\r/g, ' ');
-  var match = html.match(/달성 최고 점수<\/span>\s*<span[^>]*>([\d.]+)<\/span>/);
-
-  return match ? match[1].trim() : '';
-}
-
-// ============================================================
-// 레이드현황판 P4 범례 생성
-// ============================================================
-function setupLegend(boardSheet) {
-  const COL_S = 16; // P열
-  const COL_D = 17; // Q열
-  const START = 4;  // 4행부터
-
-  const legends = [
-    { symbol: '✓',  bg: '#1a4a2a', text: '#2ecc71', desc: '완료' },
-    { symbol: '✗',  bg: '#4a1a1a', text: '#e74c3c', desc: '미진행/유기' },
-    { symbol: '►',  bg: '#1a2a4a', text: '#3498db', desc: '진행중' },
-    { symbol: '❚❚', bg: '#2a1a4a', text: '#9b59b6', desc: '일정 대기중' },
-    { symbol: '★',  bg: '#4a3800', text: '#f1c40f', desc: '오늘 할 예정' },
-  ];
-
-  // 범례 영역 유효성 검사 먼저 제거
-  boardSheet.getRange(START, COL_S, 2 + legends.length, 2).setDataValidation(null);
-
-  // P3~Q3 하단 테두리 제거, P4~Q4 상단 테두리 제거
-  boardSheet.getRange(3, COL_S, 1, 2).setBorder(null, null, false, null, null, null);
-  boardSheet.getRange(START, COL_S, 1, 2).setBorder(false, null, null, null, null, null);
-
-  // 헤더 (P4:Q4 병합) - 채우기 없음
-  boardSheet.getRange(START, COL_S, 1, 2).merge()
-    .setValue('더블 클릭하여 상태 변경 하시면 됩니다.')
-    .setBackground(null)
-    .setFontColor('#333333')
-    .setFontWeight('bold')
-    .setFontSize(9)
-    .setHorizontalAlignment('center')
-    .setVerticalAlignment('middle')
-    .setBorder(null, true, true, true, null, null, '#aaaaaa', SpreadsheetApp.BorderStyle.SOLID);
-
-  // 컬럼명 (P5: 상태, Q5: 설명)
-  boardSheet.getRange(START + 1, COL_S)
-    .setValue('상태')
-    .setBackground('#dddddd')
-    .setFontColor('#333333')
-    .setFontWeight('bold')
-    .setHorizontalAlignment('center')
-    .setBorder(true, true, true, true, null, null, '#aaaaaa', SpreadsheetApp.BorderStyle.SOLID);
-  boardSheet.getRange(START + 1, COL_D)
-    .setValue('설명')
-    .setBackground('#dddddd')
-    .setFontColor('#333333')
-    .setFontWeight('bold')
-    .setHorizontalAlignment('center')
-    .setBorder(true, true, true, true, null, null, '#aaaaaa', SpreadsheetApp.BorderStyle.SOLID);
-
-  // 각 상태 행
-  legends.forEach((legend, i) => {
-    const row = START + 2 + i;
-
-    boardSheet.getRange(row, COL_S)
-      .setValue(legend.symbol)
-      .setBackground(legend.bg)
-      .setFontColor(legend.text)
-      .setFontWeight('bold')
-      .setFontSize(11)
-      .setHorizontalAlignment('center')
-      .setVerticalAlignment('middle')
-      .setBorder(true, true, true, true, null, null, '#aaaaaa', SpreadsheetApp.BorderStyle.SOLID);
-
-    boardSheet.getRange(row, COL_D)
-      .setValue(legend.desc)
-      .setBackground('#ffffff')
-      .setFontColor('#333333')
-      .setHorizontalAlignment('left')
-      .setVerticalAlignment('middle')
-      .setBorder(true, true, true, true, null, null, '#aaaaaa', SpreadsheetApp.BorderStyle.SOLID);
-  });
-
-  // 열 너비
-  boardSheet.setColumnWidth(COL_S, 112);
-  boardSheet.setColumnWidth(COL_D, 112);
 }
 
 
@@ -637,77 +571,72 @@ function applyRaidCellValidation(boardSheet, lastDataRow) {
 }
 
 // ============================================================
-// 캐릭터 정보 갱신 - 공통 로직
+// 캐릭터 정보 갱신 (수동 버튼 + 트리거 공용)
 // ============================================================
-function _doUpdateCharacterStats() {
+function updateCharacterStats() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('캐릭터');
   const data  = sheet.getDataRange().getValues();
 
-  // 닉네임 있는 행 수집 (1행 헤더 제외)
   const targets = [];
   for (let i = 1; i < data.length; i++) {
     const nick = data[i][CHAR_NICK_COL - 1];
     if (!nick) continue;
     targets.push({ rowIndex: i, nick });
   }
-  if (targets.length === 0) return 0;
+  if (targets.length === 0) return;
 
-  // fetchAll로 병렬 요청
-  const requests = targets.map(t => ({
+  // 로스트아크 API + 로펙 병렬 요청
+  const apiKey = PropertiesService.getScriptProperties().getProperty('LOSTARK_API_KEY');
+  if (!apiKey) {
+    SpreadsheetApp.getUi().alert('API 키가 설정되지 않았습니다.\n메뉴 → [🗝️ API 키 설정]을 먼저 실행해주세요.');
+    return;
+  }
+
+  const lostarkRes = UrlFetchApp.fetchAll(targets.map(t => ({
     url    : 'https://developer-lostark.game.onstove.com/armories/characters/'
-             + encodeURIComponent(t.nick) + '/profiles',
-    headers: { 'Authorization': LOSTARK_API_KEY },
+             + encodeURIComponent(t.nick) + '?filters=profiles+arkpassive',
+    headers: { 'Authorization': apiKey },
     muteHttpExceptions: true
-  }));
+  })));
 
-  const responses = UrlFetchApp.fetchAll(requests);
+  const lopecRes = UrlFetchApp.fetchAll(targets.map(t => ({
+    url    : 'https://m.lopec.kr/character/specPoint/' + encodeURIComponent(t.nick),
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+    muteHttpExceptions: true
+  })));
 
-  responses.forEach((res, idx) => {
-    if (res.getResponseCode() !== 200) return;
+  targets.forEach((t, idx) => {
+    const row = t.rowIndex + 1;
+
+    // 로스트아크 API 결과
+    if (lostarkRes[idx].getResponseCode() === 200) {
+      try {
+        const json = JSON.parse(lostarkRes[idx].getContentText());
+        sheet.getRange(row, CHAR_CLS_COL).setValue(json.ArmoryProfile.CharacterClassName || '');
+        sheet.getRange(row, CHAR_LV_COL).setValue(json.ArmoryProfile.ItemAvgLevel        || '');
+        sheet.getRange(row, CHAR_POW_COL).setValue(json.ArmoryProfile.CombatPower        || '');
+        sheet.getRange(row, CHAR_ARC_COL).setValue(json.ArkPassive?.Title                || '');
+      } catch(e) {
+        Logger.log('로스트아크 API 오류: ' + t.nick + ' / ' + e.message);
+      }
+    }
+
+    // 로펙 결과
     try {
-      const json = JSON.parse(res.getContentText());
-      const row  = targets[idx].rowIndex + 1;
-      sheet.getRange(row, CHAR_CLS_COL).setValue(json.CharacterClassName || '');
-      sheet.getRange(row, CHAR_LV_COL).setValue(json.ItemAvgLevel        || '');
-      sheet.getRange(row, CHAR_POW_COL).setValue(json.CombatPower        || '');
+      const html  = lopecRes[idx].getContentText('UTF-8').replace(/\n|\r/g, ' ');
+      const match = html.match(/달성 최고 점수<\/span>\s*<span[^>]*>([\d.]+)<\/span>/);
+      sheet.getRange(row, CHAR_ROB_COL).setValue(match ? match[1].trim() : '');
     } catch(e) {
-      Logger.log('캐릭터 파싱 오류: ' + targets[idx].nick + ' / ' + e.message);
+      Logger.log('로펙 오류: ' + t.nick + ' / ' + e.message);
     }
   });
 
-  return targets.length;
-}
-
-// ============================================================
-// 캐릭터 정보 갱신 - 수동 버튼용 (완료 알림 있음)
-// ============================================================
-function updateCharacterStats() {
-  const count = _doUpdateCharacterStats();
-  SpreadsheetApp.getUi().alert('✅ 캐릭터 정보 갱신 완료! (' + count + '명)');
-}
-
-// ============================================================
-// 캐릭터 정보 갱신 - 트리거용 (알림 없음)
-// ============================================================
-function updateCharacterStatsAuto() {
-  _doUpdateCharacterStats();
-}
-
-// ============================================================
-// 10분 트리거 등록 (최초 1회 실행)
-// ============================================================
-function createCharacterUpdateTrigger() {
-  // 기존 동일 트리거 삭제
-  ScriptApp.getProjectTriggers()
-    .filter(t => t.getHandlerFunction() === 'updateCharacterStatsAuto')
-    .forEach(t => ScriptApp.deleteTrigger(t));
-
-  ScriptApp.newTrigger('updateCharacterStatsAuto')
-    .timeBased()
-    .everyMinutes(10)
-    .create();
-
-  SpreadsheetApp.getUi().alert('✅ 10분마다 자동 갱신 트리거 설정 완료!');
+  // 마지막 갱신 시간 기록 (I1셀)
+  const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+  sheet.getRange(1, 9)
+    .setValue('마지막 갱신: ' + now)
+    .setFontColor('#ffffff')
+    .setFontSize(10)
 }
 
 // ============================================================
@@ -720,7 +649,6 @@ function onOpen() {
     .addItem('현황판 수동 갱신', 'updateRaidBoard')
     .addSeparator()
     .addItem('👤 캐릭터 정보 수동 갱신', 'updateCharacterStats')
-    .addItem('⏱️ 10분 자동 갱신 트리거 설정', 'createCharacterUpdateTrigger')
     .addSeparator()
     .addItem('🔄 주차 리셋', 'resetWeek')
     .addToUi();

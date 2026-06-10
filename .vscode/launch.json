@@ -25,7 +25,7 @@
             "vmArgs": "-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8",
             "shortenCommandLine": "jarmanifest",
             "env": {
-                "SPRING_DEVTOOLS_RESTART_ENABLED": "false"
+                "SPRING_DEVTOOLS_RESTART_ENABLED": "true"
             }
         }
     ],

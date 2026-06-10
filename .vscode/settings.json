@@ -18,5 +18,6 @@
   "terminal.integrated.defaultProfile.windows": "mPowerShell",
   "terminal.integrated.env.windows": {
     "JAVA_TOOL_OPTIONS": "-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"
-  }
+  },
+  "debug.onTaskErrors": "debugAnyway"
 }

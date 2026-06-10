@@ -617,12 +617,25 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                 return;
             }
             var msg = "【 " + name + " 이번주 일정 】\n";
-            msg += "───────────────\n";
             for (var i = 0; i < json.data.length; i++) {
+                msg += "───────────────\n";
                 var item = json.data[i];
                 msg += "◆ " + item.raidName + "  " + item.schedule + "\n";
+                msg += "   · " + item.selfDisplay + "\n";
+                var members = item.participants || [];
+                for (var p = 0; p < members.length; p++) {
+                    msg += "   · " + members[p] + "\n";
+                }
             }
             replier.reply(msg.trim());
+        } catch(e) { replier.reply("오류: " + e.message); }
+
+    // /일정새로고침
+    } else if (text === "/일정새로고침") {
+        try {
+            org.jsoup.Jsoup.connect(SERVER_URL + "/api/schedule/refresh")
+                .ignoreContentType(true).method(org.jsoup.Connection.Method.POST).timeout(5000).execute();
+            replier.reply("일정 캐시가 초기화되었습니다.\n다음 /일정 조회 시 최신 데이터를 불러옵니다.");
         } catch(e) { replier.reply("오류: " + e.message); }
 
     // /기빵봇
@@ -650,6 +663,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
         help += "───────────────\n";
         help += "◆ 길드\n";
         help += "  /일정 캐릭명\n";
+        help += "  /일정새로고침\n";
         help += "───────────────\n";
         help += "◆ 경매\n";
         help += "  /분배금 금액";

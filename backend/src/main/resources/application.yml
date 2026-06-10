@@ -30,7 +30,7 @@ google:
   sheets:
     spreadsheet-id: 1_i5MeUeQkEXX3cwP1_JH-bSqkx-EoE7smbYTxegm0Vk
     credentials-path: classpath:google-credentials.json
-    sheet-name: 레이드현황판
+    sheet-name: 레이드일정
 
 lostark:
   api:
