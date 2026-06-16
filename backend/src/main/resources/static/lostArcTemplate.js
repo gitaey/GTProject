@@ -630,6 +630,157 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
             replier.reply(msg.trim());
         } catch(e) { replier.reply("오류: " + e.message); }
 
+    // /일정전체 캐릭명
+    } else if (text.startsWith("/일정전체 ")) {
+        var name = text.substring(6).trim();
+        try {
+            var res = org.jsoup.Jsoup.connect(SERVER_URL + "/api/schedule/expedition/" + java.net.URLEncoder.encode(name, "UTF-8"))
+                .ignoreContentType(true).timeout(30000).get().body().text();
+            var json = JSON.parse(res);
+            if (!json.success || !json.data) {
+                replier.reply(name + "의 원정대를 찾을 수 없습니다.");
+                return;
+            }
+            var data = json.data;
+            var members = data.members || [];
+
+            // 일정이 있는 멤버만 필터
+            var activeMembers = [];
+            for (var i = 0; i < members.length; i++) {
+                if (members[i].schedules && members[i].schedules.length > 0) {
+                    activeMembers.push(members[i]);
+                }
+            }
+
+            if (activeMembers.length === 0) {
+                replier.reply("【 " + data.expeditionName + " 】\n이번 주 레이드 일정이 없습니다.");
+                return;
+            }
+
+            var msg = "【 " + data.expeditionName + " 원정대 일정 】\n";
+            for (var i = 0; i < activeMembers.length; i++) {
+                var member = activeMembers[i];
+                msg += "━━━━━━━━━━━━\n";
+                msg += "▶ " + member.characterName + "\n";
+                var schedules = member.schedules;
+                for (var j = 0; j < schedules.length; j++) {
+                    if (j > 0) msg += "────────────\n";
+                    var item = schedules[j];
+                    msg += "◆ " + item.raidName + "  " + item.schedule + "\n";
+                    msg += "   · " + item.selfDisplay + "\n";
+                    var parts = item.participants || [];
+                    for (var p = 0; p < parts.length; p++) {
+                        msg += "   · " + parts[p] + "\n";
+                    }
+                }
+            }
+            replier.reply(msg.trim());
+        } catch(e) { replier.reply("오류: " + e.message); }
+
+    // /오늘일정 캐릭명
+    } else if (text.startsWith("/오늘일정 ")) {
+        var name = text.substring(6).trim();
+        try {
+            var res = org.jsoup.Jsoup.connect(SERVER_URL + "/api/schedule/expedition/" + java.net.URLEncoder.encode(name, "UTF-8"))
+                .ignoreContentType(true).timeout(30000).get().body().text();
+            var json = JSON.parse(res);
+            if (!json.success || !json.data) {
+                replier.reply(name + "의 원정대를 찾을 수 없습니다.");
+                return;
+            }
+            var data = json.data;
+
+            // 오늘 요일 첫 글자 (일/월/화/수/목/금/토)
+            var cal = java.util.Calendar.getInstance();
+            var dow = cal.get(java.util.Calendar.DAY_OF_WEEK); // 1=일, 2=월, ..., 7=토
+            var dayChars    = ["일", "월", "화", "수", "목", "금", "토"];
+            var dayFulls    = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
+            var todayChar   = dayChars[dow - 1];
+            var todayFull   = dayFulls[dow - 1];
+
+            // 오늘 일정만 필터
+            var todayMembers = [];
+            var members = data.members || [];
+            for (var i = 0; i < members.length; i++) {
+                var todaySchedules = [];
+                var schedules = members[i].schedules || [];
+                for (var j = 0; j < schedules.length; j++) {
+                    if (schedules[j].schedule.indexOf(todayChar) === 0) {
+                        todaySchedules.push(schedules[j]);
+                    }
+                }
+                if (todaySchedules.length > 0) {
+                    todayMembers.push({ characterName: members[i].characterName, schedules: todaySchedules });
+                }
+            }
+
+            if (todayMembers.length === 0) {
+                replier.reply("【 " + data.expeditionName + " 】\n" + todayFull + " 레이드 일정이 없습니다.");
+                return;
+            }
+
+            var msg = "【 " + data.expeditionName + " " + todayFull + " 】\n";
+            for (var i = 0; i < todayMembers.length; i++) {
+                var member = todayMembers[i];
+                msg += "━━━━━━━━━━━━\n";
+                msg += "▶ " + member.characterName + "\n";
+                var scheds = member.schedules;
+                for (var j = 0; j < scheds.length; j++) {
+                    if (j > 0) msg += "────────────\n";
+                    var item = scheds[j];
+                    msg += "◆ " + item.raidName + "  " + item.schedule + "\n";
+                    msg += "   · " + item.selfDisplay + "\n";
+                    var parts = item.participants || [];
+                    for (var p = 0; p < parts.length; p++) {
+                        msg += "   · " + parts[p] + "\n";
+                    }
+                }
+            }
+            replier.reply(msg.trim());
+        } catch(e) { replier.reply("오류: " + e.message); }
+
+    // /파티편성
+    } else if (text === "/파티편성") {
+        try {
+            replier.reply("파티 편성 중... 잠시만 기다려주세요.");
+            var res = org.jsoup.Jsoup.connect(SERVER_URL + "/api/schedule/compose")
+                .ignoreContentType(true)
+                .method(org.jsoup.Connection.Method.POST)
+                .timeout(30000).execute().body();
+            var json = JSON.parse(res);
+            if (!json.success || !json.data) {
+                replier.reply("파티 편성 실패. 서버 로그를 확인해주세요.");
+                return;
+            }
+            var data = json.data;
+            var parties = data.parties || [];
+            var partyAverages = data.partyAverages || [];
+
+            var msg = "【 파티편성 완료 】\n";
+            msg += "총 " + data.partyCount + "파티 / " + data.totalMembers + "명\n";
+            for (var i = 0; i < parties.length; i++) {
+                msg += "━━━━━━━━━━━━\n";
+
+                // 서버에서 계산된 평균 사용 (시트 H8과 동일한 값)
+                var avgStr = partyAverages[i] ? "  " + partyAverages[i] : "";
+
+                msg += (i + 1) + "파티 (" + parties[i].length + "인)" + avgStr + "\n";
+
+                for (var j = 0; j < parties[i].length; j++) {
+                    var m = parties[i][j];
+                    var tag = m.support ? "[S]" : "[D]";
+                    var raw = (m.power || "").trim();
+                    var lopec = raw ? (raw.indexOf("L") === 0 ? raw : "L" + raw) : "";
+                    msg += " · " + tag + " " + m.nickname;
+                    if (lopec) msg += " | " + lopec;
+                    msg += "\n";
+                }
+            }
+            msg += "━━━━━━━━━━━━\n";
+            msg += "다음주레이드 시트 확인!";
+            replier.reply(msg.trim());
+        } catch(e) { replier.reply("오류: " + e.message); }
+
     // /일정새로고침
     } else if (text === "/일정새로고침") {
         try {
@@ -663,6 +814,9 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
         help += "───────────────\n";
         help += "◆ 길드\n";
         help += "  /일정 캐릭명\n";
+        help += "  /일정전체 캐릭명\n";
+        help += "  /오늘일정 캐릭명\n";
+        help += "  /파티편성\n";
         help += "  /일정새로고침\n";
         help += "───────────────\n";
         help += "◆ 경매\n";

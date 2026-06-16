@@ -424,7 +424,7 @@ function updateRaidBoard() {
   const totalCols    = schedData[0].length;
 
   for (let col = 0; col < totalCols; col++) {
-    if (col + 1 < 8) continue;
+    if (col + 1 < 7) continue;
     const raidCell = schedData[ROW_RAID - 1][col];
     if (!raidCell) continue;
 
@@ -493,6 +493,9 @@ function resetWeek() {
   if (lastRow >= DATA_START_ROW) {
     const raidRange = boardSheet.getRange(DATA_START_ROW, CHAR_COL_COUNT + 1, lastRow - HEADER_ROWS, allRaids.length * RAID_COL_SPAN);
 
+    // 초기화 전 배경색 저장 (칠해둔 셀 보존용)
+    const savedBgs = raidRange.getBackgrounds();
+
     raidRange.clearContent();
     raidRange.setBackground('#ffffff');
     raidRange.setFontColor('#ffffff');
@@ -504,23 +507,26 @@ function resetWeek() {
         .build()
     );
     applyRaidCellValidation(boardSheet, lastRow);
+
+    // #333333 셀만 배경색 복원
+    raidRange.setBackgrounds(savedBgs.map(row => row.map(bg => bg === '#333333' ? '#333333' : '#ffffff')));
   }
 
   // 레이드일정 H열 이후 초기화
   const scheduleSheet = ss.getSheetByName('레이드일정');
   const lastCol       = scheduleSheet.getLastColumn();
-  if (lastCol >= 8) {
-    const colCount = lastCol - 7;
-    scheduleSheet.getRange(ROW_DAY,        8, 1, colCount).clearContent();
-    scheduleSheet.getRange(ROW_TIME,       8, 1, colCount).clearContent();
-    scheduleSheet.getRange(ROW_SKILL,      8, 1, colCount).clearContent();
-    scheduleSheet.getRange(ROW_RAID,       8, 1, colCount).clearContent();
-    scheduleSheet.getRange(ROW_DIFFICULTY, 8, 1, colCount).clearContent();
+  if (lastCol >= 7) {
+    const colCount = lastCol - 6;
+    scheduleSheet.getRange(ROW_DAY,        7, 1, colCount).clearContent();
+    scheduleSheet.getRange(ROW_TIME,       7, 1, colCount).clearContent();
+    scheduleSheet.getRange(ROW_SKILL,      7, 1, colCount).clearContent();
+    scheduleSheet.getRange(ROW_RAID,       7, 1, colCount).clearContent();
+    scheduleSheet.getRange(ROW_DIFFICULTY, 7, 1, colCount).clearContent();
 
     for (let slot = 0; slot < TOTAL_SLOTS; slot++) {
-      scheduleSheet.getRange(NICK_START_ROW + slot * ROWS_PER_SLOT, 8, 1, colCount).clearContent();
+      scheduleSheet.getRange(NICK_START_ROW + slot * ROWS_PER_SLOT, 7, 1, colCount).clearContent();
     }
-    scheduleSheet.getRange(ROW_COMPLETE, 8, 1, colCount).setValue(false);
+    scheduleSheet.getRange(ROW_COMPLETE, 7, 1, colCount).setValue(false);
   }
 }
 
@@ -574,6 +580,11 @@ function applyRaidCellValidation(boardSheet, lastDataRow) {
 // 캐릭터 정보 갱신 (수동 버튼 + 트리거 공용)
 // ============================================================
 function updateCharacterStats() {
+  const now  = new Date();
+  const day  = now.getDay();  // 0=일, 3=수
+  const hour = now.getHours();
+  if (day === 3 && hour >= 5 && hour < 10) return; // 수요일 05~10시 스킵
+
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('캐릭터');
   const data  = sheet.getDataRange().getValues();
 
@@ -632,11 +643,43 @@ function updateCharacterStats() {
   });
 
   // 마지막 갱신 시간 기록 (I1셀)
-  const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+  const updatedAt = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
   sheet.getRange(1, 9)
-    .setValue('마지막 갱신: ' + now)
+    .setValue('마지막 갱신: ' + updatedAt)
     .setFontColor('#ffffff')
     .setFontSize(10)
+}
+
+function composeParties() {
+  try {
+    const BACKEND_URL = "http://sisnet2.iptime.org:48080/api/schedule/compose";
+
+    const response = UrlFetchApp.fetch(BACKEND_URL, {
+      method: "post",
+      muteHttpExceptions: true,
+      connectTimeout: 30000,
+      readTimeout: 90000,
+    });
+
+    const code = response.getResponseCode();
+    const body = response.getContentText();
+    Logger.log("HTTP %s | %s", code, body.substring(0, 200));
+
+    if (code !== 200) {
+      SpreadsheetApp.getUi().alert("❌ 백엔드 오류 (HTTP " + code + ")\n\n" + body.substring(0, 300));
+      return;
+    }
+
+    const json = JSON.parse(body);
+    const d = json.data;
+    SpreadsheetApp.getUi().alert(
+      "✅ 파티 편성 완료!\n" + d.partyCount + "파티 / 총 " + d.totalMembers + "명\n\n다음주레이드 시트를 확인하세요."
+    );
+
+  } catch (e) {
+    Logger.log("composeParties 오류: " + e.message + "\n" + e.stack);
+    SpreadsheetApp.getUi().alert("❌ 오류 발생\n\n" + e.message + "\n\nApps Script 실행 로그를 확인하세요.");
+  }
 }
 
 // ============================================================
@@ -648,8 +691,9 @@ function onOpen() {
     .addItem('현황판 구조 생성 / 재생성', 'setupRaidBoard')
     .addItem('현황판 수동 갱신', 'updateRaidBoard')
     .addSeparator()
-    .addItem('👤 캐릭터 정보 수동 갱신', 'updateCharacterStats')
+    .addItem('캐릭터 정보 수동 갱신', 'updateCharacterStats')
     .addSeparator()
-    .addItem('🔄 주차 리셋', 'resetWeek')
+    .addItem('주차 리셋', 'resetWeek')
+    .addItem('다음주 레이드', 'composeParties')
     .addToUi();
 }

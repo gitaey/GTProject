@@ -1,6 +1,8 @@
 package com.gtp.domain.schedule.controller;
 
 import com.gtp.domain.schedule.dto.CharacterScheduleItem;
+import com.gtp.domain.schedule.dto.ExpeditionScheduleResponse;
+import com.gtp.domain.schedule.dto.PartyCompositionResult;
 import com.gtp.domain.schedule.service.GoogleSheetsService;
 import com.gtp.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,34 @@ public class ScheduleController {
             @PathVariable String name) {
         List<CharacterScheduleItem> schedule = googleSheetsService.getCharacterSchedule(name);
         return ApiResponse.ok(schedule);
+    }
+
+    /**
+     * GET /api/schedule/expedition/{name}
+     * 캐릭터 이름으로 원정대 전체 레이드 일정 조회
+     */
+    @GetMapping("/expedition/{name}")
+    public ApiResponse<ExpeditionScheduleResponse> getExpeditionSchedule(
+            @PathVariable String name) {
+        ExpeditionScheduleResponse response = googleSheetsService.getExpeditionSchedule(name);
+        if (response == null) {
+            return ApiResponse.ok(null);
+        }
+        return ApiResponse.ok(response);
+    }
+
+    /**
+     * POST /api/schedule/compose
+     * 파티 자동 편성 후 다음주레이드 시트에 기입
+     */
+    @PostMapping("/compose")
+    public ApiResponse<PartyCompositionResult> composeParties() {
+        try {
+            PartyCompositionResult result = googleSheetsService.composeParties();
+            return ApiResponse.ok(result);
+        } catch (Exception e) {
+            return ApiResponse.ok(null);
+        }
     }
 
     @GetMapping("/debug")

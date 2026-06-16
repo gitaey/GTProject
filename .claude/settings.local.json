@@ -26,7 +26,8 @@
       "Bash(git -C \"D:/git/GTProject\" for-each-ref --format=\"delete %\\(refname\\)\" refs/original/)",
       "Bash(git -C \"D:/git/GTProject\" update-ref --stdin)",
       "Bash(git -C \"D:/git/GTProject\" reflog expire --expire=now --all)",
-      "Bash(git -C \"D:/git/GTProject\" gc --prune=now --aggressive)"
+      "Bash(git -C \"D:/git/GTProject\" gc --prune=now --aggressive)",
+      "Bash(./mvnw compile *)"
     ]
   }
 }
