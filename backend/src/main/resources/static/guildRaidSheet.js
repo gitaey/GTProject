@@ -77,12 +77,21 @@ function setupRaidBoard() {
 
   // 기존 시트 재사용 (없으면 새로 생성)
   let boardSheet = ss.getSheetByName('레이드현황판');
+  const savedDark = [];
   if (!boardSheet) {
     boardSheet = ss.insertSheet('레이드현황판');
   } else {
+    // #333333 채우기 셀 위치 저장 (스타일 재적용 후 맨 끝에서 복원)
+    const maxRow = boardSheet.getLastRow();
+    const maxCol = boardSheet.getLastColumn();
+    if (maxRow > 0 && maxCol > 0) {
+      const bgs = boardSheet.getRange(1, 1, maxRow, maxCol).getBackgrounds();
+      bgs.forEach((rowArr, r) => rowArr.forEach((bg, c) => {
+        if (bg.toLowerCase() === '#333333') savedDark.push([r + 1, c + 1]);
+      }));
+    }
     boardSheet.clearContents();
     boardSheet.clearFormats();
-    // 기존 병합 해제
     boardSheet.getRange(1, 1, boardSheet.getMaxRows(), boardSheet.getMaxColumns()).breakApart();
   }
   ss.setActiveSheet(boardSheet);
@@ -93,7 +102,7 @@ function setupRaidBoard() {
 
   // ── Row 1: 주차 헤더 ──
   boardSheet.getRange(1, 1, 1, totalCols).merge();
-  boardSheet.getRange(1, 1).setValue('6월 1주차');
+  boardSheet.getRange(1, 1).setFormula('=MONTH(today())&"월 "&(WEEKNUM(today())-WEEKNUM(today()-DAY(today())+1)+1)&"주차"');
 
   // ── Row 2: 캐릭터 정보 + 카테고리 헤더 ──
   boardSheet.getRange(2, 1, 1, CHAR_COL_COUNT).merge();
@@ -363,6 +372,9 @@ function setupRaidBoard() {
   boardSheet.setColumnWidth(COL_S, 112);
   boardSheet.setColumnWidth(COL_D, 112);
   boardSheet.setColumnWidth(16, 45);
+
+  // 모든 스타일 적용 후 #333333 셀 복원
+  savedDark.forEach(([r, c]) => boardSheet.getRange(r, c).setBackground('#333333'));
 }
 
 
@@ -592,62 +604,105 @@ function updateCharacterStats() {
   for (let i = 1; i < data.length; i++) {
     const nick = data[i][CHAR_NICK_COL - 1];
     if (!nick) continue;
-    targets.push({ rowIndex: i, nick });
+    targets.push({ rowIndex: i + 1, nick }); // 1-indexed 실제 시트 행
   }
   if (targets.length === 0) return;
 
-  // 로스트아크 API + 로펙 병렬 요청
   const apiKey = PropertiesService.getScriptProperties().getProperty('LOSTARK_API_KEY');
   if (!apiKey) {
     SpreadsheetApp.getUi().alert('API 키가 설정되지 않았습니다.\n메뉴 → [🗝️ API 키 설정]을 먼저 실행해주세요.');
     return;
   }
 
-  const lostarkRes = UrlFetchApp.fetchAll(targets.map(t => ({
-    url    : 'https://developer-lostark.game.onstove.com/armories/characters/'
-             + encodeURIComponent(t.nick) + '?filters=profiles+arkpassive',
-    headers: { 'Authorization': apiKey },
-    muteHttpExceptions: true
-  })));
+  fetchAndWriteCharacterStats(sheet, targets, apiKey);
 
-  const lopecRes = UrlFetchApp.fetchAll(targets.map(t => ({
-    url    : 'https://m.lopec.kr/character/specPoint/' + encodeURIComponent(t.nick),
-    headers: { 'User-Agent': 'Mozilla/5.0' },
-    muteHttpExceptions: true
-  })));
-
-  targets.forEach((t, idx) => {
-    const row = t.rowIndex + 1;
-
-    // 로스트아크 API 결과
-    if (lostarkRes[idx].getResponseCode() === 200) {
-      try {
-        const json = JSON.parse(lostarkRes[idx].getContentText());
-        sheet.getRange(row, CHAR_CLS_COL).setValue(json.ArmoryProfile.CharacterClassName || '');
-        sheet.getRange(row, CHAR_LV_COL).setValue(json.ArmoryProfile.ItemAvgLevel        || '');
-        sheet.getRange(row, CHAR_POW_COL).setValue(json.ArmoryProfile.CombatPower        || '');
-        sheet.getRange(row, CHAR_ARC_COL).setValue(json.ArkPassive?.Title                || '');
-      } catch(e) {
-        Logger.log('로스트아크 API 오류: ' + t.nick + ' / ' + e.message);
-      }
-    }
-
-    // 로펙 결과
-    try {
-      const html  = lopecRes[idx].getContentText('UTF-8').replace(/\n|\r/g, ' ');
-      const match = html.match(/달성 최고 점수<\/span>\s*<span[^>]*>([\d.]+)<\/span>/);
-      sheet.getRange(row, CHAR_ROB_COL).setValue(match ? match[1].trim() : '');
-    } catch(e) {
-      Logger.log('로펙 오류: ' + t.nick + ' / ' + e.message);
-    }
-  });
-
-  // 마지막 갱신 시간 기록 (I1셀)
   const updatedAt = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
-  sheet.getRange(1, 9)
-    .setValue('마지막 갱신: ' + updatedAt)
-    .setFontColor('#ffffff')
-    .setFontSize(10)
+  sheet.getRange(1, 9).setValue('마지막 갱신: ' + updatedAt).setFontColor('#ffffff').setFontSize(10);
+}
+
+// 50개씩 배치로 나눠 API 요청 후 시트에 기록
+function fetchAndWriteCharacterStats(sheet, targets, apiKey) {
+  const BATCH = 50;
+  for (let start = 0; start < targets.length; start += BATCH) {
+    const batch = targets.slice(start, start + BATCH);
+
+    const lostarkRes = UrlFetchApp.fetchAll(batch.map(t => ({
+      url    : 'https://developer-lostark.game.onstove.com/armories/characters/'
+               + encodeURIComponent(t.nick) + '?filters=profiles%2Barkpassive',
+      headers: { 'Authorization': apiKey },
+      muteHttpExceptions: true
+    })));
+
+    const lopecRes = UrlFetchApp.fetchAll(batch.map(t => ({
+      url    : 'https://m.lopec.kr/character/specPoint/' + encodeURIComponent(t.nick),
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      muteHttpExceptions: true
+    })));
+
+    batch.forEach((t, idx) => {
+      const row = t.rowIndex; // rowIndex가 이미 1-indexed 실제 시트 행
+      if (lostarkRes[idx].getResponseCode() === 200) {
+        try {
+          const json = JSON.parse(lostarkRes[idx].getContentText());
+          sheet.getRange(row, CHAR_CLS_COL).setValue(json.ArmoryProfile.CharacterClassName || '');
+          sheet.getRange(row, CHAR_LV_COL).setValue(json.ArmoryProfile.ItemAvgLevel        || '');
+          sheet.getRange(row, CHAR_POW_COL).setValue(json.ArmoryProfile.CombatPower        || '');
+          sheet.getRange(row, CHAR_ARC_COL).setValue(json.ArkPassive?.Title                || '');
+        } catch(e) {
+          Logger.log('로스트아크 API 오류: ' + t.nick + ' / ' + e.message);
+        }
+      }
+      try {
+        const html  = lopecRes[idx].getContentText('UTF-8').replace(/\n|\r/g, ' ');
+        const match = html.match(/달성 최고 점수<\/span>\s*<span[^>]*>([\d.]+)<\/span>/);
+        sheet.getRange(row, CHAR_ROB_COL).setValue(match ? match[1].trim() : '');
+      } catch(e) {
+        Logger.log('로펙 오류: ' + t.nick + ' / ' + e.message);
+      }
+    });
+  }
+}
+
+function updateCharacterStatsPartial() {
+  const ui       = SpreadsheetApp.getUi();
+  const response = ui.prompt('부분 갱신', '갱신할 행 범위를 입력하세요 (예: 5 또는 5-10)', ui.ButtonSet.OK_CANCEL);
+  if (response.getSelectedButton() !== ui.Button.OK) return;
+
+  const input = response.getResponseText().trim();
+  let startRow, endRow;
+  if (input.includes('-')) {
+    const parts = input.split('-');
+    startRow = parseInt(parts[0]);
+    endRow   = parseInt(parts[1]);
+  } else {
+    startRow = endRow = parseInt(input);
+  }
+  if (isNaN(startRow) || isNaN(endRow) || startRow < 2 || endRow < startRow) {
+    ui.alert('올바른 행 번호를 입력해주세요. (2행 이상)');
+    return;
+  }
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('캐릭터');
+  const data  = sheet.getRange(startRow, 1, endRow - startRow + 1, CHAR_COL_COUNT).getValues();
+
+  const targets = [];
+  data.forEach((row, i) => {
+    const nick = row[CHAR_NICK_COL - 1];
+    if (!nick) return;
+    targets.push({ rowIndex: startRow + i, nick });
+  });
+  if (targets.length === 0) { ui.alert('해당 범위에 닉네임이 없습니다.'); return; }
+
+  const apiKey = PropertiesService.getScriptProperties().getProperty('LOSTARK_API_KEY');
+  if (!apiKey) {
+    ui.alert('API 키가 설정되지 않았습니다.\n메뉴 → [🗝️ API 키 설정]을 먼저 실행해주세요.');
+    return;
+  }
+
+  fetchAndWriteCharacterStats(sheet, targets, apiKey);
+
+  const updatedAt = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+  sheet.getRange(1, 9).setValue('마지막 갱신: ' + updatedAt).setFontColor('#ffffff').setFontSize(10);
 }
 
 function composeParties() {
@@ -686,14 +741,65 @@ function composeParties() {
 // 상단 메뉴
 // ============================================================
 function onOpen() {
+  if (Session.getActiveUser().getEmail() !== 'work.gitaey@gmail.com') return;
+  if (Session.getActiveUser().getEmail() !== 'dev.jsh88@gmail.com') return;
+
   SpreadsheetApp.getUi()
-    .createMenu('🗡️ 길드 레이드')
+    .createMenu('길드 레이드')
     .addItem('현황판 구조 생성 / 재생성', 'setupRaidBoard')
     .addItem('현황판 수동 갱신', 'updateRaidBoard')
     .addSeparator()
     .addItem('캐릭터 정보 수동 갱신', 'updateCharacterStats')
+    .addItem('캐릭터 정보 부분 갱신', 'updateCharacterStatsPartial')
     .addSeparator()
     .addItem('주차 리셋', 'resetWeek')
     .addItem('다음주 레이드', 'composeParties')
+    .addSeparator()
+    .addItem('닉네임 드롭다운 설정', 'setupNicknameDropdown')
     .addToUi();
+}
+
+// 레이드일정 시트 닉네임 칸에 캐릭터 시트 B열 닉네임 드롭다운 설정
+function setupNicknameDropdown() {
+  const ss           = SpreadsheetApp.getActiveSpreadsheet();
+  const charSheet    = ss.getSheetByName('캐릭터');
+  const schedSheet   = ss.getSheetByName('레이드일정');
+
+  // 캐릭터 시트 B열에서 닉네임 수집 (빈 셀 제외)
+  const nickValues = charSheet.getRange('B2:B' + charSheet.getLastRow()).getValues();
+  const nicknames  = nickValues.map(r => r[0]).filter(v => v !== '');
+  if (nicknames.length === 0) return;
+
+  const sheetId = schedSheet.getSheetId();
+  const lastCol = Math.max(schedSheet.getLastColumn(), 7);
+
+  // 닉네임 행 목록 (9, 13, 17 ... TOTAL_SLOTS개 + 추가 행 41, 45)
+  const nickRows = [];
+  for (let slot = 0; slot < TOTAL_SLOTS; slot++) {
+    nickRows.push(NICK_START_ROW + slot * ROWS_PER_SLOT);
+  }
+  nickRows.push(41, 45);
+
+  const rule = {
+    condition: {
+      type  : 'ONE_OF_LIST',
+      values: nicknames.map(n => ({ userEnteredValue: String(n) }))
+    },
+    showCustomUi: false,
+    strict: false
+  };
+
+  const requests = nickRows.map(row => ({
+    setDataValidation: {
+      range: {
+        sheetId,
+        startRowIndex   : row - 1,
+        endRowIndex     : row,
+        startColumnIndex: 6,
+        endColumnIndex  : lastCol
+      },
+      rule
+    }
+  }));
+  Sheets.Spreadsheets.batchUpdate({ requests }, ss.getId());
 }

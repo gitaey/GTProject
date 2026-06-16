@@ -12,6 +12,8 @@ import com.gtp.domain.schedule.dto.PartyCompositionResult;
 import com.gtp.domain.schedule.dto.PartyMember;
 import com.google.api.services.sheets.v4.model.AddSheetRequest;
 import com.google.api.services.sheets.v4.model.BatchUpdateSpreadsheetRequest;
+import com.google.api.services.sheets.v4.model.BatchClearValuesRequest;
+import com.google.api.services.sheets.v4.model.BatchUpdateValuesRequest;
 import com.google.api.services.sheets.v4.model.ClearValuesRequest;
 import com.google.api.services.sheets.v4.model.Request;
 import com.google.api.services.sheets.v4.model.SheetProperties;
@@ -57,12 +59,12 @@ public class GoogleSheetsService {
     // index 0 = 4행(요일), 1 = 5행(시간), 2 = 6행(숙련도), 3 = 7행(레이드명)
     // index 4~ = 데이터 (캐릭터 슬롯, 슬롯당 4행)
     //   슬롯 내부: +0=닉네임, +1=클래스, +2=아이템레벨, +3=전투력
-    // H열(index 7)부터 파티 데이터 시작, 각 열이 하나의 파티
+    // G열(index 6)부터 파티 데이터 시작, 각 열이 하나의 파티
     private static final int ROW_DAY        = 0;  // 요일
     private static final int ROW_TIME       = 1;  // 시간
     private static final int ROW_RAID       = 3;  // 레이드명
     private static final int DATA_START_ROW = 5;  // 첫 번째 슬롯 닉네임 행 (index 4는 단계 행)
-    private static final int DATA_START_COL = 7;  // H열 (0-indexed)
+    private static final int DATA_START_COL = 6;  // G열 (0-indexed)
     private static final int SLOT_SIZE      = 4;  // 슬롯당 행 수
     private static final int SLOT_CLASS     = 1;  // 슬롯 내 클래스 offset
     private static final int SLOT_POWER     = 3;  // 슬롯 내 전투력 offset
@@ -803,13 +805,20 @@ public class GoogleSheetsService {
         return abCnt <= (hasZ ? 2 : 1);
     }
 
-    /** 다음주레이드 시트에 파티 데이터 기입 */
+    /** 다음주레이드 시트에 파티 데이터 기입 (닉네임 행만 초기화/기입, 클래스/아이템레벨/전투력 행은 유지) */
     private void writePartiesToSheet(List<List<PartyMember>> parties) throws IOException {
         ensureSheetExists(COMPOSE_SHEET_NAME);
 
-        // G7 이후 초기화 (A:F 및 G4:G6 요일/시간 행 보존, G7 레이드 종류는 자동 기입)
+        // G8 (평균 행) + 닉네임 행(G9, G13, G17...) 만 초기화 (G7 레이드 종류는 건드리지 않음)
+        int maxSlots = 8;
+        List<String> clearRanges = new ArrayList<>();
+        clearRanges.add(COMPOSE_SHEET_NAME + "!G3:Z3");
+        for (int slot = 0; slot < maxSlots; slot++) {
+            int sheetRow = 9 + slot * SLOT_SIZE;
+            clearRanges.add(COMPOSE_SHEET_NAME + "!G" + sheetRow + ":Z" + sheetRow);
+        }
         sheetsService.spreadsheets().values()
-                .clear(spreadsheetId, COMPOSE_SHEET_NAME + "!G7:Z200", new ClearValuesRequest())
+                .batchClear(spreadsheetId, new BatchClearValuesRequest().setRanges(clearRanges))
                 .execute();
 
         if (parties.isEmpty()) return;
@@ -819,15 +828,6 @@ public class GoogleSheetsService {
 
         // 각 파티 내 서폿을 맨 앞으로 정렬
         parties.forEach(party -> party.sort((a, b) -> Boolean.compare(!a.isSupport(), !b.isSupport())));
-
-        // ── G7: 각 파티 열에 레이드 종류 "성당, 세르카" 기입 (다중 선택 드롭다운)
-        List<Object> raidTypeRow = new ArrayList<>();
-        for (int i = 0; i < numParties; i++) raidTypeRow.add("성당, 세르카");
-        sheetsService.spreadsheets().values()
-                .update(spreadsheetId, COMPOSE_SHEET_NAME + "!G7",
-                        new ValueRange().setValues(Collections.singletonList(raidTypeRow)))
-                .setValueInputOption("USER_ENTERED")
-                .execute();
 
         // ── G8: 파티별 딜러 로펙 평균 기입
         List<Object> avgRow = new ArrayList<>();
@@ -839,43 +839,27 @@ public class GoogleSheetsService {
                     .average();
             avgRow.add(avg.isPresent() ? String.format("[D]평균 L%.0f", avg.getAsDouble()) : "");
         }
-        sheetsService.spreadsheets().values()
-                .update(spreadsheetId, COMPOSE_SHEET_NAME + "!G8",
-                        new ValueRange().setValues(Collections.singletonList(avgRow)))
-                .setValueInputOption("RAW")
-                .execute();
 
-        // ── G9 기준으로 파티 데이터 작성 (닉네임/클래스/아이템레벨/전투력, 서폿 우선)
-        List<List<Object>> grid = new ArrayList<>();
-
-        for (int row = 0; row < maxPartySize * SLOT_SIZE; row++) {
-            int memberIdx  = row / SLOT_SIZE;
-            int slotOffset = row % SLOT_SIZE;
-
-            List<Object> dataRow = new ArrayList<>();
+        // ── 닉네임 행만 기입 (G9, G13, G17... slotOffset=0 행만)
+        List<ValueRange> data = new ArrayList<>();
+        data.add(new ValueRange()
+                .setRange(COMPOSE_SHEET_NAME + "!G3")
+                .setValues(Collections.singletonList(avgRow)));
+        for (int memberIdx = 0; memberIdx < maxPartySize; memberIdx++) {
+            int sheetRow = 9 + memberIdx * SLOT_SIZE;
+            List<Object> nickRow = new ArrayList<>();
             for (int p = 0; p < numParties; p++) {
                 List<PartyMember> party = parties.get(p);
-                if (memberIdx < party.size()) {
-                    PartyMember m = party.get(memberIdx);
-                    switch (slotOffset) {
-                        case 0: dataRow.add(m.getNickname());       break;
-                        case 1: dataRow.add(m.getClassName());      break;
-                        case 2: dataRow.add(m.getItemLevel());      break;
-                        case 3: dataRow.add(m.getFormattedPower()); break;
-                        default: dataRow.add("");
-                    }
-                } else {
-                    dataRow.add("");
-                }
+                nickRow.add(memberIdx < party.size() ? party.get(memberIdx).getNickname() : "");
             }
-            grid.add(dataRow);
+            data.add(new ValueRange()
+                    .setRange(COMPOSE_SHEET_NAME + "!G" + sheetRow)
+                    .setValues(Collections.singletonList(nickRow)));
         }
-
-        // G9 위치에서 기입 시작 (G4:G6 사용자 입력 행은 건드리지 않음)
         sheetsService.spreadsheets().values()
-                .update(spreadsheetId, COMPOSE_SHEET_NAME + "!G9",
-                        new ValueRange().setValues(grid))
-                .setValueInputOption("RAW")
+                .batchUpdate(spreadsheetId, new BatchUpdateValuesRequest()
+                        .setValueInputOption("RAW")
+                        .setData(data))
                 .execute();
 
         log.info("다음주레이드 시트 파티 편성 완료: {}파티", parties.size());
