@@ -68,6 +68,8 @@ public class GoogleSheetsService {
     private static final int SLOT_SIZE      = 4;  // 슬롯당 행 수
     private static final int SLOT_CLASS     = 1;  // 슬롯 내 클래스 offset
     private static final int SLOT_POWER     = 3;  // 슬롯 내 전투력 offset
+    private static final int TOTAL_SLOTS    = 8;  // 파티당 최대 슬롯 수
+    private static final int ROW_COMPLETE   = 45; // 완료 체크박스 행 (시트 49행 = A4 기준 index 45)
 
     // 서폿 가능 직업 목록 (이 클래스라도 아크패시브가 딜러면 딜러로 분류)
     private static final Set<String> SUPPORT_CLASSES = new HashSet<>(
@@ -201,6 +203,8 @@ public class GoogleSheetsService {
             for (int col = DATA_START_COL; col < maxCol; col++) {
                 String raidName = cell(raidRow, col);
                 if (raidName.isEmpty()) continue; // 빈 열(머지 공백) 스킵
+                String complete = cell(row(values, ROW_COMPLETE), col);
+                if ("TRUE".equalsIgnoreCase(complete)) continue; // 완료된 레이드 스킵
 
                 String day  = cell(dayRow, col);
                 String time = cell(timeRow, col);
@@ -210,7 +214,8 @@ public class GoogleSheetsService {
                 String selfDisplay = null;
                 List<String> participants = new ArrayList<>();
 
-                for (int slotRow = DATA_START_ROW; slotRow < values.size(); slotRow += SLOT_SIZE) {
+                int slotLimit = DATA_START_ROW + TOTAL_SLOTS * SLOT_SIZE;
+                for (int slotRow = DATA_START_ROW; slotRow < slotLimit; slotRow += SLOT_SIZE) {
                     String nick  = cell(row(values, slotRow), col);
                     if (nick.isEmpty()) continue;
                     // 체크박스 값(TRUE/FALSE) 건너뜀
@@ -233,12 +238,23 @@ public class GoogleSheetsService {
                 }
             }
 
+            result.sort(Comparator.comparingInt(item -> dayOrder(item.getSchedule())));
             return result;
 
         } catch (IOException e) {
             log.error("Google Sheets 조회 오류: {}", e.getMessage());
             return Collections.emptyList();
         }
+    }
+
+    private static final List<String> DAY_ORDER = Arrays.asList(
+            "수요일", "목요일", "금요일", "토요일", "일요일", "월요일", "화요일");
+
+    private int dayOrder(String schedule) {
+        for (int i = 0; i < DAY_ORDER.size(); i++) {
+            if (schedule.contains(DAY_ORDER.get(i))) return i;
+        }
+        return DAY_ORDER.size();
     }
 
     public List<List<Object>> getRawData() {
@@ -350,6 +366,10 @@ public class GoogleSheetsService {
                 List<CharacterScheduleItem> schedules = getCharacterSchedule(member);
                 memberSchedules.add(new ExpeditionScheduleResponse.MemberSchedule(member, schedules));
             }
+            memberSchedules.sort(Comparator.comparingInt(ms -> {
+                List<CharacterScheduleItem> s = ms.getSchedules();
+                return (s == null || s.isEmpty()) ? DAY_ORDER.size() : dayOrder(s.get(0).getSchedule());
+            }));
             return new ExpeditionScheduleResponse(expResult.expeditionName, memberSchedules);
 
         } catch (IOException e) {
