@@ -27,7 +27,9 @@
       "Bash(git -C \"D:/git/GTProject\" update-ref --stdin)",
       "Bash(git -C \"D:/git/GTProject\" reflog expire --expire=now --all)",
       "Bash(git -C \"D:/git/GTProject\" gc --prune=now --aggressive)",
-      "Bash(./mvnw compile *)"
+      "Bash(./mvnw compile *)",
+      "Bash(xargs grep -l \"일정전체\")",
+      "Bash(git -C /d/git/GTProject diff HEAD -- backend/src/main/resources/static/guildRaidSheet.js)"
     ]
   }
 }

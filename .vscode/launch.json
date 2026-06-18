@@ -9,11 +9,11 @@
             "runtimeArgs": ["run", "dev"],
             "cwd": "${workspaceFolder}/frontend",
             "console": "integratedTerminal",
-            "serverReadyAction": {
-                "pattern": "Local:\\s+(https?://\\S+)",
-                "uriFormat": "%s",
-                "action": "openExternally"
-            }
+            // "serverReadyAction": {
+            //     "pattern": "Local:\\s+(https?://\\S+)",
+            //     "uriFormat": "%s",
+            //     "action": "openExternally"
+            // }
         },
         {
             "type": "java",
