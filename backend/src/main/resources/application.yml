@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://sisnet.iptime.org:9091/gtp
-    username: postgres
-    password: sis3047!@
+    url: ${DB_URL:jdbc:postgresql://sisnet.iptime.org:9091/gtp}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:sis3047!@}
     driver-class-name: org.postgresql.Driver
 
   jpa:

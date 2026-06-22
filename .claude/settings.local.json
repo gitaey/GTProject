@@ -31,7 +31,9 @@
       "Bash(xargs grep -l \"일정전체\")",
       "Bash(git -C /d/git/GTProject diff HEAD -- backend/src/main/resources/static/guildRaidSheet.js)",
       "Bash(curl -s -X POST http://localhost:8080/api/auth/login -H \"Content-Type: application/json\" -d \"{\\\\\"userId\\\\\":\\\\\"gitaey\\\\\",\\\\\"password\\\\\":\\\\\"sis3047!@\\\\\"}\")",
-      "Bash(curl -s http://localhost:8080/api/posts?size=1)"
+      "Bash(curl -s http://localhost:8080/api/posts?size=1)",
+      "Bash(node -e \"const bcrypt = require\\('bcrypt'\\); bcrypt.hash\\('sis3047!@', 10\\).then\\(h => console.log\\(h\\)\\)\")",
+      "Bash(npx bcryptjs-cli *)"
     ]
   }
 }
