@@ -171,9 +171,7 @@ export default function BlogPostPage() {
             {!loading && post && (
                 <div className="max-w-4xl mx-auto px-6 py-10 space-y-8">
                     {/* 커버 */}
-                    <div className={`h-64 sm:h-80 rounded-2xl bg-gradient-to-br ${post.gradient ?? 'from-gray-400 to-gray-600'} relative overflow-hidden shadow-lg`}>
-                        <div className="absolute inset-0 bg-black/10" />
-                    </div>
+                    <div className={`h-2 rounded-full bg-gradient-to-r ${post.gradient ?? 'from-gray-400 to-gray-600'}`} />
 
                     {/* 헤더 */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
