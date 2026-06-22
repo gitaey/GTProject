@@ -106,6 +106,12 @@ public class PostService {
         postRepository.delete(post);
     }
 
+    /* ── 일괄 삭제 ── */
+    @Transactional
+    public void deletePosts(java.util.List<Long> ids) {
+        postRepository.deleteAllById(ids);
+    }
+
     /* ── 추천 토글 ── */
     @Transactional
     public PostResponse toggleFeatured(Long id) {

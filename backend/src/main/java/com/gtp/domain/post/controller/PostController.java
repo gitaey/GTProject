@@ -70,6 +70,13 @@ public class PostController {
         postService.deletePost(id);
     }
 
+    /* 일괄 삭제 */
+    @DeleteMapping("/batch")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deletePosts(@RequestBody java.util.List<Long> ids) {
+        postService.deletePosts(ids);
+    }
+
     /* 추천 토글 */
     @PatchMapping("/{id}/featured")
     public ApiResponse<PostResponse> toggleFeatured(@PathVariable Long id) {

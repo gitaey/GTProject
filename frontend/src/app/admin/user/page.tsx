@@ -417,16 +417,16 @@ export default function UserManagementPage() {
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="bg-gray-50 border-b border-gray-100">
-                                        <th className="px-4 py-3 w-10">
+                                        <th className="px-4 py-3 w-10 align-middle">
                                             <input
                                                 type="checkbox"
                                                 checked={isAllChecked}
                                                 ref={(el) => { if (el) el.indeterminate = isIndeterminate }}
                                                 onChange={toggleAll}
-                                                className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
+                                                className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer block"
                                             />
                                         </th>
-                                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-12">No.</th>
+                                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-12 align-middle">No.</th>
                                         <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">아이디</th>
                                         <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">닉네임</th>
                                         <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">이메일</th>
@@ -460,12 +460,12 @@ export default function UserManagementPage() {
                                                 key={user.userId}
                                                 className={`hover:bg-gray-50/60 transition-colors ${selectedIds.has(user.userId) ? 'bg-blue-50/50' : ''}`}
                                             >
-                                                <td className="px-4 py-4">
+                                                <td className="px-4 py-4 align-middle">
                                                     <input
                                                         type="checkbox"
                                                         checked={selectedIds.has(user.userId)}
                                                         onChange={() => toggleOne(user.userId)}
-                                                        className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
+                                                        className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer block"
                                                     />
                                                 </td>
                                                 <td className="px-4 py-4 text-gray-400 text-xs">{currentPage * 10 + idx + 1}</td>

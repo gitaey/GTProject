@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -40,14 +40,27 @@ const updatePost = (id: number, data: PostRequest) =>
     apiFetch<Post>(`/api/posts/${id}`, { method: 'PUT', body: JSON.stringify(data) })
 
 const deletePost      = (id: number) => apiFetch<void>(`/api/posts/${id}`, { method: 'DELETE' })
+const deletePosts     = (ids: number[]) => apiFetch<void>('/api/posts/batch', { method: 'DELETE', body: JSON.stringify(ids) })
 const toggleFeatured  = (id: number) => apiFetch<Post>(`/api/posts/${id}/featured`, { method: 'PATCH' })
 const toggleStatus    = (id: number) => apiFetch<Post>(`/api/posts/${id}/status`,   { method: 'PATCH' })
 const fetchPostBySlug = (slug: string) => apiFetch<Post>(`/api/posts/${slug}`)
 
+/* ── 슬러그 자동 생성 ── */
+function toSlug(title: string): string {
+    const base = title
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+    const suffix = Date.now().toString(36)
+    return base ? `${base}-${suffix}` : `post-${suffix}`
+}
+
 /* ── 빈 폼 ── */
 const EMPTY_FORM: PostFormState = {
     slug: '', title: '', excerpt: '', content: '',
-    category: 'DEV', tags: '', emoji: '', gradient: GRADIENT_PRESETS[0].value,
+    category: 'DEV', tags: '', gradient: GRADIENT_PRESETS[0].value,
     featured: false, status: 'PUBLISHED',
 }
 
@@ -74,13 +87,16 @@ function AdminBlogContent() {
     const [statFilter, setStatFilter]   = useState('')
     const [currentPage, setCurrentPage] = useState(0)
 
-    const [modalType, setModalType]     = useState<'create' | 'edit' | 'delete' | null>(null)
+    const [modalType, setModalType]     = useState<'create' | 'edit' | 'delete' | 'batchDelete' | null>(null)
     const [selected, setSelected]       = useState<Post | null>(null)
     const [form, setForm]               = useState<PostFormState>(EMPTY_FORM)
     const [formError, setFormError]     = useState<string | null>(null)
     const [submitting, setSubmitting]   = useState(false)
     const abortRef        = useRef<AbortController | null>(null)
     const dismissedEditId = useRef<string | null>(null)
+    const slugAutoRef     = useRef(true)  // true면 제목 변경 시 슬러그 자동 채움
+
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
     const posts      = page?.content ?? []
     const totalPages = page?.totalPages ?? 0
@@ -95,6 +111,7 @@ function AdminBlogContent() {
             if (catFilter)  params.category = catFilter
             if (statFilter) params.status   = statFilter
             setPage(await fetchPosts(params))
+            setSelectedIds(new Set())
         } catch (e) {
             if (e instanceof Error && e.name !== 'AbortError') setError('목록을 불러오지 못했습니다.')
         } finally { setLoading(false) }
@@ -112,7 +129,22 @@ function AdminBlogContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams, page])
 
-    const openCreate = () => { setForm(EMPTY_FORM); setFormError(null); setModalType('create') }
+    const toggleAll = () => {
+        if (selectedIds.size === posts.length) {
+            setSelectedIds(new Set())
+        } else {
+            setSelectedIds(new Set(posts.map((p) => p.id)))
+        }
+    }
+
+    const toggleOne = (id: number) => {
+        const next = new Set(selectedIds)
+        if (next.has(id)) next.delete(id)
+        else next.add(id)
+        setSelectedIds(next)
+    }
+
+    const openCreate = () => { slugAutoRef.current = true; setForm(EMPTY_FORM); setFormError(null); setModalType('create') }
     const openEdit   = async (p: Post) => {
         setSelected(p)
         setFormError(null)
@@ -122,7 +154,7 @@ function AdminBlogContent() {
             setForm({
                 slug: full.slug, title: full.title, excerpt: full.excerpt ?? '',
                 content: full.content ?? '', category: full.category,
-                tags: full.tags.join(', '), emoji: full.emoji ?? '',
+                tags: full.tags.join(', '),
                 gradient: full.gradient ?? GRADIENT_PRESETS[0].value,
                 featured: full.featured, status: full.status,
             })
@@ -130,7 +162,7 @@ function AdminBlogContent() {
             setForm({
                 slug: p.slug, title: p.title, excerpt: p.excerpt ?? '',
                 content: p.content ?? '', category: p.category,
-                tags: p.tags.join(', '), emoji: p.emoji ?? '',
+                tags: p.tags.join(', '),
                 gradient: p.gradient ?? GRADIENT_PRESETS[0].value,
                 featured: p.featured, status: p.status,
             })
@@ -152,7 +184,6 @@ function AdminBlogContent() {
         content:  f.content  || undefined,
         category: f.category,
         tags: f.tags ? f.tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
-        emoji:    f.emoji    || undefined,
         gradient: f.gradient || undefined,
         featured: f.featured,
         status:   f.status,
@@ -181,6 +212,17 @@ function AdminBlogContent() {
         finally { setSubmitting(false) }
     }
 
+    const handleBatchDelete = async () => {
+        setSubmitting(true)
+        try {
+            await deletePosts(Array.from(selectedIds))
+            closeModal()
+            load()
+        } catch (e) {
+            setFormError(e instanceof Error ? e.message : '삭제에 실패했습니다.')
+        } finally { setSubmitting(false) }
+    }
+
     const handleToggleFeatured = async (p: Post) => {
         try { await toggleFeatured(p.id); load() }
         catch (e) { setError(e instanceof Error ? e.message : '처리 실패') }
@@ -192,7 +234,8 @@ function AdminBlogContent() {
     }
 
     const isEdit = modalType === 'edit'
-
+    const allChecked = posts.length > 0 && selectedIds.size === posts.length
+    const someChecked = selectedIds.size > 0 && selectedIds.size < posts.length
     return (
         <div className="flex min-h-screen bg-gray-50">
             <Sidebar />
@@ -221,6 +264,13 @@ function AdminBlogContent() {
                             <option value="PUBLISHED">발행</option>
                             <option value="DRAFT">임시저장</option>
                         </select>
+                        {selectedIds.size > 0 && (
+                            <button
+                                onClick={() => { setFormError(null); setModalType('batchDelete') }}
+                                className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors">
+                                <Trash2 size={15} /> 선택 삭제 ({selectedIds.size})
+                            </button>
+                        )}
                         <button onClick={openCreate}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors ml-auto">
                             <Plus size={15} /> 포스트 작성
@@ -242,8 +292,17 @@ function AdminBlogContent() {
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="bg-gray-50 border-b border-gray-100">
-                                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-12">No.</th>
-                                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">제목</th>
+                                        <th className="px-4 py-3 w-10 align-middle">
+                                            <input
+                                                type="checkbox"
+                                                checked={allChecked}
+                                                ref={(el) => { if (el) el.indeterminate = someChecked }}
+                                                onChange={toggleAll}
+                                                className="w-4 h-4 rounded border-gray-300 cursor-pointer block"
+                                            />
+                                        </th>
+                                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-12 align-middle">No.</th>
+                                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide align-middle">제목</th>
                                         <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-24">카테고리</th>
                                         <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-20">상태</th>
                                         <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-16">추천</th>
@@ -253,25 +312,27 @@ function AdminBlogContent() {
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
                                     {loading ? (
-                                        <tr><td colSpan={7} className="text-center py-16 text-gray-400">
+                                        <tr><td colSpan={8} className="text-center py-16 text-gray-400">
                                             <div className="flex flex-col items-center gap-2">
                                                 <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                                                 <span className="text-sm">불러오는 중...</span>
                                             </div>
                                         </td></tr>
                                     ) : posts.length === 0 ? (
-                                        <tr><td colSpan={7} className="text-center py-16 text-gray-400 text-sm">포스트가 없습니다.</td></tr>
+                                        <tr><td colSpan={8} className="text-center py-16 text-gray-400 text-sm">포스트가 없습니다.</td></tr>
                                     ) : posts.map((p, idx) => (
-                                        <tr key={p.id} className="hover:bg-gray-50/60 transition-colors">
+                                        <tr key={p.id} className={'hover:bg-gray-50/60 transition-colors' + (selectedIds.has(p.id) ? ' bg-blue-50/40' : '')}>
+                                            <td className="px-4 py-4 align-middle">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.has(p.id)}
+                                                    onChange={() => toggleOne(p.id)}
+                                                    className="w-4 h-4 rounded border-gray-300 cursor-pointer block"
+                                                />
+                                            </td>
                                             <td className="px-4 py-4 text-gray-400 text-xs">{currentPage * 15 + idx + 1}</td>
                                             <td className="px-4 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-lg">{p.emoji ?? '📝'}</span>
-                                                    <div>
-                                                        <p className="font-medium text-gray-800 text-sm line-clamp-1">{p.title}</p>
-                                                        <p className="text-xs text-gray-400 mt-0.5">{p.slug}</p>
-                                                    </div>
-                                                </div>
+                                                <p className="font-medium text-gray-800 text-sm line-clamp-1">{p.title}</p>
                                             </td>
                                             <td className="px-4 py-4">
                                                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CATEGORY_BADGE[p.category]}`}>
@@ -348,7 +409,6 @@ function AdminBlogContent() {
                     </div>
                 </main>
             </div>
-
             {/* ── 작성/수정 모달 ── */}
             {(modalType === 'create' || modalType === 'edit') && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -362,29 +422,31 @@ function AdminBlogContent() {
 
                         <div className="overflow-y-auto px-6 py-5 space-y-4">
 
-                            {/* 슬러그 + 카테고리 */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1.5">슬러그 <span className="text-red-400">*</span></label>
-                                    <input type="text" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })}
-                                        placeholder="url-friendly-slug"
-                                        className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1.5">카테고리 <span className="text-red-400">*</span></label>
-                                    <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as PostCategoryCode })}
-                                        className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white">
-                                        {CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                                    </select>
-                                </div>
+                            {/* 카테고리 */}
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1.5">카테고리 <span className="text-red-400">*</span></label>
+                                <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as PostCategoryCode })}
+                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white">
+                                    {CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                                </select>
                             </div>
 
+                            {/* 제목 → 슬러그 자동 생성 */}
                             <div>
                                 <label className="block text-xs font-medium text-gray-600 mb-1.5">제목 <span className="text-red-400">*</span></label>
-                                <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
+                                <input type="text" value={form.title}
+                                    onChange={(e) => {
+                                        const title = e.target.value
+                                        if (modalType === 'create' && slugAutoRef.current) {
+                                            setForm({ ...form, title, slug: toSlug(title) })
+                                        } else {
+                                            setForm({ ...form, title })
+                                        }
+                                    }}
                                     placeholder="포스트 제목"
                                     className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
                             </div>
+
 
                             <div>
                                 <label className="block text-xs font-medium text-gray-600 mb-1.5">요약 <span className="text-gray-400 font-normal">(선택)</span></label>
@@ -400,19 +462,11 @@ function AdminBlogContent() {
                                     className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none font-mono" />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1.5">태그 <span className="text-gray-400 font-normal">(쉼표 구분)</span></label>
-                                    <input type="text" value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })}
-                                        placeholder="React, TypeScript, 육아"
-                                        className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1.5">이모지</label>
-                                    <input type="text" value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })}
-                                        placeholder="🚀"
-                                        className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
-                                </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1.5">태그 <span className="text-gray-400 font-normal">(쉼표 구분)</span></label>
+                                <input type="text" value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })}
+                                    placeholder="React, TypeScript, 육아"
+                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
                             </div>
 
                             <div>
@@ -493,6 +547,34 @@ function AdminBlogContent() {
                             <button onClick={handleDelete} disabled={submitting}
                                 className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors">
                                 {submitting ? '삭제 중...' : '삭제'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── 일괄 삭제 확인 ── */}
+            {modalType === 'batchDelete' && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+                        <div className="px-6 pt-6 pb-4 text-center">
+                            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Trash2 size={22} className="text-red-500" />
+                            </div>
+                            <h3 className="font-semibold text-gray-800 mb-2">선택 포스트 삭제</h3>
+                            <p className="text-sm text-gray-500">
+                                선택한 <span className="font-medium text-gray-700">{selectedIds.size}개</span> 포스트를
+                                <br />정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                            </p>
+                            {formError && <p className="mt-3 text-xs text-red-500">{formError}</p>}
+                        </div>
+                        <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+                            <button onClick={closeModal} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                                취소
+                            </button>
+                            <button onClick={handleBatchDelete} disabled={submitting}
+                                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors">
+                                {submitting ? '삭제 중...' : `${selectedIds.size}개 삭제`}
                             </button>
                         </div>
                     </div>

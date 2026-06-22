@@ -52,7 +52,6 @@ export interface PostFormState {
     content: string
     category: PostCategoryCode
     tags: string          // 쉼표 구분 문자열로 입력
-    emoji: string
     gradient: string
     featured: boolean
     status: PostStatusCode

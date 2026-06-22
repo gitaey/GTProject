@@ -2,10 +2,24 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Search, Tag, ArrowUpRight, Code2, Baby, Coffee, BookOpen, Heart, LayoutDashboard } from 'lucide-react'
-import type { Post, PostCategoryCode, PostPage } from '@/types/post'
+import { Search, Tag, ArrowUpRight, Code2, Baby, Coffee, BookOpen, Heart, LayoutDashboard, Plus, X, Star } from 'lucide-react'
+import type { Post, PostCategoryCode, PostFormState, PostPage, PostRequest, PostStatusCode } from '@/types/post'
+import { CATEGORY_OPTIONS, GRADIENT_PRESETS } from '@/types/post'
+import { useAuthStore, getToken } from '@/store/authStore'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
+
+function toSlug(title: string): string {
+    const base = title.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+    const suffix = Date.now().toString(36)
+    return base ? `${base}-${suffix}` : `post-${suffix}`
+}
+
+const EMPTY_FORM: PostFormState = {
+    slug: '', title: '', excerpt: '', content: '',
+    category: 'DEV', tags: '', gradient: GRADIENT_PRESETS[0].value,
+    featured: false, status: 'PUBLISHED',
+}
 
 const CATEGORY_BADGE: Record<PostCategoryCode, string> = {
     DEV:       'bg-blue-100 text-blue-700',
@@ -26,33 +40,30 @@ function formatDate(iso: string) {
 
 function FeaturedPost({ post }: { post: Post }) {
     return (
-        <Link href={`/blog/${post.slug}`} className="group block">
-            <div className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100">
-                <div className={`h-64 bg-gradient-to-br ${post.gradient ?? 'from-gray-400 to-gray-600'} flex items-center justify-center relative overflow-hidden`}>
-                    <div className="absolute inset-0 bg-black/10" />
-                    <span className="text-7xl relative z-10 drop-shadow-lg select-none">{post.emoji ?? '📝'}</span>
-                    <div className="absolute top-5 left-5">
-                        <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-white">
-                            ✨ 추천 포스트
-                        </span>
-                    </div>
-                </div>
-                <div className="p-7">
-                    <div className="flex items-center gap-3 mb-3">
+        <Link href={`/blog/${post.slug}`} className="group block h-full">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 h-full flex flex-col overflow-hidden">
+                <div className={`h-3 bg-gradient-to-r ${post.gradient ?? 'from-gray-400 to-gray-600'} shrink-0`} />
+                <div className="p-7 flex flex-col flex-1">
+                    <div className="flex items-center gap-2 mb-4">
                         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${CATEGORY_BADGE[post.category]}`}>
                             {post.categoryLabel}
                         </span>
-                        <span className="text-xs text-gray-400 ml-auto">{formatDate(post.createdAt)}</span>
+                        <span className="text-xs font-medium text-amber-500 bg-amber-50 px-2.5 py-1 rounded-full">✦ 추천</span>
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-blue-600 transition-colors line-clamp-2 leading-snug">
+                    <h2 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-blue-600 transition-colors line-clamp-2 leading-snug">
                         {post.title}
                     </h2>
-                    <p className="text-sm text-gray-500 line-clamp-3 leading-relaxed">{post.excerpt}</p>
-                    <div className="flex items-center gap-2 mt-5">
-                        {post.tags.slice(0, 4).map((tag) => (
-                            <span key={tag} className="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">#{tag}</span>
-                        ))}
-                        <ArrowUpRight size={18} className="ml-auto text-gray-300 group-hover:text-blue-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                    <p className="text-sm text-gray-500 line-clamp-3 leading-relaxed flex-1">{post.excerpt}</p>
+                    <div className="flex items-center justify-between mt-5 pt-4 border-t border-gray-50">
+                        <div className="flex gap-1.5 flex-wrap">
+                            {post.tags.slice(0, 3).map((tag) => (
+                                <span key={tag} className="text-[11px] text-gray-400 px-2 py-0.5 bg-gray-50 rounded-md">#{tag}</span>
+                            ))}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs text-gray-400 shrink-0">
+                            <span>{formatDate(post.createdAt)}</span>
+                            <ArrowUpRight size={14} className="text-gray-300 group-hover:text-blue-500 transition-colors" />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -62,30 +73,27 @@ function FeaturedPost({ post }: { post: Post }) {
 
 function PostCard({ post }: { post: Post }) {
     return (
-        <Link href={`/blog/${post.slug}`} className="group block">
-            <div className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 border border-gray-100 h-full flex flex-col">
-                <div className={`h-44 bg-gradient-to-br ${post.gradient ?? 'from-gray-400 to-gray-600'} flex items-center justify-center relative overflow-hidden shrink-0`}>
-                    <div className="absolute inset-0 bg-black/5" />
-                    <span className="text-5xl relative z-10 drop-shadow select-none">{post.emoji ?? '📝'}</span>
-                </div>
+        <Link href={`/blog/${post.slug}`} className="group block h-full">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 h-full flex flex-col overflow-hidden">
+                <div className={`h-1.5 bg-gradient-to-r ${post.gradient ?? 'from-gray-400 to-gray-600'} shrink-0`} />
                 <div className="p-5 flex flex-col flex-1">
-                    <div className="flex items-center gap-2 mb-2.5">
+                    <div className="flex items-center gap-2 mb-3">
                         <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${CATEGORY_BADGE[post.category]}`}>
                             {post.categoryLabel}
                         </span>
+                        <span className="text-[11px] text-gray-400 ml-auto">{formatDate(post.createdAt)}</span>
                     </div>
                     <h3 className="text-base font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors line-clamp-2 leading-snug">
                         {post.title}
                     </h3>
                     <p className="text-xs text-gray-500 line-clamp-3 leading-relaxed flex-1">{post.excerpt}</p>
-                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-50">
-                        <div className="flex gap-1 flex-wrap">
-                            {post.tags.slice(0, 2).map((tag) => (
-                                <span key={tag} className="text-[10px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full">#{tag}</span>
+                    {post.tags.length > 0 && (
+                        <div className="flex gap-1 flex-wrap mt-4 pt-3 border-t border-gray-50">
+                            {post.tags.slice(0, 3).map((tag) => (
+                                <span key={tag} className="text-[10px] text-gray-400 px-1.5 py-0.5 bg-gray-50 rounded-md">#{tag}</span>
                             ))}
                         </div>
-                        <span className="text-[11px] text-gray-400 shrink-0">{formatDate(post.createdAt)}</span>
-                    </div>
+                    )}
                 </div>
             </div>
         </Link>
@@ -93,12 +101,55 @@ function PostCard({ post }: { post: Post }) {
 }
 
 export default function BlogPage() {
+    const { user } = useAuthStore()
+    const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+
     const [page, setPage]             = useState<PostPage | null>(null)
     const [loading, setLoading]       = useState(false)
     const [category, setCategory]     = useState<PostCategoryCode | ''>('')
     const [keyword, setKeyword]       = useState('')
     const [tagFilter, setTagFilter]   = useState('')
-    const abortRef = useRef<AbortController | null>(null)
+    const abortRef    = useRef<AbortController | null>(null)
+    const slugAutoRef = useRef(true)
+
+    const [showCreateModal, setShowCreateModal] = useState(false)
+    const [createForm, setCreateForm]           = useState<PostFormState>(EMPTY_FORM)
+    const [createError, setCreateError]         = useState<string | null>(null)
+    const [createSubmitting, setCreateSubmitting] = useState(false)
+
+    const openCreateModal = () => {
+        slugAutoRef.current = true
+        setCreateForm(EMPTY_FORM)
+        setCreateError(null)
+        setShowCreateModal(true)
+    }
+
+    const handleCreate = async () => {
+        setCreateSubmitting(true); setCreateError(null)
+        try {
+            const token = getToken()
+            const req: PostRequest = {
+                slug: createForm.slug, title: createForm.title,
+                excerpt:  createForm.excerpt  || undefined,
+                content:  createForm.content  || undefined,
+                category: createForm.category,
+                tags: createForm.tags ? createForm.tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
+                gradient: createForm.gradient || undefined,
+                featured: createForm.featured, status: createForm.status,
+            }
+            const res = await fetch(`${API}/api/posts`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify(req),
+            })
+            const json = await res.json()
+            if (!json.success) throw new Error(json.message)
+            setShowCreateModal(false)
+            load()
+        } catch (e) {
+            setCreateError(e instanceof Error ? e.message : '작성에 실패했습니다.')
+        } finally { setCreateSubmitting(false) }
+    }
 
     const load = useCallback(async () => {
         abortRef.current?.abort()
@@ -167,6 +218,15 @@ export default function BlogPage() {
                                 onChange={(e) => { setKeyword(e.target.value); setTagFilter('') }}
                                 className="w-40 pl-8 pr-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 focus:w-52 transition-all" />
                         </div>
+
+                        {/* 포스트 작성 (슈퍼관리자) */}
+                        {isSuperAdmin && (
+                            <button onClick={openCreateModal}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+                                <Plus size={14} />
+                                <span className="hidden sm:inline">작성</span>
+                            </button>
+                        )}
 
                         {/* 대시보드 이동 */}
                         <Link href="/" className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-colors">
@@ -286,6 +346,106 @@ export default function BlogPage() {
                     </Link>
                 </footer>
             </div>
+
+            {/* ── 포스트 작성 모달 ── */}
+            {showCreateModal && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+                            <h3 className="font-semibold text-gray-800">포스트 작성</h3>
+                            <button onClick={() => setShowCreateModal(false)} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400">
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="overflow-y-auto px-6 py-5 space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1.5">카테고리 <span className="text-red-400">*</span></label>
+                                <select value={createForm.category} onChange={(e) => setCreateForm({ ...createForm, category: e.target.value as PostCategoryCode })}
+                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white">
+                                    {CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1.5">제목 <span className="text-red-400">*</span></label>
+                                <input type="text" value={createForm.title}
+                                    onChange={(e) => {
+                                        const title = e.target.value
+                                        if (slugAutoRef.current) {
+                                            setCreateForm({ ...createForm, title, slug: toSlug(title) })
+                                        } else {
+                                            setCreateForm({ ...createForm, title })
+                                        }
+                                    }}
+                                    placeholder="포스트 제목"
+                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1.5">요약 <span className="text-gray-400 font-normal">(선택)</span></label>
+                                <textarea value={createForm.excerpt} onChange={(e) => setCreateForm({ ...createForm, excerpt: e.target.value })}
+                                    placeholder="포스트 목록에 표시될 요약 (최대 200자)" rows={2}
+                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1.5">본문 <span className="text-gray-400 font-normal">(마크다운)</span></label>
+                                <textarea value={createForm.content} onChange={(e) => setCreateForm({ ...createForm, content: e.target.value })}
+                                    placeholder="## 제목&#10;&#10;본문 내용을 마크다운으로 작성하세요." rows={8}
+                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none font-mono" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1.5">태그 <span className="text-gray-400 font-normal">(쉼표 구분)</span></label>
+                                <input type="text" value={createForm.tags} onChange={(e) => setCreateForm({ ...createForm, tags: e.target.value })}
+                                    placeholder="React, TypeScript, 육아"
+                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1.5">커버 그라디언트</label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {GRADIENT_PRESETS.map((g) => (
+                                        <button key={g.value} type="button" onClick={() => setCreateForm({ ...createForm, gradient: g.value })}
+                                            className={`h-10 rounded-lg bg-gradient-to-br ${g.value} transition-all ${
+                                                createForm.gradient === g.value ? 'ring-2 ring-offset-2 ring-blue-500 scale-105' : 'hover:scale-105'
+                                            }`} title={g.label} />
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1.5">상태</label>
+                                    <select value={createForm.status} onChange={(e) => setCreateForm({ ...createForm, status: e.target.value as PostStatusCode })}
+                                        className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white">
+                                        <option value="PUBLISHED">발행</option>
+                                        <option value="DRAFT">임시저장</option>
+                                    </select>
+                                </div>
+                                <div className="flex items-end pb-2.5">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" checked={createForm.featured}
+                                            onChange={(e) => setCreateForm({ ...createForm, featured: e.target.checked })}
+                                            className="w-4 h-4 rounded border-gray-300 cursor-pointer" />
+                                        <span className="text-sm text-gray-700 flex items-center gap-1">
+                                            <Star size={14} className="text-amber-400" /> 추천 포스트
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        {createError && (
+                            <div className="px-6 py-2 shrink-0">
+                                <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{createError}</div>
+                            </div>
+                        )}
+                        <div className="flex gap-3 px-6 py-4 border-t border-gray-100 shrink-0">
+                            <button onClick={() => setShowCreateModal(false)} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                                취소
+                            </button>
+                            <button onClick={handleCreate} disabled={createSubmitting}
+                                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                                {createSubmitting ? '발행 중...' : '발행'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

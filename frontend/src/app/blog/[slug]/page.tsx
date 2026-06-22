@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Tag, Calendar, BookOpen, LayoutDashboard, PenLine, Trash2, X } from 'lucide-react'
-import type { Post } from '@/types/post'
+import { ArrowLeft, Tag, Calendar, BookOpen, LayoutDashboard, PenLine, Trash2, X, Star } from 'lucide-react'
+import type { Post, PostCategoryCode, PostFormState, PostRequest, PostStatusCode } from '@/types/post'
+import { CATEGORY_OPTIONS, GRADIENT_PRESETS } from '@/types/post'
 import { useAuthStore, getToken } from '@/store/authStore'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
@@ -48,6 +49,11 @@ export default function BlogPostPage() {
     const [deleting, setDeleting]       = useState(false)
     const [deleteError, setDeleteError] = useState<string | null>(null)
 
+    const [showEditModal, setShowEditModal]   = useState(false)
+    const [editForm, setEditForm]             = useState<PostFormState | null>(null)
+    const [editError, setEditError]           = useState<string | null>(null)
+    const [editSubmitting, setEditSubmitting] = useState(false)
+
     useEffect(() => {
         fetch(`${API}/api/posts/${slug}`)
             .then((r) => r.json())
@@ -55,6 +61,47 @@ export default function BlogPostPage() {
             .catch(() => setNotFound(true))
             .finally(() => setLoading(false))
     }, [slug])
+
+    const openEditModal = () => {
+        if (!post) return
+        setEditForm({
+            slug: post.slug, title: post.title, excerpt: post.excerpt ?? '',
+            content: post.content ?? '', category: post.category,
+            tags: post.tags.join(', '),
+            gradient: post.gradient ?? GRADIENT_PRESETS[0].value,
+            featured: post.featured, status: post.status,
+        })
+        setEditError(null)
+        setShowEditModal(true)
+    }
+
+    const handleUpdate = async () => {
+        if (!post || !editForm) return
+        setEditSubmitting(true); setEditError(null)
+        try {
+            const token = getToken()
+            const req: PostRequest = {
+                slug: editForm.slug, title: editForm.title,
+                excerpt:  editForm.excerpt  || undefined,
+                content:  editForm.content  || undefined,
+                category: editForm.category,
+                tags: editForm.tags ? editForm.tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
+                gradient: editForm.gradient || undefined,
+                featured: editForm.featured, status: editForm.status,
+            }
+            const res = await fetch(`${API}/api/posts/${post.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify(req),
+            })
+            const json = await res.json()
+            if (!json.success) throw new Error(json.message)
+            setPost(json.data)
+            setShowEditModal(false)
+        } catch (e) {
+            setEditError(e instanceof Error ? e.message : '수정에 실패했습니다.')
+        } finally { setEditSubmitting(false) }
+    }
 
     const handleDelete = async () => {
         if (!post) return
@@ -124,9 +171,8 @@ export default function BlogPostPage() {
             {!loading && post && (
                 <div className="max-w-4xl mx-auto px-6 py-10 space-y-8">
                     {/* 커버 */}
-                    <div className={`h-64 sm:h-80 rounded-2xl bg-gradient-to-br ${post.gradient ?? 'from-gray-400 to-gray-600'} flex items-center justify-center relative overflow-hidden shadow-lg`}>
+                    <div className={`h-64 sm:h-80 rounded-2xl bg-gradient-to-br ${post.gradient ?? 'from-gray-400 to-gray-600'} relative overflow-hidden shadow-lg`}>
                         <div className="absolute inset-0 bg-black/10" />
-                        <span className="text-8xl relative z-10 drop-shadow-xl select-none">{post.emoji ?? '📝'}</span>
                     </div>
 
                     {/* 헤더 */}
@@ -134,12 +180,12 @@ export default function BlogPostPage() {
                         {/* 슈퍼관리자 액션 버튼 */}
                         {isSuperAdmin && (
                             <div className="flex items-center justify-end gap-2 mb-5">
-                                <Link
-                                    href={`/admin/blog?edit=${post.id}`}
+                                <button
+                                    onClick={openEditModal}
                                     className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
                                 >
                                     <PenLine size={14} /> 수정
-                                </Link>
+                                </button>
                                 <button
                                     onClick={() => { setShowDeleteModal(true); setDeleteError(null) }}
                                     className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium text-red-500 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
@@ -195,6 +241,98 @@ export default function BlogPostPage() {
                     <footer className="text-center py-6 border-t border-gray-100">
                         <p className="text-sm text-gray-400">© 2026 기빵 블로그</p>
                     </footer>
+                </div>
+            )}
+
+            {/* ── 수정 모달 ── */}
+            {showEditModal && editForm && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+                            <h3 className="font-semibold text-gray-800">포스트 수정</h3>
+                            <button onClick={() => setShowEditModal(false)} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400">
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="overflow-y-auto px-6 py-5 space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1.5">카테고리 <span className="text-red-400">*</span></label>
+                                <select value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value as PostCategoryCode })}
+                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white">
+                                    {CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1.5">제목 <span className="text-red-400">*</span></label>
+                                <input type="text" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                                    placeholder="포스트 제목"
+                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1.5">요약 <span className="text-gray-400 font-normal">(선택)</span></label>
+                                <textarea value={editForm.excerpt} onChange={(e) => setEditForm({ ...editForm, excerpt: e.target.value })}
+                                    placeholder="포스트 목록에 표시될 요약 (최대 200자)" rows={2}
+                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1.5">본문 <span className="text-gray-400 font-normal">(마크다운)</span></label>
+                                <textarea value={editForm.content} onChange={(e) => setEditForm({ ...editForm, content: e.target.value })}
+                                    placeholder="## 제목&#10;&#10;본문 내용을 마크다운으로 작성하세요." rows={8}
+                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none font-mono" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1.5">태그 <span className="text-gray-400 font-normal">(쉼표 구분)</span></label>
+                                <input type="text" value={editForm.tags} onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })}
+                                    placeholder="React, TypeScript, 육아"
+                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1.5">커버 그라디언트</label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {GRADIENT_PRESETS.map((g) => (
+                                        <button key={g.value} type="button" onClick={() => setEditForm({ ...editForm, gradient: g.value })}
+                                            className={`h-10 rounded-lg bg-gradient-to-br ${g.value} transition-all ${
+                                                editForm.gradient === g.value ? 'ring-2 ring-offset-2 ring-blue-500 scale-105' : 'hover:scale-105'
+                                            }`} title={g.label} />
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1.5">상태</label>
+                                    <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value as PostStatusCode })}
+                                        className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white">
+                                        <option value="PUBLISHED">발행</option>
+                                        <option value="DRAFT">임시저장</option>
+                                    </select>
+                                </div>
+                                <div className="flex items-end pb-2.5">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" checked={editForm.featured}
+                                            onChange={(e) => setEditForm({ ...editForm, featured: e.target.checked })}
+                                            className="w-4 h-4 rounded border-gray-300 cursor-pointer" />
+                                        <span className="text-sm text-gray-700 flex items-center gap-1">
+                                            <Star size={14} className="text-amber-400" /> 추천 포스트
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        {editError && (
+                            <div className="px-6 py-2 shrink-0">
+                                <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{editError}</div>
+                            </div>
+                        )}
+                        <div className="flex gap-3 px-6 py-4 border-t border-gray-100 shrink-0">
+                            <button onClick={() => setShowEditModal(false)} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                                취소
+                            </button>
+                            <button onClick={handleUpdate} disabled={editSubmitting}
+                                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                                {editSubmitting ? '저장 중...' : '저장'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
