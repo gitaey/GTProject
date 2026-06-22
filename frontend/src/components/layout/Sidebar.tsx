@@ -16,6 +16,7 @@ import {
     ChevronRight,
     Layers,
     PenLine,
+    Bot,
 } from 'lucide-react'
 
 interface SubMenuItem {
@@ -49,6 +50,7 @@ const menuItems: MenuItem[] = [
             { id: 'admin-blog',       label: '블로그 관리', href: '/admin/blog',       icon: <PenLine size={15} /> },
             { id: 'admin-menu',       label: '메뉴 관리',   href: '/admin/menu',       icon: <MenuIcon size={15} /> },
             { id: 'admin-permission', label: '권한 관리',   href: '/admin/permission', icon: <Shield size={15} /> },
+            { id: 'admin-botlog',     label: '봇 로그',     href: '/admin/bot-log',    icon: <Bot size={15} /> },
         ],
     },
     {

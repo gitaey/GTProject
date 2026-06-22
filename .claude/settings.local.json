@@ -29,7 +29,9 @@
       "Bash(git -C \"D:/git/GTProject\" gc --prune=now --aggressive)",
       "Bash(./mvnw compile *)",
       "Bash(xargs grep -l \"일정전체\")",
-      "Bash(git -C /d/git/GTProject diff HEAD -- backend/src/main/resources/static/guildRaidSheet.js)"
+      "Bash(git -C /d/git/GTProject diff HEAD -- backend/src/main/resources/static/guildRaidSheet.js)",
+      "Bash(curl -s -X POST http://localhost:8080/api/auth/login -H \"Content-Type: application/json\" -d \"{\\\\\"userId\\\\\":\\\\\"gitaey\\\\\",\\\\\"password\\\\\":\\\\\"sis3047!@\\\\\"}\")",
+      "Bash(curl -s http://localhost:8080/api/posts?size=1)"
     ]
   }
 }

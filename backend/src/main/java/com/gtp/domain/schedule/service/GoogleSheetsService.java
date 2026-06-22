@@ -10,6 +10,7 @@ import com.gtp.domain.schedule.dto.CharacterScheduleItem;
 import com.gtp.domain.schedule.dto.ExpeditionScheduleResponse;
 import com.gtp.domain.schedule.dto.PartyCompositionResult;
 import com.gtp.domain.schedule.dto.PartyMember;
+import com.gtp.domain.schedule.dto.TodayPartyItem;
 import com.google.api.services.sheets.v4.model.AddSheetRequest;
 import com.google.api.services.sheets.v4.model.BatchUpdateSpreadsheetRequest;
 import com.google.api.services.sheets.v4.model.BatchClearValuesRequest;
@@ -31,6 +32,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalDouble;
@@ -132,7 +134,7 @@ public class GoogleSheetsService {
         if (cachedData != null && (now - cacheTime) < CACHE_TTL_MS) {
             return cachedData;
         }
-        String range = sheetName + "!A4:Z";
+        String range = sheetName + "!A4:AZ";
         ValueRange response = sheetsService.spreadsheets().values()
                 .get(spreadsheetId, range)
                 .execute();
@@ -375,6 +377,54 @@ public class GoogleSheetsService {
         } catch (IOException e) {
             log.error("원정대 일정 조회 오류: {}", e.getMessage());
             return null;
+        }
+    }
+
+    /** 오늘 요일에 해당하는 미완료 파티 목록 반환 */
+    public List<TodayPartyItem> getTodayParties() {
+        if (sheetsService == null) return Collections.emptyList();
+        try {
+            List<List<Object>> values = getSheetData();
+            if (values == null || values.size() <= DATA_START_ROW) return Collections.emptyList();
+
+            String[] dayNames = {"일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"};
+            String today = dayNames[Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1];
+
+            List<Object> dayRow  = row(values, ROW_DAY);
+            List<Object> timeRow = row(values, ROW_TIME);
+            List<Object> raidRow = row(values, ROW_RAID);
+
+            int maxCol = 0;
+            for (List<Object> r : values) maxCol = Math.max(maxCol, r.size());
+
+            List<TodayPartyItem> result = new ArrayList<>();
+            int slotLimit = DATA_START_ROW + TOTAL_SLOTS * SLOT_SIZE;
+
+            for (int col = DATA_START_COL; col < maxCol; col++) {
+                String raidName = cell(raidRow, col);
+                if (raidName.isEmpty()) continue;
+                String complete = cell(row(values, ROW_COMPLETE), col);
+                if ("TRUE".equalsIgnoreCase(complete)) continue;
+                String day = cell(dayRow, col);
+                if (!today.equals(day.trim())) continue;
+
+                String time = cell(timeRow, col);
+                List<String> members = new ArrayList<>();
+                for (int slotRow = DATA_START_ROW; slotRow < slotLimit; slotRow += SLOT_SIZE) {
+                    String nick = cell(row(values, slotRow), col);
+                    if (nick.isEmpty()) continue;
+                    if (nick.equalsIgnoreCase("TRUE") || nick.equalsIgnoreCase("FALSE")) continue;
+                    String cls   = cell(row(values, slotRow + SLOT_CLASS), col);
+                    String power = cell(row(values, slotRow + SLOT_POWER), col);
+                    members.add(formatMember(nick, cls, power));
+                }
+                result.add(new TodayPartyItem(raidName, time, members));
+            }
+            return result;
+
+        } catch (IOException e) {
+            log.error("오늘의 파티 조회 오류: {}", e.getMessage());
+            return Collections.emptyList();
         }
     }
 

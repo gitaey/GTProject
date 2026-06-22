@@ -3,6 +3,7 @@ package com.gtp.domain.schedule.controller;
 import com.gtp.domain.schedule.dto.CharacterScheduleItem;
 import com.gtp.domain.schedule.dto.ExpeditionScheduleResponse;
 import com.gtp.domain.schedule.dto.PartyCompositionResult;
+import com.gtp.domain.schedule.dto.TodayPartyItem;
 import com.gtp.domain.schedule.service.GoogleSheetsService;
 import com.gtp.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +55,12 @@ public class ScheduleController {
         } catch (Exception e) {
             return ApiResponse.ok(null);
         }
+    }
+
+    /** GET /api/schedule/today — 오늘 요일의 미완료 파티 목록 */
+    @GetMapping("/today")
+    public ApiResponse<List<TodayPartyItem>> getTodayParties() {
+        return ApiResponse.ok(googleSheetsService.getTodayParties());
     }
 
     @GetMapping("/debug")

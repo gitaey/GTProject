@@ -1,12 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
 import {
     PenLine, Trash2, X, ChevronLeft, ChevronRight,
-    Star, StarOff, Eye, EyeOff, Search, Plus,
+    Star, StarOff, Eye, Search, Plus,
 } from 'lucide-react'
 import type { Post, PostCategoryCode, PostFormState, PostPage, PostRequest, PostStatusCode } from '@/types/post'
 import { CATEGORY_OPTIONS, GRADIENT_PRESETS } from '@/types/post'
@@ -39,9 +39,9 @@ const createPost = (data: PostRequest) =>
 const updatePost = (id: number, data: PostRequest) =>
     apiFetch<Post>(`/api/posts/${id}`, { method: 'PUT', body: JSON.stringify(data) })
 
-const deletePost  = (id: number) => apiFetch<void>(`/api/posts/${id}`, { method: 'DELETE' })
-const toggleFeatured = (id: number) => apiFetch<Post>(`/api/posts/${id}/featured`, { method: 'PATCH' })
-const toggleStatus   = (id: number) => apiFetch<Post>(`/api/posts/${id}/status`,   { method: 'PATCH' })
+const deletePost      = (id: number) => apiFetch<void>(`/api/posts/${id}`, { method: 'DELETE' })
+const toggleFeatured  = (id: number) => apiFetch<Post>(`/api/posts/${id}/featured`, { method: 'PATCH' })
+const toggleStatus    = (id: number) => apiFetch<Post>(`/api/posts/${id}/status`,   { method: 'PATCH' })
 const fetchPostBySlug = (slug: string) => apiFetch<Post>(`/api/posts/${slug}`)
 
 /* ── 빈 폼 ── */
@@ -61,25 +61,25 @@ function formatDate(iso: string) {
     return new Date(iso).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit', year: 'numeric' })
 }
 
-/* ── 메인 ── */
-export default function AdminBlogPage() {
+/* ── 실제 컨텐츠 컴포넌트 ── */
+function AdminBlogContent() {
     const searchParams = useSearchParams()
     const router = useRouter()
 
-    const [page, setPage]             = useState<PostPage | null>(null)
-    const [loading, setLoading]       = useState(false)
-    const [error, setError]           = useState<string | null>(null)
-    const [keyword, setKeyword]       = useState('')
-    const [catFilter, setCatFilter]   = useState('')
-    const [statFilter, setStatFilter] = useState('')
+    const [page, setPage]               = useState<PostPage | null>(null)
+    const [loading, setLoading]         = useState(false)
+    const [error, setError]             = useState<string | null>(null)
+    const [keyword, setKeyword]         = useState('')
+    const [catFilter, setCatFilter]     = useState('')
+    const [statFilter, setStatFilter]   = useState('')
     const [currentPage, setCurrentPage] = useState(0)
 
-    const [modalType, setModalType]   = useState<'create' | 'edit' | 'delete' | null>(null)
-    const [selected, setSelected]     = useState<Post | null>(null)
-    const [form, setForm]             = useState<PostFormState>(EMPTY_FORM)
-    const [formError, setFormError]   = useState<string | null>(null)
-    const [submitting, setSubmitting] = useState(false)
-    const abortRef = useRef<AbortController | null>(null)
+    const [modalType, setModalType]     = useState<'create' | 'edit' | 'delete' | null>(null)
+    const [selected, setSelected]       = useState<Post | null>(null)
+    const [form, setForm]               = useState<PostFormState>(EMPTY_FORM)
+    const [formError, setFormError]     = useState<string | null>(null)
+    const [submitting, setSubmitting]   = useState(false)
+    const abortRef        = useRef<AbortController | null>(null)
     const dismissedEditId = useRef<string | null>(null)
 
     const posts      = page?.content ?? []
@@ -106,7 +106,7 @@ export default function AdminBlogPage() {
     useEffect(() => {
         const editId = searchParams.get('edit')
         if (!editId || !page) return
-        if (dismissedEditId.current === editId) return   // 이미 닫은 파라미터면 무시
+        if (dismissedEditId.current === editId) return
         const target = page.content.find((p) => p.id === Number(editId))
         if (target) openEdit(target)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -117,7 +117,6 @@ export default function AdminBlogPage() {
         setSelected(p)
         setFormError(null)
         setModalType('edit')
-        /* 목록 API는 content를 제외하므로 단건 조회로 본문을 가져옴 */
         try {
             const full = await fetchPostBySlug(p.slug)
             setForm({
@@ -128,7 +127,6 @@ export default function AdminBlogPage() {
                 featured: full.featured, status: full.status,
             })
         } catch {
-            /* 단건 조회 실패 시 목록 데이터로 폴백 */
             setForm({
                 slug: p.slug, title: p.title, excerpt: p.excerpt ?? '',
                 content: p.content ?? '', category: p.category,
@@ -143,7 +141,7 @@ export default function AdminBlogPage() {
         setModalType(null); setSelected(null); setFormError(null)
         const editId = searchParams.get('edit')
         if (editId) {
-            dismissedEditId.current = editId   // effect 재실행 시 재오픈 방지
+            dismissedEditId.current = editId
             router.replace('/admin/blog')
         }
     }
@@ -364,7 +362,7 @@ export default function AdminBlogPage() {
 
                         <div className="overflow-y-auto px-6 py-5 space-y-4">
 
-                            {/* 슬러그 + 제목 */}
+                            {/* 슬러그 + 카테고리 */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1.5">슬러그 <span className="text-red-400">*</span></label>
@@ -501,5 +499,14 @@ export default function AdminBlogPage() {
                 </div>
             )}
         </div>
+    )
+}
+
+/* ── 메인 (Suspense 래퍼) ── */
+export default function AdminBlogPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-gray-400 text-sm">로딩 중...</div>}>
+            <AdminBlogContent />
+        </Suspense>
     )
 }
