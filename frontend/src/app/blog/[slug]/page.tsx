@@ -175,23 +175,6 @@ export default function BlogPostPage() {
 
                     {/* 헤더 */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
-                        {/* 슈퍼관리자 액션 버튼 */}
-                        {isSuperAdmin && (
-                            <div className="flex items-center justify-end gap-2 mb-5">
-                                <button
-                                    onClick={openEditModal}
-                                    className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-                                >
-                                    <PenLine size={14} /> 수정
-                                </button>
-                                <button
-                                    onClick={() => { setShowDeleteModal(true); setDeleteError(null) }}
-                                    className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium text-red-500 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
-                                >
-                                    <Trash2 size={14} /> 삭제
-                                </button>
-                            </div>
-                        )}
                         <div className="flex flex-wrap items-center gap-3 mb-5">
                             <span className={`text-xs font-semibold px-3 py-1.5 rounded-full ${CATEGORY_BADGE[post.category] ?? 'bg-gray-100 text-gray-600'}`}>
                                 {post.categoryLabel}
@@ -200,6 +183,22 @@ export default function BlogPostPage() {
                                 <Calendar size={13} />
                                 {new Date(post.createdAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
                             </span>
+                            {isSuperAdmin && (
+                                <div className="flex items-center gap-1.5 ml-auto">
+                                    <button
+                                        onClick={openEditModal}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                                    >
+                                        <PenLine size={13} /> 수정
+                                    </button>
+                                    <button
+                                        onClick={() => { setShowDeleteModal(true); setDeleteError(null) }}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-500 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                                    >
+                                        <Trash2 size={13} /> 삭제
+                                    </button>
+                                </div>
+                            )}
                         </div>
                         <h1 className="text-3xl font-extrabold text-gray-900 leading-snug mb-5 tracking-tight">
                             {post.title}
