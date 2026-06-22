@@ -1,4 +1,4 @@
-var SERVER_URL = "http://sisnet2.iptime.org:48080";
+var SERVER_URL = "https://api.gitaey-dev";
 var GUILD_ROOM = "이쁜말";
 var savedGuildReplier = null;
 var timerStarted = false;
