@@ -18,18 +18,28 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ApiResponse<?>> handleCustomException(CustomException e,
-                                                                HttpServletRequest request) {
+            HttpServletRequest request) {
         log.error("CustomException: {}", e.getMessage());
-        botLogService.saveApiError(request.getRequestURI(), e.getMessage());
+
+        // /api/bot-log 요청이나 카카오봇 관련만 저장
+        if (request.getRequestURI().startsWith("/api/bot")) {
+            botLogService.saveApiError(request.getRequestURI(), e.getMessage());
+        }
+
         return ResponseEntity.status(e.getErrorCode().getStatus())
                 .body(ApiResponse.fail(e.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<?>> handleException(Exception e,
-                                                          HttpServletRequest request) {
+            HttpServletRequest request) {
         log.error("Exception: {}", e.getMessage());
-        botLogService.saveApiError(request.getRequestURI(), e.getMessage());
+
+        // /api/bot-log 요청이나 카카오봇 관련만 저장
+        if (request.getRequestURI().startsWith("/api/bot")) {
+            botLogService.saveApiError(request.getRequestURI(), e.getMessage());
+        }
+
         return ResponseEntity.status(500)
                 .body(ApiResponse.fail("서버 오류가 발생했습니다."));
     }
