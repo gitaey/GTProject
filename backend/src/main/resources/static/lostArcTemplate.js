@@ -32,7 +32,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
       .text();
     var json = JSON.parse(res);
     if (json.success && json.data) {
-      if (json.data.imageUrl) replier.reply(json.data.imageUrl);
+      if (json.data.imageUrl) replier.reply(SERVER_URL + json.data.imageUrl);
       if (json.data.reply) replier.reply(json.data.reply);
     }
   } catch (e) {

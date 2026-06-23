@@ -142,8 +142,9 @@ public class BotMessageService {
     private BotMessageResult handleInfoResult(String name, String room) throws Exception {
         CharacterInfoResponse info = lostarkService.getCharacterInfo(name);
         String reply = handleInfo(name, room, info);
-        String imageUrl = info.getProfile() != null ? info.getProfile().getCharacterImage() : null;
-        return BotMessageResult.of(reply, imageUrl);
+        String encoded = java.net.URLEncoder.encode(name, java.nio.charset.StandardCharsets.UTF_8);
+        String previewUrl = "/preview/character/" + encoded;
+        return BotMessageResult.of(reply, previewUrl);
     }
 
     private String handleInfo(String name, String room) throws Exception {
@@ -657,14 +658,9 @@ public class BotMessageService {
             String encoded = java.net.URLEncoder.encode(name, java.nio.charset.StandardCharsets.UTF_8);
             String html = lopecRestTemplate().getForObject("https://m.lopec.kr/character/specPoint/" + encoded, String.class);
             if (html == null) return null;
-            html = html.replaceAll("[\n\r\t]", " ").replaceAll("\\s{2,}", " ");
-            // 패턴 1: "달성 최고 점수" 근처 숫자 추출
-            Matcher m = Pattern.compile("달성 최고 점수[^<]*<[^>]+>\\s*([\\d,]+(?:\\.[\\d]+)?)").matcher(html);
-            if (m.find()) return m.group(1).trim();
-            // 패턴 2: spec-point, specPoint 관련 숫자
-            m = Pattern.compile("(?:spec[_-]?[Pp]oint|최고점수|최고 점수)[^\\d]*([\\d,]+(?:\\.[\\d]+)?)").matcher(html);
-            if (m.find()) return m.group(1).trim();
-            return null;
+            // "달성 최고 점수" 이후 처음 나오는 숫자 추출 (HTML 태그 무시)
+            Matcher m = Pattern.compile("달성 최고 점수[^0-9]*([0-9,]+(?:\\.[0-9]+)?)").matcher(html);
+            return m.find() ? m.group(1).trim() : null;
         } catch (Exception e) {
             log.debug("fetchLopecScore 오류 [{}]: {}", name, e.getMessage());
             return null;
