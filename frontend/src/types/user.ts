@@ -1,13 +1,10 @@
-export type Role = 'SUPER_ADMIN' | 'USER' | 'LOSTARK'
+export type Role = 'SUPER_ADMIN' | 'MAP_ADMIN' | 'MAP_USER'
 export type UserStatus = 'ACTIVE' | 'INACTIVE'
 
 export type Permission =
-    | 'USER_PERMISSION_1'
-    | 'USER_PERMISSION_2'
-    | 'USER_PERMISSION_3'
-    | 'LOSTARK_OPERATOR'
-    | 'LOSTARK_GUILD'
-    | 'LOSTARK_GUEST'
+    | 'VIEWER'
+    | 'DEPT_A'
+    | 'DEPT_B'
 
 export interface RoleOption {
     value: Role
@@ -22,21 +19,16 @@ export interface PermissionOption {
 /* 역할 목록 */
 export const ROLE_OPTIONS: RoleOption[] = [
     { value: 'SUPER_ADMIN', label: '슈퍼관리자' },
-    { value: 'USER',        label: '일반 사용자' },
-    { value: 'LOSTARK',     label: '로스트아크' },
+    { value: 'MAP_ADMIN',   label: '지도관리자' },
+    { value: 'MAP_USER',    label: '지도사용자' },
 ]
 
-/* 역할별 세부 권한 목록 */
+/* 역할별 세부 권한 목록 (MAP_USER 전용) */
 export const PERMISSION_MAP: Partial<Record<Role, PermissionOption[]>> = {
-    USER: [
-        { value: 'USER_PERMISSION_1', label: '권한1' },
-        { value: 'USER_PERMISSION_2', label: '권한2' },
-        { value: 'USER_PERMISSION_3', label: '권한3' },
-    ],
-    LOSTARK: [
-        { value: 'LOSTARK_OPERATOR', label: '운영진' },
-        { value: 'LOSTARK_GUILD',    label: '길드원' },
-        { value: 'LOSTARK_GUEST',    label: '손님' },
+    MAP_USER: [
+        { value: 'VIEWER', label: '뷰어' },
+        { value: 'DEPT_A', label: '부서A' },
+        { value: 'DEPT_B', label: '부서B' },
     ],
 }
 

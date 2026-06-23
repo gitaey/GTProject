@@ -31,4 +31,20 @@ public class BotLogController {
             @RequestParam(defaultValue = "50") int size) {
         return ApiResponse.ok(botLogService.getLogs(type, page, size));
     }
+
+    /** GET /api/bot-log/stats/daily?date=2026-06-23&type=COMMAND */
+    @GetMapping("/stats/daily")
+    public ApiResponse<com.gtp.domain.botlog.dto.BotLogStatsResponse> getDailyStats(
+            @RequestParam String date,
+            @RequestParam(required = false) BotLogType type) {
+        return ApiResponse.ok(botLogService.getDailyStats(date, type));
+    }
+
+    /** GET /api/bot-log/stats/monthly?month=2026-06&type=COMMAND */
+    @GetMapping("/stats/monthly")
+    public ApiResponse<com.gtp.domain.botlog.dto.BotLogStatsResponse> getMonthlyStats(
+            @RequestParam String month,
+            @RequestParam(required = false) BotLogType type) {
+        return ApiResponse.ok(botLogService.getMonthlyStats(month, type));
+    }
 }

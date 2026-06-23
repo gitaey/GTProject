@@ -8,8 +8,8 @@ import lombok.RequiredArgsConstructor;
 public enum Role {
 
     SUPER_ADMIN("슈퍼관리자"),
-    USER("일반 사용자"),
-    LOSTARK("로스트아크");
+    MAP_ADMIN("지도관리자"),
+    MAP_USER("지도사용자");
 
     private final String label;
 }

@@ -2,6 +2,9 @@ package com.gtp.domain.botlog.service;
 
 import com.gtp.domain.botlog.dto.BotLogRequest;
 import com.gtp.domain.botlog.dto.BotLogResponse;
+import com.gtp.domain.botlog.dto.BotLogStatsResponse;
+import com.gtp.domain.botlog.dto.BotLogStatsResponse.DayStat;
+import com.gtp.domain.botlog.dto.BotLogStatsResponse.HourStat;
 import com.gtp.domain.botlog.entity.BotLog;
 import com.gtp.domain.botlog.entity.BotLogType;
 import com.gtp.domain.botlog.repository.BotLogRepository;
@@ -10,6 +13,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -46,5 +57,70 @@ public class BotLogService {
                 ? botLogRepository.findByTypeOrderByCreatedAtDesc(type, pageable)
                 : botLogRepository.findAllByOrderByCreatedAtDesc(pageable);
         return logs.map(BotLogResponse::new);
+    }
+
+    /** 일별 통계: date = "2026-06-23" */
+    public BotLogStatsResponse getDailyStats(String date, BotLogType type) {
+        LocalDate d   = LocalDate.parse(date);
+        LocalDateTime from = d.atStartOfDay();
+        LocalDateTime to   = d.plusDays(1).atStartOfDay();
+        List<BotLog> logs  = fetchRange(type, from, to);
+        return buildStats(logs, "daily");
+    }
+
+    /** 월별 통계: month = "2026-06" */
+    public BotLogStatsResponse getMonthlyStats(String month, BotLogType type) {
+        LocalDate first = LocalDate.parse(month + "-01");
+        LocalDateTime from = first.atStartOfDay();
+        LocalDateTime to   = first.plusMonths(1).atStartOfDay();
+        List<BotLog> logs  = fetchRange(type, from, to);
+        return buildStats(logs, "monthly");
+    }
+
+    private List<BotLog> fetchRange(BotLogType type, LocalDateTime from, LocalDateTime to) {
+        return (type != null)
+                ? botLogRepository.findByTypeAndCreatedAtBetweenOrderByCreatedAtDesc(type, from, to)
+                : botLogRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(from, to);
+    }
+
+    private BotLogStatsResponse buildStats(List<BotLog> logs, String mode) {
+        int total        = logs.size();
+        int successCount = (int) logs.stream().filter(BotLog::isSuccess).count();
+        int failCount    = total - successCount;
+
+        Map<String, Long> byType = logs.stream()
+                .collect(Collectors.groupingBy(l -> l.getType().name(), Collectors.counting()));
+
+        List<HourStat> byHour = new ArrayList<>();
+        if ("daily".equals(mode)) {
+            Map<Integer, List<BotLog>> grouped = logs.stream()
+                    .collect(Collectors.groupingBy(l -> l.getCreatedAt().getHour()));
+            for (int h = 0; h < 24; h++) {
+                List<BotLog> g = grouped.getOrDefault(h, List.of());
+                long ok = g.stream().filter(BotLog::isSuccess).count();
+                byHour.add(HourStat.builder().hour(h).total(g.size()).success(ok).fail(g.size() - ok).build());
+            }
+        }
+
+        List<DayStat> byDay = new ArrayList<>();
+        if ("monthly".equals(mode)) {
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            Map<String, List<BotLog>> grouped = logs.stream()
+                    .collect(Collectors.groupingBy(l -> l.getCreatedAt().format(fmt)));
+            grouped.forEach((day, g) -> {
+                long ok = g.stream().filter(BotLog::isSuccess).count();
+                byDay.add(DayStat.builder().date(day).total(g.size()).success(ok).fail(g.size() - ok).build());
+            });
+            byDay.sort((a, b) -> a.getDate().compareTo(b.getDate()));
+        }
+
+        return BotLogStatsResponse.builder()
+                .total(total)
+                .successCount(successCount)
+                .failCount(failCount)
+                .byType(byType)
+                .byHour(byHour)
+                .byDay(byDay)
+                .build();
     }
 }

@@ -1287,9 +1287,41 @@ function sendBotLog(type, room, sender, command, detail, success) {
   } catch (e) {}
 }
 
-// ── 오전 10시 오늘의 파티 자동 전송 ──────────────────────────────
+// ── 자동 전송 스케줄 설정 조회 ─────────────────────────────────────
+// 백엔드에서 활성화된 첫 번째 스케줄을 가져온다.
+// 반환값: { id, sendTime, targetRoom } 또는 null
+function fetchActiveSchedule() {
+  try {
+    var res = org.jsoup.Jsoup.connect(SERVER_URL + "/api/bot/schedules")
+      .ignoreContentType(true)
+      .timeout(5000)
+      .get()
+      .body()
+      .text();
+    var json = JSON.parse(res);
+    if (!json.success || !json.data || json.data.length === 0) return null;
+    for (var i = 0; i < json.data.length; i++) {
+      var s = json.data[i];
+      if (s.active) return s;
+    }
+    return null;
+  } catch (e) {
+    Log.d("fetchActiveSchedule 오류: " + (e.message || e));
+    return null;
+  }
+}
+
+// ── 오늘의 파티 자동 전송 ─────────────────────────────────────────
 function sendTodayParty() {
   if (!savedGuildReplier) return;
+
+  // 전송 직전 active 여부 재확인
+  var schedule = fetchActiveSchedule();
+  if (!schedule) {
+    Log.d("자동전송 비활성 상태 - 스킵");
+    return;
+  }
+
   try {
     var res = org.jsoup.Jsoup.connect(SERVER_URL + "/api/schedule/today")
       .ignoreContentType(true)
@@ -1300,18 +1332,11 @@ function sendTodayParty() {
     var json = JSON.parse(res);
     if (!json.success || !json.data || json.data.length === 0) {
       sendBotLog("AUTO_SEND", GUILD_ROOM, "", "오늘파티자동전송", "파티 없음", true);
+      markScheduleSent(schedule.id);
       return;
     }
 
-    var dayNames = [
-      "일요일",
-      "월요일",
-      "화요일",
-      "수요일",
-      "목요일",
-      "금요일",
-      "토요일",
-    ];
+    var dayNames = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
     var today = dayNames[new Date().getDay()];
     var msg = "【 오늘의 레이드 파티 】 " + today + "\n";
     for (var i = 0; i < json.data.length; i++) {
@@ -1326,27 +1351,58 @@ function sendTodayParty() {
     }
     savedGuildReplier.reply(msg.trim());
     sendBotLog("AUTO_SEND", GUILD_ROOM, "", "오늘파티자동전송", "파티 " + json.data.length + "개 전송", true);
+    markScheduleSent(schedule.id);
   } catch (e) {
     sendBotLog("AUTO_SEND", GUILD_ROOM, "", "오늘파티자동전송", e.message || "오류", false);
   }
 }
 
+// 전송 완료 후 lastSentAt 업데이트
+function markScheduleSent(scheduleId) {
+  try {
+    org.jsoup.Jsoup.connect(SERVER_URL + "/api/bot/schedules/" + scheduleId + "/sent")
+      .ignoreContentType(true)
+      .method(org.jsoup.Connection.Method.PATCH)
+      .timeout(3000)
+      .execute();
+  } catch (e) {}
+}
+
+// 오늘 이미 전송했는지 추적 (날짜 문자열 "YYYY-MM-DD")
+var lastSentDate = "";
+
 function startDailyTimer() {
-  var now = new Date();
-  var target = new Date();
-  target.setHours(12, 10, 0, 0);
-  if (target <= now) target.setDate(target.getDate() + 1);
+  var MINUTE_MS = 60 * 1000;
 
-  var delay = target.getTime() - now.getTime();
-  var DAY_MS = 24 * 60 * 60 * 1000;
-
-  Log.d("startDailyTimer 호출됨 / delay(분)=" + Math.round(delay / 60000));
+  Log.d("startDailyTimer: 1분 간격 스케줄 체크 시작");
 
   var timer = new java.util.Timer(true);
   timer.scheduleAtFixedRate(new java.util.TimerTask({
     run: function() {
-      Log.d("타이머 실행됨 - sendTodayParty 호출");
-      sendTodayParty();
+      try {
+        var schedule = fetchActiveSchedule();
+        if (!schedule || !schedule.sendTime) return;
+
+        var now = new Date();
+        var hh = now.getHours();
+        var mm = now.getMinutes();
+        var todayStr = now.getFullYear() + "-" +
+                       (now.getMonth() + 1) + "-" +
+                       now.getDate();
+
+        var parts = schedule.sendTime.split(":");
+        var targetHH = parseInt(parts[0], 10);
+        var targetMM = parseInt(parts[1], 10);
+
+        // 오늘 아직 안 보냈고, 현재 시:분이 설정 시간과 일치하면 전송
+        if (hh === targetHH && mm === targetMM && lastSentDate !== todayStr) {
+          lastSentDate = todayStr;
+          Log.d("자동전송 실행: " + schedule.sendTime);
+          sendTodayParty();
+        }
+      } catch (e) {
+        Log.d("스케줄 체크 오류: " + (e.message || e));
+      }
     }
-  }), delay, DAY_MS);
+  }), 0, MINUTE_MS);
 }
