@@ -31,7 +31,7 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
     return json.data
 }
 
-const EMPTY_FORM = { roomName: '', status: 'ALLOWED' as const, memo: '' }
+const EMPTY_FORM: { roomName: string; status: 'ALLOWED' | 'BLOCKED'; memo: string } = { roomName: '', status: 'ALLOWED', memo: '' }
 const inputStyle: React.CSSProperties = {
     background: 'var(--bg-page)', border: '1px solid var(--border)',
     color: 'var(--text-primary)', borderRadius: '8px',
