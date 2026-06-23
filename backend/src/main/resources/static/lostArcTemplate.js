@@ -36,7 +36,9 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
       if (json.data.reply) replier.reply(json.data.reply);
     }
   } catch (e) {
-    Log.d("bot/message 오류: " + (e.message || e));
+    var errMsg = e.message || String(e);
+    Log.d("bot/message 오류: " + errMsg);
+    replier.reply("[봇오류] " + errMsg);
   }
 }
 
