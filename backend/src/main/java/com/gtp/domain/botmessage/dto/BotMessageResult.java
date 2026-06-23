@@ -8,12 +8,18 @@ import lombok.Getter;
 public class BotMessageResult {
     /** null 이면 무응답 */
     private final String reply;
+    /** 이미지 URL (null 이면 이미지 없음) */
+    private final String imageUrl;
 
     public static BotMessageResult of(String reply) {
-        return new BotMessageResult(reply);
+        return new BotMessageResult(reply, null);
+    }
+
+    public static BotMessageResult of(String reply, String imageUrl) {
+        return new BotMessageResult(reply, imageUrl);
     }
 
     public static BotMessageResult silent() {
-        return new BotMessageResult(null);
+        return new BotMessageResult(null, null);
     }
 }

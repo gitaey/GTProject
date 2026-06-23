@@ -72,7 +72,7 @@ public class BotMessageService {
     // ── 명령어 라우팅 ───────────────────────────────────────────────
 
     private BotMessageResult route(String room, String text, String sender) {
-        if (text.startsWith("/정보 "))        return cmd(room, sender, "/정보",        () -> handleInfo(text.substring(4).trim(), room));
+        if (text.startsWith("/정보 "))        return cmdResult(room, sender, "/정보",   () -> handleInfoResult(text.substring(4).trim(), room));
         if (text.startsWith("/각인 "))        return cmd(room, sender, "/각인",        () -> handleEngraving(text.substring(4).trim()));
         if (text.startsWith("/아크패시브 "))  return cmd(room, sender, "/아크패시브",  () -> handleArkPassive(text.substring(7).trim()));
         if (text.startsWith("/아크그리드 "))  return cmd(room, sender, "/아크그리드",  () -> handleArkGrid(text.substring(7).trim()));
@@ -102,12 +102,24 @@ public class BotMessageService {
         return BotMessageResult.silent();
     }
 
-    /** 명령어 실행 + 로그 저장 */
+    /** 명령어 실행 + 로그 저장 (텍스트 반환) */
     private BotMessageResult cmd(String room, String sender, String command, java.util.concurrent.Callable<String> fn) {
         try {
             String reply = fn.call();
             saveLog(BotLogType.COMMAND, room, sender, command, "", true);
             return BotMessageResult.of(reply);
+        } catch (Exception e) {
+            saveLog(BotLogType.COMMAND, room, sender, command, e.getMessage(), false);
+            return BotMessageResult.of("오류: " + e.getMessage());
+        }
+    }
+
+    /** 명령어 실행 + 로그 저장 (BotMessageResult 직접 반환) */
+    private BotMessageResult cmdResult(String room, String sender, String command, java.util.concurrent.Callable<BotMessageResult> fn) {
+        try {
+            BotMessageResult result = fn.call();
+            saveLog(BotLogType.COMMAND, room, sender, command, "", true);
+            return result;
         } catch (Exception e) {
             saveLog(BotLogType.COMMAND, room, sender, command, e.getMessage(), false);
             return BotMessageResult.of("오류: " + e.getMessage());
@@ -127,8 +139,19 @@ public class BotMessageService {
 
     // ── 명령어 핸들러 ───────────────────────────────────────────────
 
+    private BotMessageResult handleInfoResult(String name, String room) throws Exception {
+        CharacterInfoResponse info = lostarkService.getCharacterInfo(name);
+        String reply = handleInfo(name, room, info);
+        String imageUrl = info.getProfile() != null ? info.getProfile().getCharacterImage() : null;
+        return BotMessageResult.of(reply, imageUrl);
+    }
+
     private String handleInfo(String name, String room) throws Exception {
         CharacterInfoResponse info = lostarkService.getCharacterInfo(name);
+        return handleInfo(name, room, info);
+    }
+
+    private String handleInfo(String name, String room, CharacterInfoResponse info) throws Exception {
         ArmoryProfile d  = info.getProfile();
         ArmoryArkPassive ap = info.getArkPassive();
         ArmoryEngraving  en = info.getEngraving();
@@ -634,10 +657,16 @@ public class BotMessageService {
             String encoded = java.net.URLEncoder.encode(name, java.nio.charset.StandardCharsets.UTF_8);
             String html = lopecRestTemplate().getForObject("https://m.lopec.kr/character/specPoint/" + encoded, String.class);
             if (html == null) return null;
-            html = html.replaceAll("[\n\r]", " ");
-            Matcher m = Pattern.compile("달성 최고 점수</span>\\s*<span[^>]*>([\\d.]+)</span>").matcher(html);
-            return m.find() ? m.group(1).trim() : null;
+            html = html.replaceAll("[\n\r\t]", " ").replaceAll("\\s{2,}", " ");
+            // 패턴 1: "달성 최고 점수" 근처 숫자 추출
+            Matcher m = Pattern.compile("달성 최고 점수[^<]*<[^>]+>\\s*([\\d,]+(?:\\.[\\d]+)?)").matcher(html);
+            if (m.find()) return m.group(1).trim();
+            // 패턴 2: spec-point, specPoint 관련 숫자
+            m = Pattern.compile("(?:spec[_-]?[Pp]oint|최고점수|최고 점수)[^\\d]*([\\d,]+(?:\\.[\\d]+)?)").matcher(html);
+            if (m.find()) return m.group(1).trim();
+            return null;
         } catch (Exception e) {
+            log.debug("fetchLopecScore 오류 [{}]: {}", name, e.getMessage());
             return null;
         }
     }
