@@ -657,9 +657,21 @@ public class BotMessageService {
     private String fetchLopecScore(String name) {
         try {
             String encoded = java.net.URLEncoder.encode(name, java.nio.charset.StandardCharsets.UTF_8);
-            String html = lopecRestTemplate().getForObject("https://m.lopec.kr/character/specPoint/" + encoded, String.class);
-            if (html == null) return null;
-            // 달성 최고 점수 다음 closing tag + opening tag 건너뛰고 숫자 추출
+            java.net.URL url = new java.net.URL("https://m.lopec.kr/character/specPoint/" + encoded);
+            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36");
+            conn.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+            conn.setRequestProperty("Accept-Encoding", "gzip, deflate");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(8000);
+            conn.connect();
+
+            java.io.InputStream is = conn.getContentEncoding() != null && conn.getContentEncoding().contains("gzip")
+                    ? new java.util.zip.GZIPInputStream(conn.getInputStream())
+                    : conn.getInputStream();
+            String html = new String(is.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            is.close();
+
             Matcher m = Pattern.compile("달성 최고 점수</[^>]+><[^>]+>([\\d,.]+)").matcher(html);
             return m.find() ? m.group(1).trim() : null;
         } catch (Exception e) {
