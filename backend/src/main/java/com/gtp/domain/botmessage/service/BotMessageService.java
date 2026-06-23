@@ -143,7 +143,8 @@ public class BotMessageService {
         CharacterInfoResponse info = lostarkService.getCharacterInfo(name);
         String reply = handleInfo(name, room, info);
         String encoded = java.net.URLEncoder.encode(name, java.nio.charset.StandardCharsets.UTF_8);
-        String previewUrl = "/preview/character/" + encoded;
+        // 카카오톡 OG 프리뷰는 공개 URL이어야 하므로 항상 프로덕션 주소 사용
+        String previewUrl = "https://api.gitaey-dev.com/preview/character/" + encoded;
         return BotMessageResult.of(reply, previewUrl);
     }
 
@@ -658,8 +659,8 @@ public class BotMessageService {
             String encoded = java.net.URLEncoder.encode(name, java.nio.charset.StandardCharsets.UTF_8);
             String html = lopecRestTemplate().getForObject("https://m.lopec.kr/character/specPoint/" + encoded, String.class);
             if (html == null) return null;
-            // "달성 최고 점수" 이후 처음 나오는 숫자 추출 (HTML 태그 무시)
-            Matcher m = Pattern.compile("달성 최고 점수[^0-9]*([0-9,]+(?:\\.[0-9]+)?)").matcher(html);
+            // 달성 최고 점수 다음 closing tag + opening tag 건너뛰고 숫자 추출
+            Matcher m = Pattern.compile("달성 최고 점수</[^>]+><[^>]+>([\\d,.]+)").matcher(html);
             return m.find() ? m.group(1).trim() : null;
         } catch (Exception e) {
             log.debug("fetchLopecScore 오류 [{}]: {}", name, e.getMessage());
