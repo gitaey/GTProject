@@ -20,7 +20,9 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -92,7 +94,7 @@ public class BotMessageService {
         boolean isGuildCmd = text.startsWith("/일정 ") || text.startsWith("/일정전체 ")
                 || text.startsWith("/오늘일정 ") || text.equals("/일정새로고침");
         if (isGuildCmd) {
-            if (!room.equals(GUILD_ROOM)) return BotMessageResult.silent();
+            // if (!room.equals(GUILD_ROOM)) return BotMessageResult.silent();
             if (text.startsWith("/일정 "))       return cmd(room, sender, "/일정",       () -> handleSchedule(text.substring(4).trim()));
             if (text.startsWith("/일정전체 "))   return cmd(room, sender, "/일정전체",   () -> handleScheduleAll(text.substring(6).trim()));
             if (text.startsWith("/오늘일정 "))   return cmd(room, sender, "/오늘일정",   () -> handleTodaySchedule(text.substring(6).trim()));
@@ -102,6 +104,16 @@ public class BotMessageService {
         return BotMessageResult.silent();
     }
 
+    /** 로스트아크 정기점검 시간대 여부 (매주 수요일 05:00~10:00) */
+    private boolean isLostArkMaintenance() {
+        LocalDateTime now = LocalDateTime.now();
+        if (now.getDayOfWeek() != DayOfWeek.WEDNESDAY) return false;
+        int hour = now.getHour();
+        return hour >= 6 && hour < 10;
+    }
+
+    private static final String MAINTENANCE_MSG = "🔧 로스트아크 정기점검 중입니다.\n(매주 수요일 06:00 ~ 10:00)\n점검 종료 후 다시 시도해주세요!";
+
     /** 명령어 실행 + 로그 저장 (텍스트 반환) */
     private BotMessageResult cmd(String room, String sender, String command, java.util.concurrent.Callable<String> fn) {
         try {
@@ -109,8 +121,9 @@ public class BotMessageService {
             saveLog(BotLogType.COMMAND, room, sender, command, "", true);
             return BotMessageResult.of(reply);
         } catch (Exception e) {
+            String msg = isLostArkMaintenance() ? MAINTENANCE_MSG : "오류: " + e.getMessage();
             saveLog(BotLogType.COMMAND, room, sender, command, e.getMessage(), false);
-            return BotMessageResult.of("오류: " + e.getMessage());
+            return BotMessageResult.of(msg);
         }
     }
 
@@ -121,8 +134,9 @@ public class BotMessageService {
             saveLog(BotLogType.COMMAND, room, sender, command, "", true);
             return result;
         } catch (Exception e) {
+            String msg = isLostArkMaintenance() ? MAINTENANCE_MSG : "오류: " + e.getMessage();
             saveLog(BotLogType.COMMAND, room, sender, command, e.getMessage(), false);
-            return BotMessageResult.of("오류: " + e.getMessage());
+            return BotMessageResult.of(msg);
         }
     }
 
@@ -143,7 +157,6 @@ public class BotMessageService {
         CharacterInfoResponse info = lostarkService.getCharacterInfo(name);
         String reply = handleInfo(name, room, info);
         String encoded = java.net.URLEncoder.encode(name, java.nio.charset.StandardCharsets.UTF_8);
-        // 카카오톡 OG 프리뷰는 공개 URL이어야 하므로 항상 프로덕션 주소 사용
         String previewUrl = "https://api.gitaey-dev.com/preview/character/" + encoded;
         return BotMessageResult.of(reply, previewUrl);
     }
@@ -228,11 +241,19 @@ public class BotMessageService {
             if (!engParts.isEmpty()) sb.append("◆ 각인  ").append(String.join("", engParts)).append("\n");
         }
 
-        // 아크그리드
+        // 아크그리드 (딜러/서폿 분리 표시)
         if (ag != null && ag.getEffects() != null && !ag.getEffects().isEmpty()) {
-            sb.append("───────────────\n【 아크그리드 】\n");
-            for (ArkGridEffect ge : ag.getEffects())
-                sb.append("◆ ").append(ge.getName()).append("  Lv.").append(ge.getLevel()).append("\n");
+            Set<String> arkGridFilter = isSupportClass(d.getCharacterClassName(), ap)
+                    ? Set.of("낙인력", "아군 피해 강화", "아군 공격 강화")
+                    : Set.of("공격력", "추가 피해", "보스 피해");
+            List<ArkGridEffect> filtered = ag.getEffects().stream()
+                    .filter(ge -> arkGridFilter.contains(ge.getName()))
+                    .toList();
+            if (!filtered.isEmpty()) {
+                sb.append("───────────────\n【 아크그리드 】\n");
+                for (ArkGridEffect ge : filtered)
+                    sb.append("◆ ").append(ge.getName()).append("  Lv.").append(ge.getLevel()).append("\n");
+            }
         }
 
         // 아크패시브 포인트
@@ -646,6 +667,18 @@ public class BotMessageService {
     }
 
     // ── 유틸리티 ────────────────────────────────────────────────────
+
+    private boolean isSupportClass(String className, ArmoryArkPassive ap) {
+        if (className == null) return false;
+        String title = (ap != null && ap.getTitle() != null) ? ap.getTitle() : "";
+        return switch (className) {
+            case "바드"      -> title.contains("절실한 구원");   // 진실된 용맹 = 딜러
+            case "도화가"    -> title.contains("만개");           // 회귀 = 딜러
+            case "홀리나이트"-> title.contains("축복의 오라");    // 심판자 = 딜러
+            case "발키리"    -> title.contains("해방자");         // 빛의기사 = 딜러
+            default          -> false;
+        };
+    }
 
     private RestTemplate lopecRestTemplate() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();

@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { Sun, Moon, ChevronDown, User, Settings, LogOut, ShieldAlert, Map } from 'lucide-react'
+import { Sun, Moon, ChevronDown, User, Settings, LogOut, ShieldAlert, Map, Menu } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
+import { useSidebarStore } from '@/store/sidebarStore'
 
 interface HeaderProps {
     title?: string
@@ -21,6 +22,7 @@ export default function Header({ title = '대시보드', breadcrumb }: HeaderPro
     const router = useRouter()
     const { user, clearAuth } = useAuthStore()
     const { resolvedTheme, setTheme } = useTheme()
+    const { toggle } = useSidebarStore()
     const [mounted, setMounted] = useState(false)
     const [profileOpen, setProfileOpen] = useState(false)
 
@@ -43,8 +45,18 @@ export default function Header({ title = '대시보드', breadcrumb }: HeaderPro
                 borderBottom: '1px solid var(--border)',
             }}
         >
+            {/* 모바일 햄버거 버튼 */}
+            <button
+                onClick={toggle}
+                className="sm:hidden flex items-center justify-center w-8 h-8 rounded-lg mr-2 transition-colors"
+                style={{ color: 'var(--text-secondary)' }}
+                aria-label="메뉴 열기"
+            >
+                <Menu size={18} />
+            </button>
+
             {/* 브레드크럼 + 타이틀 */}
-            <div>
+            <div className="flex-1 min-w-0">
                 {breadcrumb && breadcrumb.length > 0 && (
                     <div className="flex items-center gap-1.5 mb-0.5">
                         {breadcrumb.map((crumb, i) => (

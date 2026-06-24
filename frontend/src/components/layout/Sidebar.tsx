@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
+import { useSidebarStore } from '@/store/sidebarStore'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 
 interface SubMenuItem {
@@ -48,7 +49,6 @@ const menuItems: MenuItem[] = [
             { id: 'bot-command',  label: '명령어 관리',   href: '/admin/bot/command' },
             { id: 'bot-schedule', label: '자동 전송 관리', href: '/admin/bot/schedule' },
             { id: 'bot-room',     label: '방 모니터링',   href: '/admin/bot/room' },
-            { id: 'bot-sender',   label: '사용자 관리',   href: '/admin/bot/sender' },
         ],
     },
     {
@@ -63,11 +63,12 @@ const menuItems: MenuItem[] = [
 const ADMIN_ONLY_IDS = new Set(['map-admin', 'bot', 'system'])
 
 export default function Sidebar() {
-    const pathname  = usePathname()
-    const { user }  = useAuthStore()
+    const pathname        = usePathname()
+    const { user }        = useAuthStore()
+    const { isOpen, close } = useSidebarStore()
 
-    const isSuperAdmin  = user?.role === 'SUPER_ADMIN'
-    const visibleMenus  = menuItems.filter(m => m.id === 'home' || isSuperAdmin || !ADMIN_ONLY_IDS.has(m.id))
+    const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+    const visibleMenus = menuItems.filter(m => m.id === 'home' || isSuperAdmin || !ADMIN_ONLY_IDS.has(m.id))
 
     const findActiveGroup = () => {
         for (const m of visibleMenus) {
@@ -78,15 +79,23 @@ export default function Sidebar() {
 
     const [open, setOpen] = useState<string | null>(findActiveGroup)
 
+    // 페이지 이동 시 모바일 사이드바 닫기
+    useEffect(() => { close() }, [pathname, close])
+
     const displayName = user?.nickname ?? user?.userId ?? '사용자'
     const initial     = displayName.charAt(0).toUpperCase()
     const roleLabel   = user?.roleLabel ?? ''
 
     const isActive = (href: string) => pathname === href
 
-    return (
+    const sidebarContent = (
         <aside
-            className="w-52 flex flex-col sticky top-0 h-screen overflow-y-auto shrink-0"
+            className={[
+                'fixed inset-y-0 left-0 z-40 w-52 flex flex-col overflow-y-auto shrink-0',
+                'transition-transform duration-200 ease-in-out',
+                'sm:sticky sm:top-0 sm:h-screen sm:translate-x-0',
+                isOpen ? 'translate-x-0' : '-translate-x-full',
+            ].join(' ')}
             style={{ background: 'var(--bg-sidebar)', borderRight: '1px solid var(--border)' }}
         >
             {/* 로고 */}
@@ -173,5 +182,18 @@ export default function Sidebar() {
                 </div>
             </div>
         </aside>
+    )
+
+    return (
+        <>
+            {/* 모바일 백드롭 */}
+            {isOpen && (
+                <div
+                    className="fixed inset-0 z-30 bg-black/50 sm:hidden"
+                    onClick={close}
+                />
+            )}
+            {sidebarContent}
+        </>
     )
 }

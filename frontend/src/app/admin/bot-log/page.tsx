@@ -82,7 +82,7 @@ export default function BotLogPage() {
         setLoading(true)
         try {
             const typeParam = tab !== 'ALL' ? `&type=${tab}` : ''
-            const res  = await fetch(`${API_BASE}/api/bot-log?page=${page}&size=50${typeParam}`)
+            const res  = await fetch(`${API_BASE}/api/bot-log?page=${page}&size=10${typeParam}`)
             const json = await res.json()
             if (json.success) setData(json.data)
         } finally {
@@ -156,12 +156,12 @@ export default function BotLogPage() {
             <Sidebar />
             <div className="flex-1 flex flex-col min-w-0">
                 <Header title="봇 로그" breadcrumb={['기빵봇', '봇 로그']} />
-                <main className="flex-1 p-6 space-y-5">
+                <main className="flex-1 p-3 sm:p-6 space-y-4 sm:space-y-5">
 
                     {/* 툴바 */}
-                    <div className="flex items-center justify-between">
-                        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>기빵봇 명령어 · 오류 · 자동전송 기록</p>
-                        <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm hidden sm:block" style={{ color: 'var(--text-muted)' }}>기빵봇 명령어 · 오류 · 자동전송 기록</p>
+                        <div className="flex items-center gap-2 justify-end">
                             <div className="flex items-center p-0.5 rounded-lg" style={{ background: 'var(--bg-page)', border: '1px solid var(--border)' }}>
                                 {(['table', 'chart'] as const).map((v) => (
                                     <button
@@ -190,21 +190,23 @@ export default function BotLogPage() {
                     </div>
 
                     {/* 탭 */}
-                    <div className="flex gap-1" style={{ borderBottom: '1px solid var(--border)' }}>
-                        {TABS.map((t) => (
-                            <button
-                                key={t.key}
-                                onClick={() => setTab(t.key)}
-                                className="px-4 py-2 text-sm font-medium transition-all border-b-2 -mb-px"
-                                style={{
-                                    borderBottomColor: tab === t.key ? 'var(--accent)' : 'transparent',
-                                    color: tab === t.key ? 'var(--accent)' : 'var(--text-muted)',
-                                }}
-                            >
-                                {t.label}
-                            </button>
-                        ))}
-                        <span className="ml-auto text-xs self-center pr-1" style={{ color: 'var(--text-faint)' }}>
+                    <div className="flex items-end justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
+                        <div className="flex gap-0.5 overflow-x-auto">
+                            {TABS.map((t) => (
+                                <button
+                                    key={t.key}
+                                    onClick={() => setTab(t.key)}
+                                    className="px-3 py-2 sm:px-4 text-xs sm:text-sm font-medium transition-all border-b-2 -mb-px whitespace-nowrap shrink-0"
+                                    style={{
+                                        borderBottomColor: tab === t.key ? 'var(--accent)' : 'transparent',
+                                        color: tab === t.key ? 'var(--accent)' : 'var(--text-muted)',
+                                    }}
+                                >
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
+                        <span className="text-xs pb-2 pr-1 shrink-0" style={{ color: 'var(--text-faint)' }}>
                             총 {data?.page?.totalElements ?? 0}건
                         </span>
                     </div>
@@ -342,55 +344,111 @@ export default function BotLogPage() {
                     {/* ── 테이블 뷰 ── */}
                     {view === 'table' && (
                         <>
-                            <div className="rounded-xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                            {/* 모바일: 카드형 */}
+                            <div className="flex flex-col gap-3 sm:hidden">
+                                {loading ? (
+                                    <div className="flex items-center justify-center py-16" style={{ color: 'var(--text-faint)' }}>
+                                        <RefreshCw size={20} className="animate-spin mr-2" /> 불러오는 중...
+                                    </div>
+                                ) : logs.length === 0 ? (
+                                    <div className="text-center py-16 text-sm" style={{ color: 'var(--text-faint)' }}>로그가 없습니다.</div>
+                                ) : logs.map((log, idx) => {
+                                    const meta = TYPE_META[log.type]
+                                    const seq = (data?.page.number ?? 0) * (data?.page.size ?? 10) + idx + 1
+                                    return (
+                                        <div key={log.id} className="rounded-xl p-3.5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                                            <div className="flex items-center justify-between mb-2.5">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-mono" style={{ color: 'var(--text-faint)' }}>#{seq}</span>
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-xs font-medium ${meta.color}`}>
+                                                        {meta.icon}{meta.label}
+                                                    </span>
+                                                </div>
+                                                {log.success
+                                                    ? <span className="inline-flex items-center gap-1 text-emerald-500 text-xs"><CheckCircle size={12} /> 성공</span>
+                                                    : <span className="inline-flex items-center gap-1 text-red-500 text-xs"><XCircle size={12} /> 실패</span>
+                                                }
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-y-1.5 text-xs mb-2.5">
+                                                <span style={{ color: 'var(--text-faint)' }}>명령어</span>
+                                                <span className="font-mono text-right" style={{ color: 'var(--text-primary)' }}>{log.command || '-'}</span>
+                                                <span style={{ color: 'var(--text-faint)' }}>발신자</span>
+                                                <span className="text-right truncate" style={{ color: 'var(--text-muted)' }}>{log.sender || '-'}</span>
+                                                <span style={{ color: 'var(--text-faint)' }}>채팅방</span>
+                                                <span className="text-right truncate" style={{ color: 'var(--text-muted)' }}>{log.room || '-'}</span>
+                                                {log.detail && <>
+                                                    <span style={{ color: 'var(--text-faint)' }}>상세</span>
+                                                    <span className="text-right truncate" style={{ color: 'var(--text-muted)' }}>{log.detail}</span>
+                                                </>}
+                                            </div>
+                                            <div className="text-xs font-mono pt-2" style={{ color: 'var(--text-faint)', borderTop: '1px solid var(--border-subtle)' }}>
+                                                {formatDate(log.createdAt)}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+
+                            {/* 태블릿 이상: 테이블 */}
+                            <div className="hidden sm:block rounded-xl overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
+                                    <table className="text-sm" style={{ minWidth: '580px', width: '100%' }}>
                                         <thead>
                                             <tr className="text-xs" style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-faint)', background: 'var(--bg-page)' }}>
-                                                <th className="text-left px-4 py-3 w-36">시각</th>
-                                                <th className="text-left px-4 py-3 w-32">구분</th>
-                                                <th className="text-left px-4 py-3 w-24">상태</th>
-                                                <th className="text-left px-4 py-3 w-28">채팅방</th>
-                                                <th className="text-left px-4 py-3 w-28">발신자</th>
-                                                <th className="text-left px-4 py-3 w-32">명령어</th>
-                                                <th className="text-left px-4 py-3">상세</th>
+                                                <th className="text-left px-3 py-3 w-10 whitespace-nowrap">순번</th>
+                                                <th className="text-left px-3 py-3 w-24 whitespace-nowrap">구분</th>
+                                                <th className="text-left px-3 py-3 w-16 whitespace-nowrap">상태</th>
+                                                <th className="text-left px-3 py-3 whitespace-nowrap lg:hidden">발신자 · 방</th>
+                                                <th className="text-left px-3 py-3 w-24 whitespace-nowrap hidden lg:table-cell">채팅방</th>
+                                                <th className="text-left px-3 py-3 w-24 whitespace-nowrap hidden lg:table-cell">발신자</th>
+                                                <th className="text-left px-3 py-3 w-28 whitespace-nowrap">명령어</th>
+                                                <th className="text-left px-3 py-3 whitespace-nowrap hidden lg:table-cell">상세</th>
+                                                <th className="text-left px-3 py-3 w-36 whitespace-nowrap">시각</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {loading ? (
                                                 <tr>
-                                                    <td colSpan={7} className="text-center py-16" style={{ color: 'var(--text-faint)' }}>
+                                                    <td colSpan={8} className="text-center py-16" style={{ color: 'var(--text-faint)' }}>
                                                         <RefreshCw size={20} className="animate-spin mx-auto mb-2" />
                                                         불러오는 중...
                                                     </td>
                                                 </tr>
                                             ) : logs.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={7} className="text-center py-16 text-sm" style={{ color: 'var(--text-faint)' }}>로그가 없습니다.</td>
+                                                    <td colSpan={8} className="text-center py-16 text-sm" style={{ color: 'var(--text-faint)' }}>로그가 없습니다.</td>
                                                 </tr>
-                                            ) : logs.map((log) => {
+                                            ) : logs.map((log, idx) => {
                                                 const meta = TYPE_META[log.type]
+                                                const seq = (data?.page.number ?? 0) * (data?.page.size ?? 10) + idx + 1
                                                 return (
                                                     <tr key={log.id} className="transition-colors" style={{ borderBottom: '1px solid var(--border-subtle)' }}
                                                         onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                                                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                                     >
-                                                        <td className="px-4 py-3 text-xs whitespace-nowrap font-mono" style={{ color: 'var(--text-faint)' }}>{formatDate(log.createdAt)}</td>
-                                                        <td className="px-4 py-3">
-                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-xs font-medium ${meta.color}`}>
+                                                        <td className="px-3 py-3 text-xs font-mono whitespace-nowrap" style={{ color: 'var(--text-faint)' }}>{seq}</td>
+                                                        <td className="px-3 py-3 whitespace-nowrap">
+                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-xs font-medium whitespace-nowrap ${meta.color}`}>
                                                                 {meta.icon}{meta.label}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-3">
+                                                        <td className="px-3 py-3 whitespace-nowrap">
                                                             {log.success
-                                                                ? <span className="inline-flex items-center gap-1 text-emerald-500 text-xs"><CheckCircle size={13} /> 성공</span>
-                                                                : <span className="inline-flex items-center gap-1 text-red-500 text-xs"><XCircle size={13} /> 실패</span>
+                                                                ? <span className="inline-flex items-center gap-1 text-emerald-500 text-xs whitespace-nowrap"><CheckCircle size={13} /> 성공</span>
+                                                                : <span className="inline-flex items-center gap-1 text-red-500 text-xs whitespace-nowrap"><XCircle size={13} /> 실패</span>
                                                             }
                                                         </td>
-                                                        <td className="px-4 py-3 text-xs truncate max-w-[7rem]" style={{ color: 'var(--text-muted)' }}>{log.room || '-'}</td>
-                                                        <td className="px-4 py-3 text-xs truncate max-w-[7rem]" style={{ color: 'var(--text-muted)' }}>{log.sender || '-'}</td>
-                                                        <td className="px-4 py-3 text-xs font-mono" style={{ color: 'var(--text-primary)' }}>{log.command || '-'}</td>
-                                                        <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>{log.detail || '-'}</td>
+                                                        {/* 태블릿: 발신자·방 병합 셀 */}
+                                                        <td className="px-3 py-3 text-xs whitespace-nowrap lg:hidden" style={{ color: 'var(--text-muted)' }}>
+                                                            <span>{log.sender || '-'}</span>
+                                                            {log.room && <span style={{ color: 'var(--text-faint)' }}> · {log.room}</span>}
+                                                        </td>
+                                                        {/* 데스크톱: 분리 셀 */}
+                                                        <td className="px-3 py-3 text-xs whitespace-nowrap hidden lg:table-cell" style={{ color: 'var(--text-muted)', maxWidth: '7rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>{log.room || '-'}</td>
+                                                        <td className="px-3 py-3 text-xs whitespace-nowrap hidden lg:table-cell" style={{ color: 'var(--text-muted)', maxWidth: '7rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>{log.sender || '-'}</td>
+                                                        <td className="px-3 py-3 text-xs font-mono whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>{log.command || '-'}</td>
+                                                        <td className="px-3 py-3 text-xs whitespace-nowrap hidden lg:table-cell" style={{ color: 'var(--text-muted)' }}>{log.detail || '-'}</td>
+                                                        <td className="px-3 py-3 text-xs whitespace-nowrap font-mono" style={{ color: 'var(--text-faint)' }}>{formatDate(log.createdAt)}</td>
                                                     </tr>
                                                 )
                                             })}
