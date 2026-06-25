@@ -54,6 +54,9 @@ public class GoogleSheetsService {
     @Value("${google.sheets.credentials-path}")
     private Resource credentialsResource;
 
+    @Value("${google.sheets.credentials-json:}")
+    private String credentialsJson;
+
     private Sheets sheetsService;
 
     // ── 레이드일정 시트 구조 ──────────────────────────────────────────
@@ -111,8 +114,12 @@ public class GoogleSheetsService {
     @PostConstruct
     public void init() {
         try {
+            java.io.InputStream credStream = (credentialsJson != null && !credentialsJson.isBlank())
+                    ? new java.io.ByteArrayInputStream(credentialsJson.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                    : credentialsResource.getInputStream();
+
             GoogleCredentials credentials = GoogleCredentials
-                    .fromStream(credentialsResource.getInputStream())
+                    .fromStream(credStream)
                     .createScoped("https://www.googleapis.com/auth/spreadsheets");
 
             sheetsService = new Sheets.Builder(
