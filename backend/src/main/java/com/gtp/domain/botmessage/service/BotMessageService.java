@@ -199,11 +199,17 @@ public class BotMessageService {
             }
         } catch (Exception ignored) {}
 
+        // 고대코어 개수
+        long ancientCount = (ag != null && ag.getSlots() != null)
+                ? ag.getSlots().stream().filter(s -> "고대".equals(s.getGrade())).count()
+                : 0;
+
         StringBuilder sb = new StringBuilder();
         if (d.getTitle() != null && !d.getTitle().isEmpty()) sb.append("❖ ").append(d.getTitle()).append("\n");
         sb.append("【 ").append(d.getCharacterName()).append(" 】\n");
         sb.append(d.getServerName()).append("/").append(d.getCharacterClassName());
         if (!arkTitle.isEmpty()) sb.append("/").append(arkTitle);
+        if (ancientCount > 0) sb.append("  ").append(ancientCount).append("고대");
         sb.append("\n───────────────\n");
         sb.append("◆ 레벨  템").append(d.getItemAvgLevel()).append("/원").append(d.getExpeditionLevel()).append("\n");
         sb.append("◆ 투력  ").append(d.getCombatPower()).append("\n");
@@ -241,11 +247,6 @@ public class BotMessageService {
             if (!engParts.isEmpty()) sb.append("◆ 각인  ").append(String.join("", engParts)).append("\n");
         }
 
-        // 고대코어 개수
-        long ancientCount = (ag != null && ag.getSlots() != null)
-                ? ag.getSlots().stream().filter(s -> "고대".equals(s.getGrade())).count()
-                : 0;
-
         // 아크그리드 (딜러/서폿 분리 표시)
         if (ag != null && ag.getEffects() != null && !ag.getEffects().isEmpty()) {
             Set<String> arkGridFilter = isSupportClass(d.getCharacterClassName(), ap)
@@ -254,16 +255,11 @@ public class BotMessageService {
             List<ArkGridEffect> filtered = ag.getEffects().stream()
                     .filter(ge -> arkGridFilter.contains(ge.getName()))
                     .toList();
-            if (!filtered.isEmpty() || ancientCount > 0) {
+            if (!filtered.isEmpty()) {
                 sb.append("───────────────\n【 아크그리드 】\n");
-                if (ancientCount > 0)
-                    sb.append("◆ 고대코어  ").append(ancientCount).append("개\n");
                 for (ArkGridEffect ge : filtered)
                     sb.append("◆ ").append(ge.getName()).append("  Lv.").append(ge.getLevel()).append("\n");
             }
-        } else if (ancientCount > 0) {
-            sb.append("───────────────\n【 아크그리드 】\n");
-            sb.append("◆ 고대코어  ").append(ancientCount).append("개\n");
         }
 
         // 아크패시브 포인트
