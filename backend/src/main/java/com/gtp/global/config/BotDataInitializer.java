@@ -1,12 +1,12 @@
 package com.gtp.global.config;
 
-import com.gtp.domain.botcommand.entity.BotCommand;
-import com.gtp.domain.botcommand.repository.BotCommandRepository;
-import com.gtp.domain.botroom.entity.BotRoom;
-import com.gtp.domain.botroom.entity.BotRoomStatus;
-import com.gtp.domain.botroom.repository.BotRoomRepository;
-import com.gtp.domain.botschedule.entity.BotSchedule;
-import com.gtp.domain.botschedule.repository.BotScheduleRepository;
+import com.gtp.domain.bot.command.entity.BotCommand;
+import com.gtp.domain.bot.command.repository.BotCommandRepository;
+import com.gtp.domain.bot.room.entity.BotRoom;
+import com.gtp.domain.bot.room.entity.BotRoomStatus;
+import com.gtp.domain.bot.room.repository.BotRoomRepository;
+import com.gtp.domain.bot.schedule.entity.BotSchedule;
+import com.gtp.domain.bot.schedule.repository.BotScheduleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;

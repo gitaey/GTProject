@@ -1,9 +1,9 @@
 package com.gtp.global.init;
 
-import com.gtp.domain.user.entity.Role;
-import com.gtp.domain.user.entity.User;
-import com.gtp.domain.user.entity.UserStatus;
-import com.gtp.domain.user.repository.UserRepository;
+import com.gtp.domain.member.user.entity.Role;
+import com.gtp.domain.member.user.entity.User;
+import com.gtp.domain.member.user.entity.UserStatus;
+import com.gtp.domain.member.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;

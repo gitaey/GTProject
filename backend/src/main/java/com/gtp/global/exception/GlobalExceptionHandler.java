@@ -1,6 +1,6 @@
 package com.gtp.global.exception;
 
-import com.gtp.domain.botlog.service.BotLogService;
+import com.gtp.domain.bot.log.service.BotLogService;
 import com.gtp.global.response.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;

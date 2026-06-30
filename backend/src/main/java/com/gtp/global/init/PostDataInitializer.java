@@ -1,9 +1,9 @@
 package com.gtp.global.init;
 
-import com.gtp.domain.post.entity.Post;
-import com.gtp.domain.post.entity.PostCategory;
-import com.gtp.domain.post.entity.PostStatus;
-import com.gtp.domain.post.repository.PostRepository;
+import com.gtp.domain.blog.entity.Post;
+import com.gtp.domain.blog.entity.PostCategory;
+import com.gtp.domain.blog.entity.PostStatus;
+import com.gtp.domain.blog.repository.PostRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
