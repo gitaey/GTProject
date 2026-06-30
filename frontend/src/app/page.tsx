@@ -86,7 +86,7 @@ export default function Home() {
 
     useEffect(() => {
         const today = new Date().toISOString().split('T')[0]
-        const auth  = token ? { Authorization: `Bearer ${token}` } : {}
+        const auth: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
 
         fetch(`${API}/api/bot-log/stats/daily?date=${today}`)
             .then(r => r.json()).then(d => { if (d.success) setStats(d.data) }).catch(() => {})
