@@ -1,5 +1,5 @@
-// var SERVER_URL = "https://api.gitaey-dev.com";
-var SERVER_URL = "http://sisnet2.iptime.org:48080";
+var SERVER_URL = "https://api.gitaey-dev.com";
+// var SERVER_URL = "http://sisnet2.iptime.org:48080";
 
 var roomRepliers = {}; // 방별 replier 저장
 var timerStarted = false;
