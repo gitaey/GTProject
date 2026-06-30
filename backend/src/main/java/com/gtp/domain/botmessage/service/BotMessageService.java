@@ -665,7 +665,6 @@ public class BotMessageService {
                       /일정 캐릭명
                       /일정전체 캐릭명
                       /오늘일정 캐릭명
-                      /파티편성
                       /일정새로고침
                     """);
         }
