@@ -241,6 +241,11 @@ public class BotMessageService {
             if (!engParts.isEmpty()) sb.append("◆ 각인  ").append(String.join("", engParts)).append("\n");
         }
 
+        // 고대코어 개수
+        long ancientCount = (ag != null && ag.getSlots() != null)
+                ? ag.getSlots().stream().filter(s -> "고대".equals(s.getGrade())).count()
+                : 0;
+
         // 아크그리드 (딜러/서폿 분리 표시)
         if (ag != null && ag.getEffects() != null && !ag.getEffects().isEmpty()) {
             Set<String> arkGridFilter = isSupportClass(d.getCharacterClassName(), ap)
@@ -249,11 +254,16 @@ public class BotMessageService {
             List<ArkGridEffect> filtered = ag.getEffects().stream()
                     .filter(ge -> arkGridFilter.contains(ge.getName()))
                     .toList();
-            if (!filtered.isEmpty()) {
+            if (!filtered.isEmpty() || ancientCount > 0) {
                 sb.append("───────────────\n【 아크그리드 】\n");
+                if (ancientCount > 0)
+                    sb.append("◆ 고대코어  ").append(ancientCount).append("개\n");
                 for (ArkGridEffect ge : filtered)
                     sb.append("◆ ").append(ge.getName()).append("  Lv.").append(ge.getLevel()).append("\n");
             }
+        } else if (ancientCount > 0) {
+            sb.append("───────────────\n【 아크그리드 】\n");
+            sb.append("◆ 고대코어  ").append(ancientCount).append("개\n");
         }
 
         // 아크패시브 포인트

@@ -12,7 +12,7 @@ const RAID_CATEGORIES = [
 ];
 
 // ========== 상수 ==========
-const CHAR_COL_COUNT  = 7;  // 길드원, 닉네임, 클래스, 아크패시브, 아이템레벨, 전투력, 로펙
+const CHAR_COL_COUNT  = 8;  // 길드원, 닉네임, 클래스, 아크패시브, 아이템레벨, 전투력, 로펙, 고대코어
 const RAID_COL_SPAN   = 1;  // 레이드당 컬럼 수
 const HEADER_ROWS     = 3;  // 헤더 행 수
 const DATA_START_ROW  = 4;  // 데이터 시작 행
@@ -42,6 +42,7 @@ const CHAR_ARC_COL   = 4;   // D열: 아크패시브
 const CHAR_LV_COL    = 5;   // E열: 아이템레벨
 const CHAR_POW_COL   = 6;   // F열: 전투력
 const CHAR_ROB_COL   = 7;   // G열: 로펙
+const CHAR_CORE_COL  = 8;   // H열: 고대코어
 
 // 레이드일정 시트에서 안전하게 읽을 실제 열 수 반환
 function getSchedCols(sheet) {
@@ -78,10 +79,10 @@ function setupRaidBoard() {
   // 기존 시트 재사용 (없으면 새로 생성)
   let boardSheet = ss.getSheetByName('레이드현황판');
   const savedDark = [];
+  const raidDataMap = {}; // 닉네임 → 레이드 체크 데이터 보존
   if (!boardSheet) {
     boardSheet = ss.insertSheet('레이드현황판');
   } else {
-    // #333333 채우기 셀 위치 저장 (스타일 재적용 후 맨 끝에서 복원)
     const maxRow = boardSheet.getLastRow();
     const maxCol = boardSheet.getLastColumn();
     if (maxRow > 0 && maxCol > 0) {
@@ -89,6 +90,16 @@ function setupRaidBoard() {
       bgs.forEach((rowArr, r) => rowArr.forEach((bg, c) => {
         if (bg.toLowerCase() === '#333333') savedDark.push([r + 1, c + 1]);
       }));
+
+      // 레이드 체크 데이터 닉네임 기준으로 저장 (DATA_START_ROW부터, 레이드 열부터)
+      if (maxRow >= DATA_START_ROW && maxCol > CHAR_COL_COUNT) {
+        const raidColCount = maxCol - CHAR_COL_COUNT;
+        const allData = boardSheet.getRange(DATA_START_ROW, 1, maxRow - DATA_START_ROW + 1, maxCol).getValues();
+        allData.forEach(rowArr => {
+          const nick = rowArr[1]; // B열 닉네임 (0-indexed: 1)
+          if (nick) raidDataMap[nick] = rowArr.slice(CHAR_COL_COUNT);
+        });
+      }
     }
     boardSheet.clearContents();
     boardSheet.clearFormats();
@@ -164,6 +175,12 @@ function setupRaidBoard() {
     boardSheet.getRange(row, 5).setFormula(`=IFERROR(INDEX('캐릭터'!$${lvCol}:$${lvCol},   MATCH(B${row}, '캐릭터'!$${nickCol}:$${nickCol}, 0)), "")`);
     boardSheet.getRange(row, 6).setFormula(`=IFERROR(INDEX('캐릭터'!$${powCol}:$${powCol}, MATCH(B${row}, '캐릭터'!$${nickCol}:$${nickCol}, 0)), "")`);
     boardSheet.getRange(row, 7).setFormula(`=IFERROR(INDEX('캐릭터'!$${robCol}:$${robCol}, MATCH(B${row}, '캐릭터'!$${nickCol}:$${nickCol}, 0)), "")`);
+
+    // 기존 레이드 체크 데이터 복원
+    if (raidDataMap[nick]) {
+      boardSheet.getRange(row, CHAR_COL_COUNT + 1, 1, raidDataMap[nick].length)
+        .setValues([raidDataMap[nick]]);
+    }
     row++;
   });
 
@@ -617,18 +634,19 @@ function updateCharacterStats() {
   fetchAndWriteCharacterStats(sheet, targets, apiKey);
 
   const updatedAt = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
-  sheet.getRange(1, 9).setValue('마지막 갱신: ' + updatedAt).setFontColor('#ffffff').setFontSize(10);
+  sheet.getRange(1, 10).setValue('마지막 갱신: ' + updatedAt).setFontColor('#ffffff').setFontSize(10);
 }
 
-// 50개씩 배치로 나눠 API 요청 후 시트에 기록
+// 30개씩 배치로 나눠 API 요청 후 시트에 기록
 function fetchAndWriteCharacterStats(sheet, targets, apiKey) {
-  const BATCH = 50;
+  const BATCH = 30;
   for (let start = 0; start < targets.length; start += BATCH) {
     const batch = targets.slice(start, start + BATCH);
+    if (start > 0) Utilities.sleep(1000); // 배치 사이 1초 대기 (레이트 리밋 방지)
 
     const lostarkRes = UrlFetchApp.fetchAll(batch.map(t => ({
       url    : 'https://developer-lostark.game.onstove.com/armories/characters/'
-               + encodeURIComponent(t.nick) + '?filters=profiles%2Barkpassive',
+               + encodeURIComponent(t.nick) + '?filters=profiles%2Barkpassive%2Barkgrid',
       headers: { 'Authorization': apiKey },
       muteHttpExceptions: true
     })));
@@ -648,6 +666,8 @@ function fetchAndWriteCharacterStats(sheet, targets, apiKey) {
           sheet.getRange(row, CHAR_LV_COL).setValue(json.ArmoryProfile.ItemAvgLevel        || '');
           sheet.getRange(row, CHAR_POW_COL).setValue(json.ArmoryProfile.CombatPower        || '');
           sheet.getRange(row, CHAR_ARC_COL).setValue(json.ArkPassive?.Title                || '');
+          const coreCount = (json.ArkGrid?.Slots || []).filter(s => s.Grade === '고대').length;
+          sheet.getRange(row, CHAR_CORE_COL).setValue(coreCount);
         } catch(e) {
           Logger.log('로스트아크 API 오류: ' + t.nick + ' / ' + e.message);
         }
@@ -741,8 +761,8 @@ function composeParties() {
 // 상단 메뉴
 // ============================================================
 function onOpen() {
-  if (Session.getActiveUser().getEmail() !== 'work.gitaey@gmail.com') return;
-  if (Session.getActiveUser().getEmail() !== 'dev.jsh88@gmail.com') return;
+  if (Session.getActiveUser().getEmail() !== 'work.gitaey@gmail.com' &&
+      Session.getActiveUser().getEmail() !== 'dev.jsh88@gmail.com') return;
 
   SpreadsheetApp.getUi()
     .createMenu('길드 레이드')
@@ -802,4 +822,38 @@ function setupNicknameDropdown() {
     }
   }));
   Sheets.Spreadsheets.batchUpdate({ requests }, ss.getId());
+}
+
+// 레이드일정 G4:Z4 요일 셀 조건부 서식 설정
+function setupDayColorFormat() {
+  const ss         = SpreadsheetApp.getActiveSpreadsheet();
+  const schedSheet = ss.getSheetByName('레이드일정');
+  const lastCol    = Math.max(schedSheet.getLastColumn(), 7);
+  const range      = schedSheet.getRange(ROW_DAY, 7, 1, lastCol - 6);
+
+  const DAY_COLORS = {
+    '월요일': '#1a3a6b',
+    '화요일': '#6b2020',
+    '수요일': '#1a5a2a',
+    '목요일': '#5a4510',
+    '금요일': '#3a1a6b',
+    '토요일': '#1a4a5a',
+    '일요일': '#5a1a3a',
+    '주말중': '#4a3a1a',
+  };
+
+  const existingRules = schedSheet.getConditionalFormatRules().filter(r =>
+    !r.getRanges().some(rng => rng.getRow() === ROW_DAY)
+  );
+
+  const newRules = Object.entries(DAY_COLORS).map(([day, color]) =>
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenTextContains(day)
+      .setBackground(color)
+      .setFontColor('#ffffff')
+      .setRanges([range])
+      .build()
+  );
+
+  schedSheet.setConditionalFormatRules([...existingRules, ...newRules]);
 }

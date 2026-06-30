@@ -191,7 +191,7 @@ export default function BotLogPage() {
 
                     {/* 탭 */}
                     <div className="flex items-end justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
-                        <div className="flex gap-0.5 overflow-x-auto">
+                        <div className="flex gap-0.5 overflow-x-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }}>
                             {TABS.map((t) => (
                                 <button
                                     key={t.key}

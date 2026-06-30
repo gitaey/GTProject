@@ -1,6 +1,8 @@
+// 레이어 트리의 상태(보임/숨김/투명도)를 전역으로 관리하는 Store
 import { create } from 'zustand'
 import { LayerItem, LayerGroup, flattenItems } from '@/types/layer'
 
+// Store 인터페이스: 상태와 액션(함수)의 구조 정의
 interface LayerStore {
     tree: LayerGroup[]
     toggleLayer: (id: string) => void
@@ -8,6 +10,9 @@ interface LayerStore {
     setOpacity: (id: string, opacity: number) => void
 }
 
+// 트리를 재귀 순회하며 특정 id의 LeafItem만 updater 함수로 수정
+// { ...node, children: ... } = 스프레드 연산자: 원본 복사 후 일부만 변경
+// React는 상태를 직접 수정하지 않고 새 객체를 만들어야 변경을 감지함 (jQuery와 다른 점)
 function updateItem(
     nodes: (LayerItem | LayerGroup)[],
     id: string,
@@ -15,38 +20,39 @@ function updateItem(
 ): (LayerItem | LayerGroup)[] {
     return nodes.map((node) => {
         if ('children' in node) {
-            return { ...node, children: updateItem(node.children, id, updater) }
+            return { ...node, children: updateItem(node.children, id, updater) }  // 그룹이면 재귀
         }
-        return node.id === id ? updater(node) : node
+        return node.id === id ? updater(node) : node  // 아이템이면 id 비교 후 수정
     })
 }
 
+// 트리에서 특정 id의 LayerGroup을 찾아 반환 (없으면 null)
 function findGroup(nodes: (LayerItem | LayerGroup)[], id: string): LayerGroup | null {
     for (const node of nodes) {
         if ('children' in node) {
             if (node.id === id) return node
-            const found = findGroup(node.children, id)
+            const found = findGroup(node.children, id)  // 재귀 탐색
             if (found) return found
         }
     }
     return null
 }
 
+// 특정 그룹의 모든 하위 항목 visible을 재귀로 변경
 function setGroupVisible(
     nodes: (LayerItem | LayerGroup)[],
     groupId: string,
     visible: boolean,
 ): (LayerItem | LayerGroup)[] {
     return nodes.map((node) => {
-        if (!('children' in node)) return node
+        if (!('children' in node)) return node  // LeafItem이면 그대로
         if (node.id === groupId) {
-            // 해당 그룹의 모든 하위 항목 재귀로 visible 변경
             return {
                 ...node,
-                children: setAllVisible(node.children, visible),
+                children: setAllVisible(node.children, visible),  // 해당 그룹 하위 전체 변경
             }
         }
-        return { ...node, children: setGroupVisible(node.children, groupId, visible) }
+        return { ...node, children: setGroupVisible(node.children, groupId, visible) }  // 재귀
     })
 }
 
@@ -54,13 +60,14 @@ function setGroupVisible(
 function setAllVisible(nodes: (LayerItem | LayerGroup)[], visible: boolean): (LayerItem | LayerGroup)[] {
     return nodes.map((node) => {
         if ('children' in node) {
-            return { ...node, children: setAllVisible(node.children, visible) }
+            return { ...node, children: setAllVisible(node.children, visible) }  // 그룹이면 재귀
         }
-        return { ...node, visible }
+        return { ...node, visible }  // LeafItem이면 visible 변경
     })
 }
 
 export const useLayerStore = create<LayerStore>((set, get) => ({
+    // 레이어 트리 초기 데이터 (layer.ts에서 정의한 LayerGroup/LayerItem 구조 그대로)
     tree: [
         {
             id: 'group-base',
@@ -97,6 +104,8 @@ export const useLayerStore = create<LayerStore>((set, get) => ({
             ],
         },
     ],
+
+    // 개별 레이어 토글: updateItem으로 해당 id의 visible만 반전
     toggleLayer: (id) =>
         set((s) => ({
             tree: s.tree.map((g) => ({
@@ -104,6 +113,8 @@ export const useLayerStore = create<LayerStore>((set, get) => ({
                 children: updateItem(g.children, id, (item) => ({ ...item, visible: !item.visible })),
             })),
         })),
+
+    // 그룹 토글: 하위 아이템이 전부 보이면 전부 숨김, 하나라도 숨겨져 있으면 전부 보임
     toggleGroup: (groupId) =>
         set((s) => {
             const allNodes: (LayerItem | LayerGroup)[] = [...s.tree, ...s.tree.flatMap((g) => g.children)]
@@ -120,6 +131,8 @@ export const useLayerStore = create<LayerStore>((set, get) => ({
                 }),
             }
         }),
+
+    // 투명도 변경: updateItem으로 해당 id의 opacity만 변경
     setOpacity: (id, opacity) =>
         set((s) => ({
             tree: s.tree.map((g) => ({ ...g, children: updateItem(g.children, id, (item) => ({ ...item, opacity })) })),
