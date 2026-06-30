@@ -209,8 +209,9 @@ public class BotMessageService {
         sb.append("【 ").append(d.getCharacterName()).append(" 】\n");
         sb.append(d.getServerName()).append("/").append(d.getCharacterClassName());
         if (!arkTitle.isEmpty()) sb.append("/").append(arkTitle);
-        if (ancientCount > 0) sb.append("  ").append(ancientCount).append("고대");
-        sb.append("\n───────────────\n");
+        sb.append("\n");
+        if (ancientCount > 0) sb.append("고대코어 ").append(ancientCount).append("개\n");
+        sb.append("───────────────\n");
         sb.append("◆ 레벨  템").append(d.getItemAvgLevel()).append("/원").append(d.getExpeditionLevel()).append("\n");
         sb.append("◆ 투력  ").append(d.getCombatPower()).append("\n");
         if (lopecScore != null) sb.append("◆ 로펙  ").append(lopecScore).append("\n");
