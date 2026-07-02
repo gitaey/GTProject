@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -62,8 +63,8 @@ public class BotLogService {
     /** 일별 통계: date = "2026-06-23" */
     public BotLogStatsResponse getDailyStats(String date, BotLogType type) {
         LocalDate d   = LocalDate.parse(date);
-        LocalDateTime from = d.atStartOfDay();
-        LocalDateTime to   = d.plusDays(1).atStartOfDay();
+        LocalDateTime from = d.atStartOfDay(ZoneId.of("Asia/Seoul")).toLocalDateTime();
+        LocalDateTime to   = d.plusDays(1).atStartOfDay(ZoneId.of("Asia/Seoul")).toLocalDateTime();
         List<BotLog> logs  = fetchRange(type, from, to);
         return buildStats(logs, "daily");
     }
@@ -71,8 +72,8 @@ public class BotLogService {
     /** 월별 통계: month = "2026-06" */
     public BotLogStatsResponse getMonthlyStats(String month, BotLogType type) {
         LocalDate first = LocalDate.parse(month + "-01");
-        LocalDateTime from = first.atStartOfDay();
-        LocalDateTime to   = first.plusMonths(1).atStartOfDay();
+        LocalDateTime from = first.atStartOfDay(ZoneId.of("Asia/Seoul")).toLocalDateTime();
+        LocalDateTime to   = first.plusMonths(1).atStartOfDay(ZoneId.of("Asia/Seoul")).toLocalDateTime();
         List<BotLog> logs  = fetchRange(type, from, to);
         return buildStats(logs, "monthly");
     }
