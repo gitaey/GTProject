@@ -7,18 +7,18 @@ import Draw from 'ol/interaction/Draw'
 import Overlay from 'ol/Overlay'
 import { LineString, Polygon } from 'ol/geom'
 import { getArea, getLength } from 'ol/sphere'
-import { MapTool, onClear } from '@/stores/mapStore'
+import { MapTool, onClear } from '@/stores/map/mapStore'
 import MeasureTooltip from '@/components/map/overlay/MeasureTooltip'
 
-import { useMapStore } from '@/stores/mapStore'
+import { useMapStore } from '@/stores/map/mapStore'
 
 function formatArea(sqMeters: number): string {
     return sqMeters >= 1_000_000 ? `${(sqMeters / 1_000_000).toFixed(2)} km²` : `${sqMeters.toFixed(0)} m²`
 }
 
-export function useAreaMeasure(mapRef: React.RefObject<Map | null>, activeTool: MapTool) {
+export function useAreaMeasure(map: Map | null, activeTool: MapTool) {
     const sourceRef = useRef(new VectorSource())
-    const layerRef = useRef(new VectorLayer({ source: sourceRef.current }))
+    const layerRef = useRef(new VectorLayer({ source: sourceRef.current, zIndex: 100 }))
     const drawRef = useRef<Draw | null>(null)
     const tooltipElRef = useRef<HTMLDivElement | null>(null)
     const tooltipOverlayRef = useRef<Overlay | null>(null)
@@ -26,7 +26,6 @@ export function useAreaMeasure(mapRef: React.RefObject<Map | null>, activeTool: 
     const fixedOverlaysRef = useRef<{ overlay: Overlay; root: ReturnType<typeof createRoot>; el: HTMLDivElement }[]>([])
 
     useEffect(() => {
-        const map = mapRef.current
         if (!map) return
         map.addLayer(layerRef.current)
 
@@ -45,10 +44,9 @@ export function useAreaMeasure(mapRef: React.RefObject<Map | null>, activeTool: 
             unsubscribe()
             map.removeLayer(layerRef.current)
         }
-    }, [mapRef.current])
+    }, [map])
 
     useEffect(() => {
-        const map = mapRef.current
         if (!map) return
 
         const { setActiveTool } = useMapStore.getState()
@@ -159,5 +157,5 @@ export function useAreaMeasure(mapRef: React.RefObject<Map | null>, activeTool: 
             rootRef.current = null
             tooltipElRef.current = null
         }
-    }, [activeTool, mapRef.current])
+    }, [activeTool, map])
 }

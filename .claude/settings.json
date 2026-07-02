@@ -8,5 +8,25 @@
         "postgresql://postgres:sis3047%21%40@sisnet.iptime.org:9091/gtp"
       ]
     }
+  },
+  "permissions": {
+    "allow": [
+      "mcp__visualize__show_widget",
+      "mcp__visualize__read_me",
+      "mcp__Claude_Preview__preview_screenshot",
+      "mcp__Claude_Preview__preview_console_logs",
+      "mcp__Claude_Preview__preview_snapshot",
+      "mcp__Claude_Preview__preview_start",
+      "mcp__Claude_Preview__preview_logs",
+      "mcp__Claude_Preview__preview_network",
+      "mcp__ccd_session_mgmt__search_session_transcripts",
+      "mcp__mcp-registry__search_mcp_registry",
+      "mcp__mcp-registry__suggest_connectors",
+      "mcp__dbeaver__list_connections",
+      "mcp__dbeaver__list_tables",
+      "mcp__dbeaver__get_table_schema",
+      "mcp__dbeaver__execute_query",
+      "mcp__dbeaver__get_database_stats"
+    ]
   }
 }

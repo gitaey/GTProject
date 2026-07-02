@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useAuthStore } from '@/store/authStore'
-import { useSidebarStore } from '@/store/sidebarStore'
+import { useAuthStore } from '@/stores/authStore'
+import { useSidebarStore } from '@/stores/sidebarStore'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 
 interface SubMenuItem {

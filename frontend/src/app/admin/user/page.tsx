@@ -30,7 +30,7 @@ import type {
     UserUpdateRequest,
 } from '@/types/user'
 import { PERMISSION_MAP, ROLE_OPTIONS } from '@/types/user'
-import { getToken } from '@/store/authStore'
+import { getToken } from '@/stores/authStore'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 

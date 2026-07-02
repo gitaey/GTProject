@@ -6,7 +6,7 @@ import TileLayer from 'ol/layer/Tile'
 import ImageLayer from 'ol/layer/Image'
 import XYZ from 'ol/source/XYZ'
 import ImageWMS from 'ol/source/ImageWMS'
-import { useLayerStore } from '@/stores/layerStore'
+import { useLayerStore } from '@/stores/map/layerStore'
 import { LayerItem, LayerGroup, isLayerGroup, flattenItems } from '@/types/layer'
 import BaseLayer from 'ol/layer/Base'
 
@@ -69,7 +69,7 @@ function flattenAll(tree: LayerGroup[]): LayerItem[] {
     return flattenItems(tree.flatMap((g) => g.children))
 }
 
-export function useLayerManager(mapRef: React.RefObject<OLMap | null>) {
+export function useLayerManager(map: OLMap | null) {
     const { tree } = useLayerStore()  // layerStore에서 트리 상태 구독
     const layers = flattenAll(tree)   // 트리를 평탄화해서 LayerItem[] 추출
 
@@ -79,7 +79,6 @@ export function useLayerManager(mapRef: React.RefObject<OLMap | null>) {
     // 지도 인스턴스가 생겼을 때 레이어를 지도에 등록
     // [mapRef.current]: mapRef.current가 바뀔 때(지도 생성 시)만 실행
     useEffect(() => {
-        const map = mapRef.current
         if (!map) return
 
         olLayersRef.current.clear()
@@ -99,7 +98,7 @@ export function useLayerManager(mapRef: React.RefObject<OLMap | null>) {
             })
             olLayersRef.current.clear()
         }
-    }, [mapRef.current])
+    }, [map])
 
     // Store 상태가 바뀔 때마다 OL 레이어에 visible/opacity 동기화
     // [layers]: layerStore의 tree가 바뀌면 layers도 바뀌고 이 useEffect가 실행됨

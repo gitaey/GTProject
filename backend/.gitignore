@@ -34,3 +34,4 @@ build/
 
 
 backend/src/main/resources/google-credentials.json
+src/main/resources/application-local.yml

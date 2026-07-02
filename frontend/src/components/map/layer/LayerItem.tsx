@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { LayerItem as LayerItemType, LayerGroup, isLayerGroup, flattenItems } from '@/types/layer'
-import { useLayerStore } from '@/stores/layerStore'
+import { useLayerStore } from '@/stores/map/layerStore'
 
 interface Props {
     node: LayerItemType | LayerGroup

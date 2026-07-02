@@ -8,7 +8,7 @@ import Overlay from 'ol/Overlay'
 import { LineString } from 'ol/geom'
 import { getLength } from 'ol/sphere'
 import Feature from 'ol/Feature'
-import { MapTool, useMapStore, onClear } from '@/stores/mapStore'
+import { MapTool, useMapStore, onClear } from '@/stores/map/mapStore'
 import MeasureTooltip from '@/components/map/overlay/MeasureTooltip'
 
 function formatDistance(meters: number): string {
@@ -18,9 +18,9 @@ function formatDistance(meters: number): string {
 type OverlayItem = { overlay: Overlay; root: ReturnType<typeof createRoot>; el: HTMLDivElement }
 type FeatureGroup = { feature: Feature; items: OverlayItem[] }
 
-export function useDistanceMeasure(mapRef: React.RefObject<Map | null>, activeTool: MapTool) {
+export function useDistanceMeasure(map: Map | null, activeTool: MapTool) {
     const sourceRef = useRef(new VectorSource())
-    const layerRef = useRef(new VectorLayer({ source: sourceRef.current }))
+    const layerRef = useRef(new VectorLayer({ source: sourceRef.current, zIndex: 100 }))
     const drawRef = useRef<Draw | null>(null)
     const tooltipElRef = useRef<HTMLDivElement | null>(null)
     const tooltipOverlayRef = useRef<Overlay | null>(null)
@@ -48,7 +48,6 @@ export function useDistanceMeasure(mapRef: React.RefObject<Map | null>, activeTo
     }
 
     useEffect(() => {
-        const map = mapRef.current
         if (!map) return
         map.addLayer(layerRef.current)
 
@@ -62,10 +61,9 @@ export function useDistanceMeasure(mapRef: React.RefObject<Map | null>, activeTo
             unsubscribe()
             map.removeLayer(layerRef.current)
         }
-    }, [mapRef.current])
+    }, [map])
 
     useEffect(() => {
-        const map = mapRef.current
         if (!map) return
 
         const { setActiveTool } = useMapStore.getState()
@@ -208,5 +206,5 @@ export function useDistanceMeasure(mapRef: React.RefObject<Map | null>, activeTo
             rootRef.current = null
             tooltipElRef.current = null
         }
-    }, [activeTool, mapRef.current])
+    }, [activeTool, map])
 }

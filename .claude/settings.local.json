@@ -70,7 +70,21 @@
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('imageUrl:', d.get\\('data',{}\\).get\\('imageUrl'\\)\\); print\\('reply미리보기:', \\(d.get\\('data',{}\\).get\\('reply'\\) or ''\\)[:50]\\)\")",
       "Bash(grep -o \"imageUrl.\\\\{0,100\\\\}\")",
       "Bash(curl -s -X POST http://sisnet2.iptime.org:48080/api/bot/message -H 'Content-Type: application/json' -d @/tmp/req.json)",
-      "mcp__Claude_Preview__preview_start"
+      "mcp__Claude_Preview__preview_start",
+      "Skill(artifact-design)",
+      "Skill(artifact-design:*)",
+      "WebFetch(domain:devtalk.kakao.com)",
+      "WebFetch(domain:www.code.go.kr)",
+      "WebFetch(domain:www.hscity.go.kr)",
+      "Bash(extract-text \"C:\\\\Users\\\\gitaey\\\\Downloads\\\\경기도 화성시 행정구역\\(법정동\\) 코드 부여 내역\\\\★\\(별첨1\\) 행정기관\\(행정동\\) 및 관할구역\\(법정동\\) 변경 상세내역\\(경기도 화성시\\).xlsx\")",
+      "Bash(python3 -c ' *)",
+      "PowerShell($env:PYTHONHOME = \"\"; $env:PYTHONPATH = \"\"; & \"C:\\\\Users\\\\gitaey\\\\AppData\\\\Local\\\\Microsoft\\\\WindowsApps\\\\python.exe\" -c \"import pandas as pd; path = r'C:\\\\Users\\\\gitaey\\\\Downloads\\\\경기도 화성시 행정구역\\(법정동\\) 코드 부여 내역\\\\★\\(별첨1\\) 행정기관\\(행정동\\) 및 관할구역\\(법정동\\) 변경 상세내역\\(경기도 화성시\\).xlsx'; sheets = pd.read_excel\\(path, sheet_name=None, header=None\\); [print\\(f'=== {n} ===\\\\n{df.to_string\\(\\)}\\\\n'\\) for n,df in sheets.items\\(\\)]\" 2>&1)",
+      "PowerShell(npm install -g xlsx 2>&1)",
+      "PowerShell(tail -3)",
+      "PowerShell(node -e \"const XLSX = require\\('xlsx'\\); const wb = XLSX.readFile\\('C:/Users/gitaey/Downloads/��⵵ ȭ���� ��������\\(������\\) �ڵ� �ο� ����/��\\(��÷1\\) �������\\(������\\) �� ���ұ���\\(������\\) ���� �󼼳���\\(��⵵ ȭ����\\).xlsx'\\); wb.SheetNames.forEach\\(n => { console.log\\('=== ��Ʈ:', n, '==='\\); console.log\\(XLSX.utils.sheet_to_csv\\(wb.Sheets[n]\\).substring\\(0,8000\\)\\); }\\);\")",
+      "Skill(fewer-permission-prompts)",
+      "Skill(fewer-permission-prompts:*)",
+      "Bash(ls ~/.claude/projects/ | head -20)"
     ]
   }
 }

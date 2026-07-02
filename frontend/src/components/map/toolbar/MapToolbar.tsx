@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { PenLine, Ruler, Trash2, MapPin, Spline, Pentagon, SquareDashed } from 'lucide-react'
-import { useMapStore, MapTool } from '@/stores/mapStore'
+import { useMapStore, MapTool } from '@/stores/map/mapStore'
 
 const DRAW_TOOLS: { id: MapTool; label: string; icon: React.ReactNode }[] = [
     { id: 'draw-point', label: '포인트', icon: <MapPin size={14} /> },

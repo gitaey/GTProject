@@ -106,7 +106,7 @@ public class BotMessageService {
 
     /** 로스트아크 정기점검 시간대 여부 (매주 수요일 05:00~10:00) */
     private boolean isLostArkMaintenance() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(java.time.ZoneId.of("Asia/Seoul"));
         if (now.getDayOfWeek() != DayOfWeek.WEDNESDAY) return false;
         int hour = now.getHour();
         return hour >= 6 && hour < 10;
@@ -156,9 +156,8 @@ public class BotMessageService {
     private BotMessageResult handleInfoResult(String name, String room) throws Exception {
         CharacterInfoResponse info = lostarkService.getCharacterInfo(name);
         String reply = handleInfo(name, room, info);
-        String encoded = java.net.URLEncoder.encode(name, java.nio.charset.StandardCharsets.UTF_8);
-        String previewUrl = "https://api.gitaey-dev.com/preview/character/" + encoded;
-        return BotMessageResult.of(reply, previewUrl);
+        String imageUrl = (info.getProfile() != null) ? info.getProfile().getCharacterImage() : null;
+        return BotMessageResult.of(reply, imageUrl);
     }
 
     private String handleInfo(String name, String room) throws Exception {
@@ -584,7 +583,7 @@ public class BotMessageService {
         ExpeditionScheduleResponse data = googleSheetsService.getExpeditionSchedule(name);
         if (data == null) return name + "의 원정대를 찾을 수 없습니다.";
 
-        int dow = LocalDate.now().getDayOfWeek().getValue() % 7; // 0=일, 1=월, ..., 6=토
+        int dow = LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).getDayOfWeek().getValue() % 7; // 0=일, 1=월, ..., 6=토
         String todayChar = DAY_CHARS[dow];
         String todayFull = DAY_FULL[dow];
 

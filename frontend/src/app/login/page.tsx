@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, LogIn, Shield } from 'lucide-react'
-import { useAuthStore } from '@/store/authStore'
-import type { AuthUser } from '@/store/authStore'
+import { useAuthStore } from '@/stores/authStore'
+import type { AuthUser } from '@/stores/authStore'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 

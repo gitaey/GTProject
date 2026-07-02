@@ -22,10 +22,11 @@
             "mainClass": "com.gtp.GtpApplication",
             "projectName": "gtp",
             "cwd": "${workspaceFolder}/backend",
-            "vmArgs": "-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8",
+            "vmArgs": "-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dspring.profiles.active=local",
             "shortenCommandLine": "jarmanifest",
             "env": {
-                "SPRING_DEVTOOLS_RESTART_ENABLED": "true"
+                "SPRING_DEVTOOLS_RESTART_ENABLED": "true",
+                "SPRING_PROFILES_ACTIVE": "local"
             }
         }
     ],

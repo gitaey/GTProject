@@ -44,6 +44,8 @@ const CHAR_POW_COL   = 6;   // F열: 전투력
 const CHAR_ROB_COL   = 7;   // G열: 로펙
 const CHAR_CORE_COL  = 8;   // H열: 고대코어
 
+const BOARD_CHAR_COL_COUNT = 7;  // 현황판에 표시할 캐릭터 열 수 (고대코어 제외)
+
 // 레이드일정 시트에서 안전하게 읽을 실제 열 수 반환
 function getSchedCols(sheet) {
   return Math.min(SCHED_MAX_COLS, sheet.getMaxColumns());
@@ -65,7 +67,7 @@ function getAllRaids() {
 }
 
 function getRaidBaseCol(raidIndex) {
-  return CHAR_COL_COUNT + 1 + raidIndex * RAID_COL_SPAN;
+  return BOARD_CHAR_COL_COUNT + 1 + raidIndex * RAID_COL_SPAN;
 }
 
 
@@ -91,13 +93,18 @@ function setupRaidBoard() {
         if (bg.toLowerCase() === '#333333') savedDark.push([r + 1, c + 1]);
       }));
 
-      // 레이드 체크 데이터 닉네임 기준으로 저장 (DATA_START_ROW부터, 레이드 열부터)
-      if (maxRow >= DATA_START_ROW && maxCol > CHAR_COL_COUNT) {
-        const raidColCount = maxCol - CHAR_COL_COUNT;
+      // 레이드 체크 데이터 닉네임 기준으로 저장 (헤더에서 레이드 시작 열 동적 감지)
+      if (maxRow >= DATA_START_ROW && maxCol > 0) {
+        const headerVals = boardSheet.getRange(3, 1, 1, maxCol).getValues()[0];
+        const raidNames  = getAllRaids();
+        let oldRaidStartIdx = CHAR_COL_COUNT; // 기본값 (0-indexed)
+        for (let i = 0; i < headerVals.length; i++) {
+          if (raidNames.includes(String(headerVals[i]))) { oldRaidStartIdx = i; break; }
+        }
         const allData = boardSheet.getRange(DATA_START_ROW, 1, maxRow - DATA_START_ROW + 1, maxCol).getValues();
         allData.forEach(rowArr => {
-          const nick = rowArr[1]; // B열 닉네임 (0-indexed: 1)
-          if (nick) raidDataMap[nick] = rowArr.slice(CHAR_COL_COUNT);
+          const nick = rowArr[1];
+          if (nick) raidDataMap[nick] = rowArr.slice(oldRaidStartIdx);
         });
       }
     }
@@ -109,17 +116,17 @@ function setupRaidBoard() {
   ss.moveActiveSheet(1);
 
   const allRaids  = getAllRaids();
-  const totalCols = CHAR_COL_COUNT + allRaids.length * RAID_COL_SPAN;
+  const totalCols = BOARD_CHAR_COL_COUNT + allRaids.length * RAID_COL_SPAN;
 
   // ── Row 1: 주차 헤더 ──
   boardSheet.getRange(1, 1, 1, totalCols).merge();
   boardSheet.getRange(1, 1).setFormula('=MONTH(today())&"월 "&(WEEKNUM(today())-WEEKNUM(today()-DAY(today())+1)+1)&"주차"');
 
   // ── Row 2: 캐릭터 정보 + 카테고리 헤더 ──
-  boardSheet.getRange(2, 1, 1, CHAR_COL_COUNT).merge();
+  boardSheet.getRange(2, 1, 1, BOARD_CHAR_COL_COUNT).merge();
   boardSheet.getRange(2, 1).setValue('캐릭터 정보');
 
-  let catCol = CHAR_COL_COUNT + 1;
+  let catCol = BOARD_CHAR_COL_COUNT + 1;
   RAID_CATEGORIES.forEach(cat => {
     const span = cat.raids.length * RAID_COL_SPAN;
     if (span > 1) boardSheet.getRange(2, catCol, 1, span).merge();
@@ -132,7 +139,7 @@ function setupRaidBoard() {
     boardSheet.getRange(3, i + 1).setValue(h);
   });
   allRaids.forEach((raid, i) => {
-    boardSheet.getRange(3, CHAR_COL_COUNT + i + 1).setValue(raid);
+    boardSheet.getRange(3, BOARD_CHAR_COL_COUNT + i + 1).setValue(raid);
   });
 
   // ── Row 4~: 캐릭터 데이터 ──
@@ -178,7 +185,7 @@ function setupRaidBoard() {
 
     // 기존 레이드 체크 데이터 복원
     if (raidDataMap[nick]) {
-      boardSheet.getRange(row, CHAR_COL_COUNT + 1, 1, raidDataMap[nick].length)
+      boardSheet.getRange(row, BOARD_CHAR_COL_COUNT + 1, 1, raidDataMap[nick].length)
         .setValues([raidDataMap[nick]]);
     }
     row++;
@@ -234,7 +241,7 @@ function setupRaidBoard() {
     .setVerticalAlignment('middle');
 
   // 카테고리별 색상
-  let catStyleCol = CHAR_COL_COUNT + 1;
+  let catStyleCol = BOARD_CHAR_COL_COUNT + 1;
   RAID_CATEGORIES.forEach(cat => {
     const span  = cat.raids.length * RAID_COL_SPAN;
     const color = C.cat[cat.category] || C.midGray;
@@ -245,13 +252,13 @@ function setupRaidBoard() {
 
   // Row 3: 컬럼명
   boardSheet.setRowHeight(3, 26);
-  boardSheet.getRange(3, 1, 1, CHAR_COL_COUNT)
+  boardSheet.getRange(3, 1, 1, BOARD_CHAR_COL_COUNT)
     .setBackground(C.midGray)
     .setFontColor(C.white)
     .setFontWeight('bold')
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle');
-  boardSheet.getRange(3, CHAR_COL_COUNT + 1, 1, allRaidsForStyle.length * RAID_COL_SPAN)
+  boardSheet.getRange(3, BOARD_CHAR_COL_COUNT + 1, 1, allRaidsForStyle.length * RAID_COL_SPAN)
     .setFontColor(C.white)
     .setFontWeight('bold')
     .setHorizontalAlignment('center')
@@ -261,7 +268,7 @@ function setupRaidBoard() {
   if (lastDataRow >= DATA_START_ROW) {
     const styleRowCount = lastDataRow - DATA_START_ROW + 1;
 
-    boardSheet.getRange(DATA_START_ROW, 1, styleRowCount, CHAR_COL_COUNT)
+    boardSheet.getRange(DATA_START_ROW, 1, styleRowCount, BOARD_CHAR_COL_COUNT)
       .setBackground(C.rowDark)
       .setFontColor(C.white)
       .setHorizontalAlignment('center')
@@ -272,7 +279,7 @@ function setupRaidBoard() {
         .setFontWeight('bold');
     });
 
-    boardSheet.getRange(DATA_START_ROW, CHAR_COL_COUNT + 1, styleRowCount, allRaidsForStyle.length * RAID_COL_SPAN)
+    boardSheet.getRange(DATA_START_ROW, BOARD_CHAR_COL_COUNT + 1, styleRowCount, allRaidsForStyle.length * RAID_COL_SPAN)
       .setBackground(C.white)
       .setFontColor(C.white)
       .setHorizontalAlignment('center')
@@ -288,7 +295,7 @@ function setupRaidBoard() {
   boardSheet.setColumnWidth(5, 80);
   boardSheet.setColumnWidth(6, 80);
   boardSheet.setColumnWidth(7, 80);
-  for (let c = CHAR_COL_COUNT + 1; c <= totalCols; c++) {
+  for (let c = BOARD_CHAR_COL_COUNT + 1; c <= totalCols; c++) {
     boardSheet.setColumnWidth(c, 112);
   }
   boardSheet.setColumnWidth(16, 112); // P열
@@ -420,7 +427,7 @@ function updateRaidBoard() {
   // HYPERLINK 수식 셀 초기화 (수동 입력값 유지)
   const lastRow = boardSheet.getLastRow();
   if (lastRow >= DATA_START_ROW) {
-    const raidRange = boardSheet.getRange(DATA_START_ROW, CHAR_COL_COUNT + 1, lastRow - HEADER_ROWS, allRaids.length * RAID_COL_SPAN);
+    const raidRange = boardSheet.getRange(DATA_START_ROW, BOARD_CHAR_COL_COUNT + 1, lastRow - HEADER_ROWS, allRaids.length * RAID_COL_SPAN);
     const formulas  = raidRange.getFormulas();
     const outValues = raidRange.getValues();
     const outBgs    = raidRange.getBackgrounds();
@@ -520,7 +527,7 @@ function resetWeek() {
   const boardSheet = ss.getSheetByName('레이드현황판');
   const lastRow    = boardSheet.getLastRow();
   if (lastRow >= DATA_START_ROW) {
-    const raidRange = boardSheet.getRange(DATA_START_ROW, CHAR_COL_COUNT + 1, lastRow - HEADER_ROWS, allRaids.length * RAID_COL_SPAN);
+    const raidRange = boardSheet.getRange(DATA_START_ROW, BOARD_CHAR_COL_COUNT + 1, lastRow - HEADER_ROWS, allRaids.length * RAID_COL_SPAN);
 
     // 초기화 전 배경색 저장 (칠해둔 셀 보존용)
     const savedBgs = raidRange.getBackgrounds();
@@ -567,7 +574,7 @@ function applyRaidCellValidation(boardSheet, lastDataRow) {
   if (lastDataRow < DATA_START_ROW) return;
 
   const allRaids     = getAllRaids();
-  const raidStartCol = CHAR_COL_COUNT + 1;
+  const raidStartCol = BOARD_CHAR_COL_COUNT + 1;
   const raidColCount = allRaids.length * RAID_COL_SPAN;
   const rowCount     = lastDataRow - DATA_START_ROW + 1;
 

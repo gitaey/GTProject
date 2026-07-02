@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { Sun, Moon, ChevronDown, User, Settings, LogOut, ShieldAlert, Map, Menu } from 'lucide-react'
-import { useAuthStore } from '@/store/authStore'
-import { useSidebarStore } from '@/store/sidebarStore'
+import { useAuthStore } from '@/stores/authStore'
+import { useSidebarStore } from '@/stores/sidebarStore'
 
 interface HeaderProps {
     title?: string

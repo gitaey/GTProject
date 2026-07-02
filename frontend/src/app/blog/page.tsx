@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Search, Tag, ArrowUpRight, Code2, Baby, Coffee, BookOpen, Heart, LayoutDashboard, Plus, X, Star } from 'lucide-react'
 import type { Post, PostCategoryCode, PostFormState, PostPage, PostRequest, PostStatusCode } from '@/types/post'
 import { CATEGORY_OPTIONS, GRADIENT_PRESETS } from '@/types/post'
-import { useAuthStore, getToken } from '@/store/authStore'
+import { useAuthStore, getToken } from '@/stores/authStore'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 

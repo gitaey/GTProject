@@ -1,6 +1,6 @@
 // OpenLayers 지도 인스턴스를 생성하고 관리하는 커스텀 Hook
 // Hook: use로 시작하는 함수. jQuery의 $(document).ready() 개념과 유사
-import { useEffect, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import Map from 'ol/Map'
 import View from 'ol/View'
 import TileLayer from 'ol/layer/Tile'
@@ -27,7 +27,7 @@ export function useMap(targetRef: React.RefObject<HTMLDivElement | null>, option
     // useRef: 컴포넌트가 다시 렌더링돼도 값이 유지되는 보관함
     // mapRef.current에 OL Map 인스턴스를 저장
     // 일반 변수(let map)로 하면 렌더링될 때마다 초기화돼버림
-    const mapRef = useRef<Map | null>(null)
+    const [map, setMap] = useState<Map | null>(null)
 
     // 구조분해 + 기본값 (ES6): options에 값이 없으면 기본값 사용
     const { center = SEJONG_3857, zoom = 10 } = options
@@ -35,12 +35,12 @@ export function useMap(targetRef: React.RefObject<HTMLDivElement | null>, option
     // useEffect: 컴포넌트가 화면에 그려진 후 실행
     // 마지막 [] (의존성 배열)이 빈 배열이면 처음 한 번만 실행
     useEffect(() => {
-        if (!targetRef.current || mapRef.current) return  // 이미 만들어졌으면 스킵
+        if (!targetRef.current || map) return  // 이미 만들어졌으면 스킵
 
         const projection = getProjection('EPSG:3857')!
 
         // OL 지도 인스턴스 생성 후 mapRef.current에 저장
-        mapRef.current = new Map({
+        const newMap = new Map({
             target: targetRef.current,
             layers: [],
             view: new View({
@@ -50,15 +50,17 @@ export function useMap(targetRef: React.RefObject<HTMLDivElement | null>, option
             }),
         })
 
+        setMap(newMap);
+
         // cleanup 함수: 컴포넌트가 사라질 때 실행 (지도 정리)
         // ?. = 옵셔널 체이닝 (ES6): null이면 에러 없이 그냥 넘어감
         return () => {
-            mapRef.current?.setTarget(undefined)
-            mapRef.current = null
+            newMap?.setTarget(undefined)
+            setMap(null)
         }
     }, [])
 
     // mapRef를 반환해서 다른 Hook들이 같은 지도 인스턴스를 공유
     // MapView가 이 mapRef를 받아 useDrawing, useLayerManager 등에 전달
-    return mapRef
+    return map
 }

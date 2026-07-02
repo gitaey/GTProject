@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
 import { Plus, Pencil, Trash2, X, ShieldOff, ShieldCheck } from 'lucide-react'
-import { getToken } from '@/store/authStore'
+import { getToken } from '@/stores/authStore'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 

@@ -6,7 +6,8 @@ import VectorLayer from 'ol/layer/Vector'
 import VectorSource from 'ol/source/Vector'
 import Draw from 'ol/interaction/Draw'
 import { Type as GeomType } from 'ol/geom/Geometry'
-import { MapTool, onClear } from '@/stores/mapStore'
+import { MapTool, onClear, useMapStore } from '@/stores/map/mapStore'
+import { primaryAction } from 'ol/events/condition'
 
 // Partial<Record<MapTool, GeomType>>:
 // Record → MapTool의 모든 값에 GeomType이 있어야 함
@@ -18,19 +19,20 @@ const TOOL_GEOM_MAP: Partial<Record<MapTool, GeomType>> = {
     'draw-polygon': 'Polygon',
 }
 
-export function useDrawing(mapRef: React.RefObject<Map | null>, activeTool: MapTool) {
+export function useDrawing(map: Map | null, activeTool: MapTool) {
+    const { setActiveTool } = useMapStore()
+
     // useRef: 렌더링이 일어나도 인스턴스가 유지되어야 하므로 useRef 사용
-    const sourceRef = useRef(new VectorSource())                          // 피처(그린 도형) 저장소
-    const layerRef  = useRef(new VectorLayer({ source: sourceRef.current })) // 화면에 표시하는 레이어
-    const drawRef   = useRef<Draw | null>(null)                           // 현재 활성화된 Draw 인터랙션
+    const sourceRef = useRef(new VectorSource()) // 피처(그린 도형) 저장소
+    const layerRef = useRef(new VectorLayer({ source: sourceRef.current, zIndex: 100 })) // 화면에 표시하는 레이어
+    const drawRef = useRef<Draw | null>(null) // 현재 활성화된 Draw 인터랙션
 
     // 지도 생성 시 그리기 레이어 등록 + clearAll 이벤트 구독
     // [mapRef.current]: 지도 인스턴스가 생겼을 때 한 번 실행
     useEffect(() => {
-        const map = mapRef.current
         if (!map) return
 
-        map.addLayer(layerRef.current)  // 그리기 레이어를 지도에 추가
+        map.addLayer(layerRef.current) // 그리기 레이어를 지도에 추가
 
         // mapStore.clearAll() 호출 시 그린 피처 전부 삭제
         // onClear는 구독 해제 함수를 반환함 (mapStore.ts 참고)
@@ -47,12 +49,11 @@ export function useDrawing(mapRef: React.RefObject<Map | null>, activeTool: MapT
                 // map이 이미 소멸된 경우 무시
             }
         }
-    }, [mapRef.current])
+    }, [map])
 
     // 도구 변경 시 Draw 인터랙션 교체
     // [activeTool, mapRef.current]: 도구나 지도가 바뀔 때마다 실행
     useEffect(() => {
-        const map = mapRef.current
         if (!map) return
 
         // 기존 Draw 인터랙션 제거
@@ -69,14 +70,28 @@ export function useDrawing(mapRef: React.RefObject<Map | null>, activeTool: MapT
         const draw = new Draw({
             source: sourceRef.current,
             type: geomType,
+            stopClick: true,
+            condition: primaryAction,
         })
         map.addInteraction(draw)
         drawRef.current = draw
 
+        draw.on('drawend', (e) => {
+            console.log('피처 추가됨:', sourceRef.current.getFeatures().length)
+        })
+
+        const handleRightClick = (e: MouseEvent) => {
+            e.preventDefault()
+            draw.finishDrawing()
+            setActiveTool('none')
+        }
+        map.getViewport().addEventListener('contextmenu', handleRightClick)
+
         // cleanup: 도구가 바뀔 때 이전 Draw 인터랙션 정리
         return () => {
+            map.getViewport().removeEventListener('contextmenu', handleRightClick)
             map.removeInteraction(draw)
             drawRef.current = null
         }
-    }, [activeTool, mapRef.current])
+    }, [activeTool, map])
 }

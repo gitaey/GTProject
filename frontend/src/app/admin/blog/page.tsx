@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import type { Post, PostCategoryCode, PostFormState, PostPage, PostRequest, PostStatusCode } from '@/types/post'
 import { CATEGORY_OPTIONS, GRADIENT_PRESETS } from '@/types/post'
-import { getToken } from '@/store/authStore'
+import { getToken } from '@/stores/authStore'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
