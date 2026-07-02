@@ -74,31 +74,31 @@ public class BotMessageService {
     // ── 명령어 라우팅 ───────────────────────────────────────────────
 
     private BotMessageResult route(String room, String text, String sender) {
-        if (text.startsWith("/정보 "))        return cmdResult(room, sender, "/정보",   () -> handleInfoResult(text.substring(4).trim(), room));
-        if (text.startsWith("/각인 "))        return cmd(room, sender, "/각인",        () -> handleEngraving(text.substring(4).trim()));
-        if (text.startsWith("/아크패시브 "))  return cmd(room, sender, "/아크패시브",  () -> handleArkPassive(text.substring(7).trim()));
-        if (text.startsWith("/아크그리드 "))  return cmd(room, sender, "/아크그리드",  () -> handleArkGrid(text.substring(7).trim()));
-        if (text.startsWith("/보석 "))        return cmd(room, sender, "/보석",        () -> handleGems(text.substring(4).trim()));
-        if (text.startsWith("/스킬 "))        return cmd(room, sender, "/스킬",        () -> handleSkills(text.substring(4).trim()));
-        if (text.startsWith("/악세 "))        return cmd(room, sender, "/악세",        () -> handleAccessory(text.substring(4).trim()));
-        if (text.startsWith("/팔찌 "))        return cmd(room, sender, "/팔찌",        () -> handleBracelet(text.substring(4).trim()));
-        if (text.startsWith("/장비 "))        return cmd(room, sender, "/장비",        () -> handleEquipment(text.substring(4).trim()));
-        if (text.startsWith("/내실 "))        return cmd(room, sender, "/내실",        () -> handleCollectibles(text.substring(4).trim()));
-        if (text.startsWith("/분배금 "))      return cmd(room, sender, "/분배금",      () -> handleDistribution(text.substring(5).trim()));
-        if (text.startsWith("/로펙 "))        return cmd(room, sender, "/로펙",        () -> handleLopec(text.substring(4).trim()));
-        if (text.startsWith("/원정대 "))      return cmd(room, sender, "/원정대",      () -> handleSiblings(text.substring(5).trim()));
+        if (text.startsWith("/정보 "))        return cmdResult(room, sender, "/정보",       text.substring(4).trim(),  () -> handleInfoResult(text.substring(4).trim(), room));
+        if (text.startsWith("/각인 "))        return cmd(room, sender, "/각인",             text.substring(4).trim(),  () -> handleEngraving(text.substring(4).trim()));
+        if (text.startsWith("/아크패시브 "))  return cmd(room, sender, "/아크패시브",       text.substring(7).trim(),  () -> handleArkPassive(text.substring(7).trim()));
+        if (text.startsWith("/아크그리드 "))  return cmd(room, sender, "/아크그리드",       text.substring(7).trim(),  () -> handleArkGrid(text.substring(7).trim()));
+        if (text.startsWith("/보석 "))        return cmd(room, sender, "/보석",             text.substring(4).trim(),  () -> handleGems(text.substring(4).trim()));
+        if (text.startsWith("/스킬 "))        return cmd(room, sender, "/스킬",             text.substring(4).trim(),  () -> handleSkills(text.substring(4).trim()));
+        if (text.startsWith("/악세 "))        return cmd(room, sender, "/악세",             text.substring(4).trim(),  () -> handleAccessory(text.substring(4).trim()));
+        if (text.startsWith("/팔찌 "))        return cmd(room, sender, "/팔찌",             text.substring(4).trim(),  () -> handleBracelet(text.substring(4).trim()));
+        if (text.startsWith("/장비 "))        return cmd(room, sender, "/장비",             text.substring(4).trim(),  () -> handleEquipment(text.substring(4).trim()));
+        if (text.startsWith("/내실 "))        return cmd(room, sender, "/내실",             text.substring(4).trim(),  () -> handleCollectibles(text.substring(4).trim()));
+        if (text.startsWith("/분배금 "))      return cmd(room, sender, "/분배금",           text.substring(5).trim(),  () -> handleDistribution(text.substring(5).trim()));
+        if (text.startsWith("/로펙 "))        return cmd(room, sender, "/로펙",             text.substring(4).trim(),  () -> handleLopec(text.substring(4).trim()));
+        if (text.startsWith("/원정대 "))      return cmd(room, sender, "/원정대",           text.substring(5).trim(),  () -> handleSiblings(text.substring(5).trim()));
         if (text.equals("/기빵봇"))           return BotMessageResult.of(buildHelp(room));
-        if (text.equals("/오늘파티테스트"))   return cmd(room, sender, "/오늘파티테스트", () -> handleTodayPartyTest());
+        if (text.equals("/오늘파티테스트"))   return cmd(room, sender, "/오늘파티테스트",   "",                        () -> handleTodayPartyTest());
 
         // 길드 전용 명령어
         boolean isGuildCmd = text.startsWith("/일정 ") || text.startsWith("/일정전체 ")
                 || text.startsWith("/오늘일정 ") || text.equals("/일정새로고침");
         if (isGuildCmd) {
             // if (!room.equals(GUILD_ROOM)) return BotMessageResult.silent();
-            if (text.startsWith("/일정 "))       return cmd(room, sender, "/일정",       () -> handleSchedule(text.substring(4).trim()));
-            if (text.startsWith("/일정전체 "))   return cmd(room, sender, "/일정전체",   () -> handleScheduleAll(text.substring(6).trim()));
-            if (text.startsWith("/오늘일정 "))   return cmd(room, sender, "/오늘일정",   () -> handleTodaySchedule(text.substring(6).trim()));
-            if (text.equals("/일정새로고침"))    return cmd(room, sender, "/일정새로고침", () -> handleScheduleRefresh());
+            if (text.startsWith("/일정 "))       return cmd(room, sender, "/일정",       text.substring(4).trim(),  () -> handleSchedule(text.substring(4).trim()));
+            if (text.startsWith("/일정전체 "))   return cmd(room, sender, "/일정전체",   text.substring(6).trim(),  () -> handleScheduleAll(text.substring(6).trim()));
+            if (text.startsWith("/오늘일정 "))   return cmd(room, sender, "/오늘일정",   text.substring(6).trim(),  () -> handleTodaySchedule(text.substring(6).trim()));
+            if (text.equals("/일정새로고침"))    return cmd(room, sender, "/일정새로고침", "",                      () -> handleScheduleRefresh());
         }
 
         return BotMessageResult.silent();
@@ -115,10 +115,10 @@ public class BotMessageService {
     private static final String MAINTENANCE_MSG = "🔧 로스트아크 정기점검 중입니다.\n(매주 수요일 06:00 ~ 10:00)\n점검 종료 후 다시 시도해주세요!";
 
     /** 명령어 실행 + 로그 저장 (텍스트 반환) */
-    private BotMessageResult cmd(String room, String sender, String command, java.util.concurrent.Callable<String> fn) {
+    private BotMessageResult cmd(String room, String sender, String command, String args, java.util.concurrent.Callable<String> fn) {
         try {
             String reply = fn.call();
-            saveLog(BotLogType.COMMAND, room, sender, command, "", true);
+            saveLog(BotLogType.COMMAND, room, sender, command, args, true);
             return BotMessageResult.of(reply);
         } catch (Exception e) {
             String msg = isLostArkMaintenance() ? MAINTENANCE_MSG : "오류: " + e.getMessage();
@@ -128,10 +128,10 @@ public class BotMessageService {
     }
 
     /** 명령어 실행 + 로그 저장 (BotMessageResult 직접 반환) */
-    private BotMessageResult cmdResult(String room, String sender, String command, java.util.concurrent.Callable<BotMessageResult> fn) {
+    private BotMessageResult cmdResult(String room, String sender, String command, String args, java.util.concurrent.Callable<BotMessageResult> fn) {
         try {
             BotMessageResult result = fn.call();
-            saveLog(BotLogType.COMMAND, room, sender, command, "", true);
+            saveLog(BotLogType.COMMAND, room, sender, command, args, true);
             return result;
         } catch (Exception e) {
             String msg = isLostArkMaintenance() ? MAINTENANCE_MSG : "오류: " + e.getMessage();
