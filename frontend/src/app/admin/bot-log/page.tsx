@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { RefreshCw, CheckCircle, XCircle, Bot, AlertTriangle, Send, BarChart2, Table } from 'lucide-react'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
+import Pagination from '@/components/common/Pagination'
 import {
     ResponsiveContainer,
     PieChart, Pie, Cell, Tooltip,
@@ -457,21 +458,13 @@ export default function BotLogPage() {
                                 </div>
                             </div>
 
-                            {(data?.page?.totalPages ?? 0) > 1 && (
-                                <div className="flex items-center justify-center gap-2 mt-4">
-                                    <button disabled={page === 0} onClick={() => setPage(p => p - 1)}
-                                        className="px-3 py-1.5 rounded-lg text-sm disabled:opacity-30 transition-colors"
-                                        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
-                                        이전
-                                    </button>
-                                    <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{page + 1} / {data?.page?.totalPages}</span>
-                                    <button disabled={page + 1 === data?.page?.totalPages} onClick={() => setPage(p => p + 1)}
-                                        className="px-3 py-1.5 rounded-lg text-sm disabled:opacity-30 transition-colors"
-                                        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
-                                        다음
-                                    </button>
-                                </div>
-                            )}
+                            <div className="mt-4">
+                                <Pagination
+                                    currentPage={page}
+                                    totalPages={data?.page?.totalPages ?? 0}
+                                    onChange={setPage}
+                                />
+                            </div>
                         </>
                     )}
                 </main>

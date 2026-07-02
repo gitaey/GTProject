@@ -8,8 +8,6 @@ import {
     UserPlus,
     Pencil,
     Trash2,
-    ChevronLeft,
-    ChevronRight,
     X,
     ToggleLeft,
     ToggleRight,
@@ -18,6 +16,7 @@ import {
     Map,
     Trash,
 } from 'lucide-react'
+import Pagination from '@/components/common/Pagination'
 import type {
     ApiResponse,
     Permission,
@@ -450,36 +449,13 @@ export default function UserManagementPage() {
                         </div>
 
                         {/* 페이지네이션 */}
-                        {totalPages > 1 && (
-                            <div className="flex items-center justify-center gap-2 px-6 py-4"
-                                style={{ borderTop: '1px solid var(--border)' }}>
-                                <button onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
-                                    disabled={currentPage === 0}
-                                    className="p-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                    style={{ color: 'var(--text-muted)' }}>
-                                    <ChevronLeft size={16} />
-                                </button>
-                                {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => {
-                                    const pageNum = Math.max(0, Math.min(currentPage - 4, totalPages - 10)) + i
-                                    return (
-                                        <button key={pageNum} onClick={() => setCurrentPage(pageNum)}
-                                            className="w-8 h-8 rounded-lg text-sm font-medium transition-colors"
-                                            style={{
-                                                background: currentPage === pageNum ? 'var(--accent)' : 'transparent',
-                                                color: currentPage === pageNum ? '#fff' : 'var(--text-muted)',
-                                            }}>
-                                            {pageNum + 1}
-                                        </button>
-                                    )
-                                })}
-                                <button onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
-                                    disabled={currentPage === totalPages - 1}
-                                    className="p-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                    style={{ color: 'var(--text-muted)' }}>
-                                    <ChevronRight size={16} />
-                                </button>
-                            </div>
-                        )}
+                        <div className="px-6 py-4" style={{ borderTop: '1px solid var(--border)' }}>
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onChange={setCurrentPage}
+                            />
+                        </div>
                     </div>
                 </main>
             </div>
