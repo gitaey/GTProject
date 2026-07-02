@@ -624,7 +624,7 @@ public class BotMessageService {
     private String handleTodayPartyTest() throws Exception {
         var parties = googleSheetsService.getTodayParties();
         if (parties == null || parties.isEmpty()) return "오늘 등록된 레이드 파티가 없습니다.";
-        int dow = LocalDate.now().getDayOfWeek().getValue() % 7;
+        int dow = LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).getDayOfWeek().getValue() % 7;
         StringBuilder sb = new StringBuilder("【 오늘의 레이드 파티 】 ").append(DAY_FULL[dow]).append("\n");
         for (var party : parties) {
             sb.append("───────────────\n◆ ").append(party.getRaidName());
