@@ -156,8 +156,9 @@ public class BotMessageService {
     private BotMessageResult handleInfoResult(String name, String room) throws Exception {
         CharacterInfoResponse info = lostarkService.getCharacterInfo(name);
         String reply = handleInfo(name, room, info);
-        String imageUrl = (info.getProfile() != null) ? info.getProfile().getCharacterImage() : null;
-        return BotMessageResult.of(reply, imageUrl);
+        String previewUrl = "https://api.gitaey-dev.com/preview/character/"
+                + java.net.URLEncoder.encode(name, java.nio.charset.StandardCharsets.UTF_8);
+        return BotMessageResult.of(reply, previewUrl);
     }
 
     private String handleInfo(String name, String room) throws Exception {
