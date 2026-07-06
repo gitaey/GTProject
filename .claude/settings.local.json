@@ -84,7 +84,12 @@
       "PowerShell(node -e \"const XLSX = require\\('xlsx'\\); const wb = XLSX.readFile\\('C:/Users/gitaey/Downloads/��⵵ ȭ���� ��������\\(������\\) �ڵ� �ο� ����/��\\(��÷1\\) �������\\(������\\) �� ���ұ���\\(������\\) ���� �󼼳���\\(��⵵ ȭ����\\).xlsx'\\); wb.SheetNames.forEach\\(n => { console.log\\('=== ��Ʈ:', n, '==='\\); console.log\\(XLSX.utils.sheet_to_csv\\(wb.Sheets[n]\\).substring\\(0,8000\\)\\); }\\);\")",
       "Skill(fewer-permission-prompts)",
       "Skill(fewer-permission-prompts:*)",
-      "Bash(ls ~/.claude/projects/ | head -20)"
+      "Bash(ls ~/.claude/projects/ | head -20)",
+      "mcp__dbeaver__write_query",
+      "Bash(grep -E \"\\\\.\\(tsx|ts|java|yml\\)$\")",
+      "mcp__dbeaver__create_table",
+      "mcp__dbeaver__get_connection_info",
+      "Bash(xargs grep -l \"Scheduled\\\\|Scheduler\")"
     ]
   }
 }

@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: ${DB_URL:jdbc:postgresql://reseau.proxy.rlwy.net:21567/railway}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:hPWUWPEyMdBqvSNKznwgJXZZgeehQKIC}
+    url: jdbc:postgresql://sisnet.iptime.org:49091/gtp
+    username: postgres
+    password: '4fkdgodu!@'
     driver-class-name: org.postgresql.Driver
 
   jpa:
