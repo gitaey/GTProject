@@ -57,11 +57,11 @@ function KpiCard({ label, value, sub, color }: { label: string; value: string; s
     )
 }
 
-function Widget({ title, href, linkLabel = '전체 보기 →', subHref, subLinkLabel, children }: {
-    title: string; href: string; linkLabel?: string; subHref?: string; subLinkLabel?: string; children: React.ReactNode
+function Widget({ title, href, linkLabel = '전체 보기 →', subHref, subLinkLabel, className, children }: {
+    title: string; href: string; linkLabel?: string; subHref?: string; subLinkLabel?: string; className?: string; children: React.ReactNode
 }) {
     return (
-        <div className="rounded-lg flex flex-col" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+        <div className={`rounded-lg flex flex-col ${className ?? ''}`} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
             <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{title}</span>
                 <div className="flex items-center gap-3">
@@ -111,7 +111,7 @@ export default function Home() {
                 }
             }).catch(() => {})
 
-        fetch(`${API}/api/posts?page=0&size=3`)
+        fetch(`${API}/api/posts?page=0&size=5`)
             .then(r => r.json()).then(d => { if (d.success) setPosts(d.data?.content ?? []) }).catch(() => {})
     }, [token])
 
