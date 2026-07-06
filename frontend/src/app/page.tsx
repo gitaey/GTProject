@@ -167,7 +167,7 @@ export default function Home() {
                                             />
                                             <div className="min-w-0">
                                                 <p className="font-mono truncate" style={{ color: 'var(--text-primary)' }}>
-                                                    {log.command}
+                                                    {log.command}{log.detail ? ` ${log.detail}` : ''}
                                                 </p>
                                                 <p className="truncate" style={{ color: 'var(--text-faint)' }}>
                                                     {[log.room, log.sender, log.createdAt?.slice(11, 16)].filter(Boolean).join(' · ')}
