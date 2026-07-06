@@ -1,4 +1,3 @@
-# test
 spring:
   datasource:
     url: jdbc:postgresql://sisnet.iptime.org:49091/gtp
