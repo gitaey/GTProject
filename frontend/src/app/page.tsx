@@ -57,14 +57,19 @@ function KpiCard({ label, value, sub, color }: { label: string; value: string; s
     )
 }
 
-function Widget({ title, href, linkLabel = '전체 보기 →', children }: {
-    title: string; href: string; linkLabel?: string; children: React.ReactNode
+function Widget({ title, href, linkLabel = '전체 보기 →', subHref, subLinkLabel, children }: {
+    title: string; href: string; linkLabel?: string; subHref?: string; subLinkLabel?: string; children: React.ReactNode
 }) {
     return (
         <div className="rounded-lg flex flex-col" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
             <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{title}</span>
-                <Link href={href} className="text-xs" style={{ color: 'var(--accent)' }}>{linkLabel}</Link>
+                <div className="flex items-center gap-3">
+                    {subHref && subLinkLabel && (
+                        <Link href={subHref} className="text-xs" style={{ color: 'var(--text-faint)' }}>{subLinkLabel}</Link>
+                    )}
+                    <Link href={href} className="text-xs" style={{ color: 'var(--accent)' }}>{linkLabel}</Link>
+                </div>
             </div>
             <div className="p-4">{children}</div>
         </div>
@@ -252,15 +257,12 @@ export default function Home() {
                             </div>
                         </Widget>
 
-                        <Widget title="최근 게시글" href="/admin/blog" linkLabel="관리 →">
+                        <Widget title="최근 게시글" href="/admin/blog" linkLabel="관리 →" subHref="/blog" subLinkLabel="블로그 →">
                             {posts.length === 0
                                 ? <Empty text="게시글 없음" />
                                 : <ul className="space-y-2.5">
                                     {posts.map(post => (
                                         <li key={post.id} className="flex items-start gap-2 text-xs">
-                                            {post.emoji && (
-                                                <span className="shrink-0 text-sm leading-none mt-0.5">{post.emoji}</span>
-                                            )}
                                             <div className="min-w-0">
                                                 <p className="truncate" style={{ color: 'var(--text-primary)' }}>
                                                     {post.title}
