@@ -6,7 +6,7 @@ export default function MapHeader() {
     return (
         <div className="flex items-center gap-3 h-12 px-4 bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
 
-            {/* 로고 */}
+            {/* 로고로고 */}
             <div className="flex items-center gap-2 font-bold text-sm text-gray-800 whitespace-nowrap">
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm text-white"
                     style={{ background: 'linear-gradient(135deg, #F26722 0%, #E04E0A 100%)', boxShadow: '0 2px 6px rgba(242,103,34,0.35)' }}>
