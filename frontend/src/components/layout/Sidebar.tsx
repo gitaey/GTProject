@@ -21,7 +21,7 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
-    { id: 'home', label: '홈', href: '/' },
+    { id: 'home', label: '대시보드', href: '/' },
     {
         id: 'map-admin',
         label: '지도',
