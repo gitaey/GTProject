@@ -21,6 +21,7 @@ interface BotLogItem {
     room: string
     sender: string
     command: string
+    detail?: string
     success: boolean
     createdAt: string
 }
