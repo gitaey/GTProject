@@ -111,7 +111,8 @@
       "WebFetch(domain:www.eum.go.kr)",
       "WebFetch(domain:wehagohelp.zendesk.com)",
       "WebFetch(domain:jusoga.com)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
