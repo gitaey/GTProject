@@ -19,6 +19,7 @@ jobs:
           port: 19922
           command_timeout: 30m
           script: |
+            set -e
             cd /gtp/GTProject
             git pull origin master
 
