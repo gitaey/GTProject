@@ -8,6 +8,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+    # CI/CD 테스트
     show-sql: true
     properties:
       hibernate:
