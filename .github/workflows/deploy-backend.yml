@@ -19,12 +19,12 @@ jobs:
           port: 19922
           command_timeout: 30m
           script: |
+            set -e
             cd /gtp/GTProject
             git pull origin master
 
-            cd /gtp/GTProject/backend
-            JAVA_HOME=/usr/lib/jvm/java-17-amazon-corretto ./mvnw clean package -DskipTests
-            /gtp/stop-backend.sh 2>/dev/null || true
-            /gtp/start-backend.sh
+            cd /gtp/docker
+            docker compose build backend
+            docker compose up -d --no-deps backend
 
             echo "백엔드 배포 완료"
