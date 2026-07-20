@@ -8,7 +8,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    # CI/CD 테스트
+    # Docker CI/CD 배포 테스트
     show-sql: true
     properties:
       hibernate:
