@@ -5,14 +5,21 @@ import VectorLayer from 'ol/layer/Vector'
 import VectorSource from 'ol/source/Vector'
 import Draw from 'ol/interaction/Draw'
 import Overlay from 'ol/Overlay'
-import { LineString } from 'ol/geom'
+import { LineString, Point } from 'ol/geom'
 import { getLength } from 'ol/sphere'
 import Feature from 'ol/Feature'
+import Style from 'ol/style/Style'
+import Stroke from 'ol/style/Stroke'
+import Fill from 'ol/style/Fill'
+import CircleStyle from 'ol/style/Circle'
 import { MapTool, useMapStore, onClear } from '@/stores/map/mapStore'
 import MeasureTooltip from '@/components/map/overlay/MeasureTooltip'
 
 function formatDistance(meters: number): string {
-    return meters >= 1000 ? `${(meters / 1000).toFixed(2)} km` : `${meters.toFixed(0)} m`
+    if (meters >= 1000) {
+        return `${(meters / 1000).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} km`
+    }
+    return `${Math.round(meters).toLocaleString('ko-KR')} m`
 }
 
 type OverlayItem = { overlay: Overlay; root: ReturnType<typeof createRoot>; el: HTMLDivElement }
@@ -20,7 +27,29 @@ type FeatureGroup = { feature: Feature; items: OverlayItem[] }
 
 export function useDistanceMeasure(map: Map | null, activeTool: MapTool) {
     const sourceRef = useRef(new VectorSource())
-    const layerRef = useRef(new VectorLayer({ source: sourceRef.current, zIndex: 100 }))
+    const layerRef = useRef(new VectorLayer({
+        source: sourceRef.current,
+        zIndex: 100,
+        style: (feature) => {
+            const geom = feature.getGeometry()
+            const styles: Style[] = [
+                new Style({ stroke: new Stroke({ color: '#e8365d', width: 2.5 }) }),
+            ]
+            if (geom instanceof LineString) {
+                geom.getCoordinates().forEach((coord) => {
+                    styles.push(new Style({
+                        geometry: new Point(coord),
+                        image: new CircleStyle({
+                            radius: 5,
+                            fill: new Fill({ color: '#fff' }),
+                            stroke: new Stroke({ color: '#e8365d', width: 2 }),
+                        }),
+                    }))
+                })
+            }
+            return styles
+        },
+    }))
     const drawRef = useRef<Draw | null>(null)
     const tooltipElRef = useRef<HTMLDivElement | null>(null)
     const tooltipOverlayRef = useRef<Overlay | null>(null)
@@ -97,7 +126,18 @@ export function useDistanceMeasure(map: Map | null, activeTool: MapTool) {
         map.addOverlay(overlay)
         tooltipOverlayRef.current = overlay
 
-        const draw = new Draw({ source: sourceRef.current, type: 'LineString' })
+        const draw = new Draw({
+            source: sourceRef.current,
+            type: 'LineString',
+            style: new Style({
+                stroke: new Stroke({ color: '#e8365d', width: 2.5 }),
+                image: new CircleStyle({
+                    radius: 5,
+                    fill: new Fill({ color: '#fff' }),
+                    stroke: new Stroke({ color: '#e8365d', width: 2 }),
+                }),
+            }),
+        })
 
         draw.on('drawstart', (e) => {
             const geom = e.feature.getGeometry() as LineString
@@ -108,7 +148,7 @@ export function useDistanceMeasure(map: Map | null, activeTool: MapTool) {
                 const last = coords[coords.length - 1]
 
                 // 합계 툴팁
-                const totalDist = getLength(new LineString(coords), { projection: 'EPSG:5186' })
+                const totalDist = getLength(new LineString(coords), { projection: 'EPSG:3857' })
                 root.render(<MeasureTooltip value={`합계: ${formatDistance(totalDist)}`} />)
                 overlay.setPosition(last)
 
@@ -120,7 +160,7 @@ export function useDistanceMeasure(map: Map | null, activeTool: MapTool) {
 
                 // 구간 툴팁 업데이트
                 for (let i = 0; i < segItems.length; i++) {
-                    const segDist = getLength(new LineString([coords[i], coords[i + 1]]), { projection: 'EPSG:5186' })
+                    const segDist = getLength(new LineString([coords[i], coords[i + 1]]), { projection: 'EPSG:3857' })
                     const mid: [number, number] = [
                         (coords[i][0] + coords[i + 1][0]) / 2,
                         (coords[i][1] + coords[i + 1][1]) / 2,
@@ -150,7 +190,7 @@ export function useDistanceMeasure(map: Map | null, activeTool: MapTool) {
 
                 // 구간 툴팁 — 개별 삭제
                 segItems.forEach((item, i) => {
-                    const segDist = getLength(new LineString([coords[i], coords[i + 1]]), { projection: 'EPSG:5186' })
+                    const segDist = getLength(new LineString([coords[i], coords[i + 1]]), { projection: 'EPSG:3857' })
                     item.root.render(
                         <MeasureTooltip
                             value={formatDistance(segDist)}
@@ -170,7 +210,7 @@ export function useDistanceMeasure(map: Map | null, activeTool: MapTool) {
             if (coords.length < 2) return
 
             const last = coords[coords.length - 1]
-            const dist = getLength(geom, { projection: 'EPSG:5186' })
+            const dist = getLength(geom, { projection: 'EPSG:3857' })
 
             const totalItem = createOverlayItem(map)
             totalItem.overlay.setPosition(last)

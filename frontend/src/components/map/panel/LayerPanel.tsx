@@ -3,6 +3,8 @@
 // 레이어 목록 패널 (기존 layer/LayerPanel.tsx에서 이동)
 import { useLayerStore } from '@/stores/map/layerStore'
 import LayerItem from '@/components/map/layer/LayerItem'
+import { Settings } from 'lucide-react'
+
 
 export default function LayerPanel() {
     const { tree } = useLayerStore()
@@ -11,7 +13,7 @@ export default function LayerPanel() {
         <>
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                 <span className="text-sm font-bold text-gray-800">레이어</span>
-                <button className="text-xs font-semibold text-orange-500">+ 추가</button>
+                <button className="text-xs font-semibold text-orange-500"><Settings className="cursor-pointer" size={20} /></button>
             </div>
             <div className="flex-1 overflow-y-auto">
                 {tree.map((group) => (

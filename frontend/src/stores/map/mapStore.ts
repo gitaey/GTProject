@@ -10,6 +10,7 @@ export type MapTool =
     | 'draw-polygon'
     | 'measure-distance'
     | 'measure-area'
+    | 'radius-search'
     | 'clear-map'
 
 // 파라미터 없이 void(반환값 없음)를 반환하는 함수 타입

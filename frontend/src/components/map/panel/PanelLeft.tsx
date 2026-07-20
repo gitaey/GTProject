@@ -7,9 +7,7 @@
 //   데스크탑 (1024px+): lg:relative lg:flex-shrink-0 → 지도 옆에 고정 (지도가 줄어듦)
 import { usePanelStore } from '@/stores/map/panelStore'
 import LayerPanel from './LayerPanel'
-import SearchPanel from './SearchPanel'
-import DrawPanel from './DrawPanel'
-import MeasurePanel from './MeasurePanel'
+import EtcPanel from './EtcPanel'
 
 export default function PanelLeft() {
     const { activePanel } = usePanelStore()
@@ -24,9 +22,7 @@ export default function PanelLeft() {
             lg:relative lg:flex-shrink-0 lg:shadow-none
         `}>
             {activePanel === 'layer'   && <LayerPanel />}
-            {activePanel === 'search'  && <SearchPanel />}
-            {activePanel === 'draw'    && <DrawPanel />}
-            {activePanel === 'measure' && <MeasurePanel />}
+            {activePanel === 'etc'     && <EtcPanel />}
         </div>
     )
 }

@@ -43,14 +43,21 @@ export function useMap(targetRef: React.RefObject<HTMLDivElement | null>, option
         const newMap = new Map({
             target: targetRef.current,
             layers: [],
+            // 기본 컨트롤(줌·회전·속성) 제거 → 커스텀 MapControls 컴포넌트로 대체
+            controls: [],
             view: new View({
                 projection,
                 center,
                 zoom,
+                minZoom: 7,
+                maxZoom: 21,
+                constrainResolution: true,  // 줌 1단계씩 스냅
             }),
         })
 
         setMap(newMap);
+        // 개발자도구에서 window.__map 으로 접근 가능
+        ;(window as unknown as Record<string, unknown>).__map = newMap
 
         // cleanup 함수: 컴포넌트가 사라질 때 실행 (지도 정리)
         // ?. = 옵셔널 체이닝 (ES6): null이면 에러 없이 그냥 넘어감

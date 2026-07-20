@@ -9,12 +9,14 @@ import { useDrawing } from '@/hooks/map/useDrawing'
 import { useDistanceMeasure } from '@/hooks/map/useDistanceMeasure'
 import { useAreaMeasure } from '@/hooks/map/useAreaMeasure'
 import { useLayerManager } from '@/hooks/map/useLayerManager'
+import { useRadiusSearch } from '@/hooks/map/useRadiusSearch'
 import MapHeader from '@/components/map/header/MapHeader'
 import MapStatusBar from '@/components/map/statusbar/MapStatusBar'
 import NavLeft from '@/components/map/nav/NavLeft'
 import PanelLeft from '@/components/map/panel/PanelLeft'
 import MapToolbar from '@/components/map/toolbar/MapToolbar'
 import MobileLayerButton from '@/components/map/mobile/MobileLayerButton'
+import RegionOverlay from '@/components/map/overlay/RegionOverlay'
 
 interface MapViewProps {
     center?: [number, number]
@@ -31,6 +33,7 @@ export default function MapView({ center, zoom, className }: MapViewProps) {
     useDistanceMeasure(mapRef, activeTool)
     useAreaMeasure(mapRef, activeTool)
     useLayerManager(mapRef)
+    useRadiusSearch(mapRef, activeTool)
 
     return (
         <div className={`flex flex-col w-full h-full ${className ?? ''}`}>
@@ -49,14 +52,15 @@ export default function MapView({ center, zoom, className }: MapViewProps) {
                 {/* 지도 영역 */}
                 <div className="relative flex-1 h-full">
                     <div ref={containerRef} className="w-full h-full" />
-                    <MapToolbar />
+                    <RegionOverlay map={mapRef} />
+                    <MapToolbar map={mapRef} />
                     {/* 모바일 전용 레이어 온/오프 버튼 */}
                     <MobileLayerButton />
                 </div>
             </div>
 
             {/* 하단 상태바 */}
-            <MapStatusBar />
+            <MapStatusBar map={mapRef} />
         </div>
     )
 }

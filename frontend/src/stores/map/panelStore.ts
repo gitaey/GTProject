@@ -2,7 +2,7 @@
 import { create } from 'zustand'
 
 // 네비게이션 패널 타입: 각 아이콘이 열어주는 패널 종류
-export type PanelType = 'layer' | 'search' | 'draw' | 'measure' | null
+export type PanelType = 'layer' | 'image' | 'etc' | null
 
 interface PanelStore {
     activePanel: PanelType

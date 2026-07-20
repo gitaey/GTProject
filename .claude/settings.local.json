@@ -89,7 +89,29 @@
       "Bash(grep -E \"\\\\.\\(tsx|ts|java|yml\\)$\")",
       "mcp__dbeaver__create_table",
       "mcp__dbeaver__get_connection_info",
-      "Bash(xargs grep -l \"Scheduled\\\\|Scheduler\")"
+      "Bash(xargs grep -l \"Scheduled\\\\|Scheduler\")",
+      "Bash(curl -s \"https://api.vworld.kr/ned/data/getIndvdLandPriceAttr?pnu=1111018200100010000&stdrYear=2026&key=A6929AA3-FEDC-347C-A714-46CCBA3664F5&format=json&numOfRows=1\")",
+      "Bash(curl -sv \"https://api.vworld.kr/ned/data/getIndvdLandPriceAttr?pnu=1111018200100010000&stdrYear=2026&key=A6929AA3-FEDC-347C-A714-46CCBA3664F5&format=json&numOfRows=1\")",
+      "Bash(curl -s \"http://api.vworld.kr/ned/data/getIndvdLandPriceAttr?pnu=1111018200100010000&stdrYear=2026&key=A6929AA3-FEDC-347C-A714-46CCBA3664F5&format=json&numOfRows=1\")",
+      "Bash(curl -s \"https://api.vworld.kr/ned/data/getIndvdLandPriceAttr?pnu=1111018200100010000&stdrYear=2026&key=A6929AA3-FEDC-347C-A714-46CCBA3664F5&format=json&numOfRows=1&domain=localhost\")",
+      "Bash(ls \"C:\\\\Users\\\\gitaey\\\\Downloads\\\\공시지가\")",
+      "Bash(psql --version)",
+      "Bash(python -c \"import psycopg2; print\\('ok'\\)\")",
+      "Bash(pip install *)",
+      "PowerShell(pip install psycopg2-binary -q)",
+      "PowerShell(python -m pip install psycopg2-binary -q)",
+      "PowerShell(& \"C:\\\\Users\\\\gitaey\\\\AppData\\\\Local\\\\Microsoft\\\\WindowsApps\\\\python.exe\" --version)",
+      "PowerShell(& \"C:\\\\Users\\\\gitaey\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--git-GTProject\\\\108dc092-9dd6-4e3b-8862-41aa804795d7\\\\scratchpad\\\\import_price.ps1\")",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\gitaey\\\\Downloads\" | Where-Object { $_.PSIsContainer } | Select-Object Name, FullName)",
+      "PowerShell(Stop-Process -Name \"powershell\" -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(docker system df)",
+      "PowerShell(docker context ls)",
+      "PowerShell(docker --context default ps --format \"table {{.Names}}\\\\t{{.Image}}\\\\t{{.Status}}\")",
+      "WebFetch(domain:reddol18.github.io)",
+      "WebFetch(domain:www.eum.go.kr)",
+      "WebFetch(domain:wehagohelp.zendesk.com)",
+      "WebFetch(domain:jusoga.com)",
+      "Bash(npx tsc *)"
     ]
   }
 }
