@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Search, Tag, ArrowUpRight, Code2, Baby, Coffee, BookOpen, Heart, LayoutDashboard, Plus, X, Star } from 'lucide-react'
-import type { Post, PostCategoryCode, PostFormState, PostPage, PostRequest, PostStatusCode } from '@/types/post'
-import { CATEGORY_OPTIONS, GRADIENT_PRESETS } from '@/types/post'
+import { Search, Tag, ArrowUpRight, BookOpen, Heart, LayoutDashboard, Plus, X, Star } from 'lucide-react'
+import type { Category, Post, PostCategoryCode, PostFormState, PostPage, PostRequest, PostStatusCode } from '@/types/post'
+import { GRADIENT_PRESETS } from '@/types/post'
 import { useAuthStore, getToken } from '@/stores/authStore'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
@@ -21,31 +21,31 @@ const EMPTY_FORM: PostFormState = {
     featured: false, status: 'PUBLISHED',
 }
 
-const CATEGORY_BADGE: Record<PostCategoryCode, string> = {
-    DEV:       'bg-blue-100 text-blue-700',
-    PARENTING: 'bg-pink-100 text-pink-600',
-    DAILY:     'bg-amber-100 text-amber-600',
-}
-
-const CATEGORIES: { code: PostCategoryCode | ''; label: string; icon: React.ReactNode }[] = [
-    { code: '',          label: '전체', icon: <BookOpen size={14} /> },
-    { code: 'DEV',       label: '개발', icon: <Code2 size={14} /> },
-    { code: 'PARENTING', label: '육아', icon: <Baby size={14} /> },
-    { code: 'DAILY',     label: '일상', icon: <Coffee size={14} /> },
+const CATEGORY_COLORS = [
+    'bg-blue-100 text-blue-700',
+    'bg-pink-100 text-pink-600',
+    'bg-amber-100 text-amber-600',
+    'bg-emerald-100 text-emerald-700',
+    'bg-violet-100 text-violet-700',
+    'bg-orange-100 text-orange-700',
 ]
+
+function getCategoryBadge(idx: number) {
+    return CATEGORY_COLORS[Math.max(0, idx) % CATEGORY_COLORS.length]
+}
 
 function formatDate(iso: string) {
     return new Date(iso).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
-function FeaturedPost({ post }: { post: Post }) {
+function FeaturedPost({ post, badgeClass }: { post: Post; badgeClass: string }) {
     return (
         <Link href={`/blog/${post.slug}`} className="group block h-full">
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 h-full flex flex-col overflow-hidden">
                 <div className={`h-3 bg-gradient-to-r ${post.gradient ?? 'from-gray-400 to-gray-600'} shrink-0`} />
                 <div className="p-7 flex flex-col flex-1">
                     <div className="flex items-center gap-2 mb-4">
-                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${CATEGORY_BADGE[post.category]}`}>
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${badgeClass}`}>
                             {post.categoryLabel}
                         </span>
                         <span className="text-xs font-medium text-amber-500 bg-amber-50 px-2.5 py-1 rounded-full">✦ 추천</span>
@@ -71,14 +71,14 @@ function FeaturedPost({ post }: { post: Post }) {
     )
 }
 
-function PostCard({ post }: { post: Post }) {
+function PostCard({ post, badgeClass }: { post: Post; badgeClass: string }) {
     return (
         <Link href={`/blog/${post.slug}`} className="group block h-full">
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 h-full flex flex-col overflow-hidden">
                 <div className={`h-1.5 bg-gradient-to-r ${post.gradient ?? 'from-gray-400 to-gray-600'} shrink-0`} />
                 <div className="p-5 flex flex-col flex-1">
                     <div className="flex items-center gap-2 mb-3">
-                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${CATEGORY_BADGE[post.category]}`}>
+                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${badgeClass}`}>
                             {post.categoryLabel}
                         </span>
                         <span className="text-[11px] text-gray-400 ml-auto">{formatDate(post.createdAt)}</span>
@@ -104,6 +104,7 @@ export default function BlogPage() {
     const { user } = useAuthStore()
     const isSuperAdmin = user?.role === 'SUPER_ADMIN'
 
+    const [categories, setCategories]  = useState<Category[]>([])
     const [page, setPage]             = useState<PostPage | null>(null)
     const [loading, setLoading]       = useState(false)
     const [category, setCategory]     = useState<PostCategoryCode | ''>('')
@@ -116,6 +117,10 @@ export default function BlogPage() {
     const [createForm, setCreateForm]           = useState<PostFormState>(EMPTY_FORM)
     const [createError, setCreateError]         = useState<string | null>(null)
     const [createSubmitting, setCreateSubmitting] = useState(false)
+
+    useEffect(() => {
+        fetch(`${API}/api/categories`).then(r => r.json()).then(j => { if (j.success) setCategories(j.data) }).catch(() => {})
+    }, [])
 
     const openCreateModal = () => {
         slugAutoRef.current = true
@@ -178,6 +183,11 @@ export default function BlogPage() {
     const countOf = (code: PostCategoryCode | '') =>
         code === '' ? (page?.totalElements ?? 0) : posts.filter((p) => p.category === code).length
 
+    const badgeOf = (categoryCode: string) => {
+        const idx = categories.findIndex(c => c.code === categoryCode)
+        return getCategoryBadge(idx)
+    }
+
     return (
         <div className="min-h-screen bg-gray-50">
             {/* ── 네비게이션 ── */}
@@ -196,9 +206,9 @@ export default function BlogPage() {
                     <div className="flex items-center gap-4">
                         {/* 카테고리 */}
                         <div className="hidden sm:flex items-center gap-1">
-                            {CATEGORIES.map(({ code, label }) => (
+                            {[{ code: '' as const, label: '전체' }, ...categories.map(c => ({ code: c.code, label: c.label }))].map(({ code, label }) => (
                                 <button key={code} onClick={() => { setCategory(code); setTagFilter('') }}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all cursor-pointer
                                         ${category === code
                                             ? 'bg-blue-50 text-blue-700'
                                             : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
@@ -249,11 +259,11 @@ export default function BlogPage() {
 
                 {/* 모바일 카테고리 탭 */}
                 <div className="sm:hidden flex gap-2 overflow-x-auto pb-1">
-                    {CATEGORIES.map(({ code, label, icon }) => (
+                    {[{ code: '' as const, label: '전체' }, ...categories.map(c => ({ code: c.code, label: c.label }))].map(({ code, label }) => (
                         <button key={code} onClick={() => { setCategory(code); setTagFilter('') }}
-                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all shrink-0
+                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all shrink-0 cursor-pointer
                                 ${category === code ? 'bg-gray-900 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
-                            {icon} {label}
+                            {label}
                         </button>
                     ))}
                 </div>
@@ -283,10 +293,10 @@ export default function BlogPage() {
                 {!loading && featured && (
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                         <div className="lg:col-span-3">
-                            <FeaturedPost post={featured} />
+                            <FeaturedPost post={featured} badgeClass={badgeOf(featured.category)} />
                         </div>
                         <div className="lg:col-span-2 flex flex-col gap-6">
-                            {rest.slice(0, 2).map((p) => <PostCard key={p.id} post={p} />)}
+                            {rest.slice(0, 2).map((p) => <PostCard key={p.id} post={p} badgeClass={badgeOf(p.category)} />)}
                         </div>
                     </div>
                 )}
@@ -303,7 +313,7 @@ export default function BlogPage() {
                         )}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                             {(featured ? rest.slice(2) : rest).map((p) => (
-                                <PostCard key={p.id} post={p} />
+                                <PostCard key={p.id} post={p} badgeClass={badgeOf(p.category)} />
                             ))}
                         </div>
                     </div>
@@ -362,7 +372,7 @@ export default function BlogPage() {
                                 <label className="block text-xs font-medium text-gray-600 mb-1.5">카테고리 <span className="text-red-400">*</span></label>
                                 <select value={createForm.category} onChange={(e) => setCreateForm({ ...createForm, category: e.target.value as PostCategoryCode })}
                                     className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white">
-                                    {CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                                    {categories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
                                 </select>
                             </div>
                             <div>
