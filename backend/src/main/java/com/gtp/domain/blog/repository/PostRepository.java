@@ -1,7 +1,6 @@
 package com.gtp.domain.blog.repository;
 
 import com.gtp.domain.blog.entity.Post;
-import com.gtp.domain.blog.entity.PostCategory;
 import com.gtp.domain.blog.entity.PostStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -30,7 +29,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
         ORDER BY p.featured DESC, p.createdAt DESC
     """)
     Page<Post> findPublished(
-            @Param("category") PostCategory category,
+            @Param("category") String category,
             @Param("keyword")  String keyword,
             Pageable pageable
     );
@@ -45,7 +44,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
         ORDER BY p.createdAt DESC
     """)
     Page<Post> findAll(
-            @Param("category") PostCategory category,
+            @Param("category") String category,
             @Param("status")   PostStatus status,
             @Param("keyword")  String keyword,
             Pageable pageable

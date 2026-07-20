@@ -43,7 +43,6 @@ interface PostItem {
     id: number
     title: string
     categoryLabel: string
-    emoji: string
     createdAt: string
 }
 

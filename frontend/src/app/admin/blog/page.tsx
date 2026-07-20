@@ -8,8 +8,8 @@ import {
     PenLine, Trash2, X, ChevronLeft, ChevronRight,
     Star, StarOff, Eye, Search, Plus,
 } from 'lucide-react'
-import type { Post, PostCategoryCode, PostFormState, PostPage, PostRequest, PostStatusCode } from '@/types/post'
-import { CATEGORY_OPTIONS, GRADIENT_PRESETS } from '@/types/post'
+import type { Category, Post, PostFormState, PostPage, PostRequest, PostStatusCode } from '@/types/post'
+import { GRADIENT_PRESETS } from '@/types/post'
 import { getToken } from '@/stores/authStore'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
@@ -29,6 +29,7 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
     return json.data
 }
 
+const fetchCategories = () => apiFetch<Category[]>('/api/categories')
 const fetchPosts    = (params: Record<string, string>) => apiFetch<PostPage>(`/api/posts/admin/list?${new URLSearchParams(params)}`)
 const createPost    = (data: PostRequest) => apiFetch<Post>('/api/posts', { method: 'POST', body: JSON.stringify(data) })
 const updatePost    = (id: number, data: PostRequest) => apiFetch<Post>(`/api/posts/${id}`, { method: 'PUT', body: JSON.stringify(data) })
@@ -49,10 +50,15 @@ const EMPTY_FORM: PostFormState = {
     featured: false, status: 'PUBLISHED',
 }
 
-const CATEGORY_STYLE: Record<PostCategoryCode, { bg: string; color: string }> = {
-    DEV:       { bg: 'rgba(59,130,246,0.12)',  color: '#3b82f6' },
-    PARENTING: { bg: 'rgba(236,72,153,0.12)',  color: '#ec4899' },
-    DAILY:     { bg: 'rgba(245,158,11,0.12)',  color: '#f59e0b' },
+const CATEGORY_COLORS = [
+    { bg: 'rgba(59,130,246,0.12)',  color: '#3b82f6' },
+    { bg: 'rgba(236,72,153,0.12)',  color: '#ec4899' },
+    { bg: 'rgba(245,158,11,0.12)',  color: '#f59e0b' },
+    { bg: 'rgba(16,185,129,0.12)',  color: '#10b981' },
+    { bg: 'rgba(168,85,247,0.12)',  color: '#a855f7' },
+]
+function getCategoryStyle(idx: number) {
+    return CATEGORY_COLORS[Math.max(0, idx) % CATEGORY_COLORS.length]
 }
 
 function formatDate(iso: string) {
@@ -71,6 +77,7 @@ function AdminBlogContent() {
     const router = useRouter()
 
     const [page, setPage]               = useState<PostPage | null>(null)
+    const [categories, setCategories]   = useState<Category[]>([])
     const [loading, setLoading]         = useState(false)
     const [error, setError]             = useState<string | null>(null)
     const [keyword, setKeyword]         = useState('')
@@ -109,6 +116,10 @@ function AdminBlogContent() {
     }, [keyword, catFilter, statFilter, currentPage])
 
     useEffect(() => { load() }, [load])
+
+    useEffect(() => {
+        fetchCategories().then(setCategories).catch(() => {})
+    }, [])
 
     useEffect(() => {
         const editId = searchParams.get('edit')
@@ -221,7 +232,7 @@ function AdminBlogContent() {
                         <select value={catFilter} onChange={(e) => { setCatFilter(e.target.value); setCurrentPage(0) }}
                             className="px-3 py-2 text-sm focus:outline-none" style={inputStyle}>
                             <option value="">전체 카테고리</option>
-                            {CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                            {categories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
                         </select>
                         <select value={statFilter} onChange={(e) => { setStatFilter(e.target.value); setCurrentPage(0) }}
                             className="px-3 py-2 text-sm focus:outline-none" style={inputStyle}>
@@ -231,13 +242,13 @@ function AdminBlogContent() {
                         </select>
                         {selectedIds.size > 0 && (
                             <button onClick={() => { setFormError(null); setModalType('batchDelete') }}
-                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer"
                                 style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}>
                                 <Trash2 size={15} /> 선택 삭제 ({selectedIds.size})
                             </button>
                         )}
                         <button onClick={openCreate}
-                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ml-auto"
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ml-auto cursor-pointer"
                             style={{ background: 'var(--accent)', color: '#fff' }}>
                             <Plus size={15} /> 포스트 작성
                         </button>
@@ -246,7 +257,7 @@ function AdminBlogContent() {
                     {error && (
                         <div className="px-4 py-3 rounded-lg text-sm flex items-center justify-between"
                             style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>
-                            {error} <button onClick={() => setError(null)}><X size={14} /></button>
+                            {error} <button onClick={() => setError(null)} className="cursor-pointer"><X size={14} /></button>
                         </div>
                     )}
 
@@ -305,13 +316,13 @@ function AdminBlogContent() {
                                             </td>
                                             <td className="px-4 py-4">
                                                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                                                    style={CATEGORY_STYLE[p.category]}>
+                                                    style={getCategoryStyle(categories.findIndex(c => c.code === p.category))}>
                                                     {p.categoryLabel}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-4">
                                                 <button onClick={() => handleToggleStatus(p)}
-                                                    className="text-xs font-medium px-2 py-0.5 rounded-full transition-colors"
+                                                    className="text-xs font-medium px-2 py-0.5 rounded-full transition-colors cursor-pointer"
                                                     style={p.status === 'PUBLISHED'
                                                         ? { background: 'rgba(16,185,129,0.12)', color: '#10b981' }
                                                         : { background: 'var(--bg-hover)', color: 'var(--text-faint)' }
@@ -322,7 +333,7 @@ function AdminBlogContent() {
                                             <td className="px-4 py-4 text-center">
                                                 <button onClick={() => handleToggleFeatured(p)}
                                                     title={p.featured ? '추천 해제' : '추천 설정'}
-                                                    className="p-1.5 rounded-lg transition-colors">
+                                                    className="p-1.5 rounded-lg transition-colors cursor-pointer">
                                                     {p.featured
                                                         ? <Star size={15} style={{ color: '#f59e0b', fill: '#f59e0b' }} />
                                                         : <StarOff size={15} style={{ color: 'var(--text-faint)' }} />
@@ -338,12 +349,12 @@ function AdminBlogContent() {
                                                         <Eye size={15} />
                                                     </a>
                                                     <button onClick={() => openEdit(p)} title="수정"
-                                                        className="p-1.5 rounded-lg transition-colors"
+                                                        className="p-1.5 rounded-lg transition-colors cursor-pointer"
                                                         style={{ color: 'var(--text-faint)' }}>
                                                         <PenLine size={15} />
                                                     </button>
                                                     <button onClick={() => openDelete(p)} title="삭제"
-                                                        className="p-1.5 rounded-lg transition-colors"
+                                                        className="p-1.5 rounded-lg transition-colors cursor-pointer"
                                                         style={{ color: 'var(--text-faint)' }}>
                                                         <Trash2 size={15} />
                                                     </button>
@@ -359,7 +370,7 @@ function AdminBlogContent() {
                             <div className="flex items-center justify-center gap-2 px-6 py-4"
                                 style={{ borderTop: '1px solid var(--border)' }}>
                                 <button onClick={() => setCurrentPage((p) => Math.max(0, p - 1))} disabled={currentPage === 0}
-                                    className="p-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                                     style={{ color: 'var(--text-muted)' }}>
                                     <ChevronLeft size={16} />
                                 </button>
@@ -367,7 +378,7 @@ function AdminBlogContent() {
                                     const num = Math.max(0, Math.min(currentPage - 4, totalPages - 10)) + i
                                     return (
                                         <button key={num} onClick={() => setCurrentPage(num)}
-                                            className="w-8 h-8 rounded-lg text-sm font-medium transition-colors"
+                                            className="w-8 h-8 rounded-lg text-sm font-medium transition-colors cursor-pointer"
                                             style={{
                                                 background: currentPage === num ? 'var(--accent)' : 'transparent',
                                                 color: currentPage === num ? '#fff' : 'var(--text-muted)',
@@ -377,7 +388,7 @@ function AdminBlogContent() {
                                     )
                                 })}
                                 <button onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))} disabled={currentPage === totalPages - 1}
-                                    className="p-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                                     style={{ color: 'var(--text-muted)' }}>
                                     <ChevronRight size={16} />
                                 </button>
@@ -396,7 +407,7 @@ function AdminBlogContent() {
                         <div className="flex items-center justify-between px-6 py-4 shrink-0"
                             style={{ borderBottom: '1px solid var(--border)' }}>
                             <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>{isEdit ? '포스트 수정' : '포스트 작성'}</h3>
-                            <button onClick={closeModal} className="p-1 rounded-lg transition-colors"
+                            <button onClick={closeModal} className="p-1 rounded-lg transition-colors cursor-pointer"
                                 style={{ color: 'var(--text-faint)' }}>
                                 <X size={18} />
                             </button>
@@ -407,9 +418,9 @@ function AdminBlogContent() {
                                 <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
                                     카테고리 <span style={{ color: '#ef4444' }}>*</span>
                                 </label>
-                                <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as PostCategoryCode })}
+                                <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}
                                     className="w-full px-3 py-2.5 text-sm focus:outline-none" style={inputStyle}>
-                                    {CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                                    {categories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
                                 </select>
                             </div>
 
@@ -462,7 +473,7 @@ function AdminBlogContent() {
                                 <div className="grid grid-cols-4 gap-2">
                                     {GRADIENT_PRESETS.map((g) => (
                                         <button key={g.value} type="button" onClick={() => setForm({ ...form, gradient: g.value })}
-                                            className={`h-10 rounded-lg bg-gradient-to-br ${g.value} transition-all ${
+                                            className={`h-10 rounded-lg bg-gradient-to-br ${g.value} transition-all cursor-pointer ${
                                                 form.gradient === g.value ? 'ring-2 ring-offset-2 ring-orange-500 scale-105' : 'hover:scale-105'
                                             }`}
                                             title={g.label} />
@@ -502,12 +513,12 @@ function AdminBlogContent() {
                         </div>
                         <div className="flex gap-3 px-6 py-4 shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
                             <button onClick={closeModal}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors"
+                                className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors cursor-pointer"
                                 style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
                                 취소
                             </button>
                             <button onClick={isEdit ? handleUpdate : handleCreate} disabled={submitting}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                                className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                                 style={{ background: 'var(--accent)', color: '#fff' }}>
                                 {submitting ? '처리 중...' : isEdit ? '저장' : '발행'}
                             </button>
@@ -536,12 +547,12 @@ function AdminBlogContent() {
                         </div>
                         <div className="flex gap-3 px-6 py-4" style={{ borderTop: '1px solid var(--border)' }}>
                             <button onClick={closeModal}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors"
+                                className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors cursor-pointer"
                                 style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
                                 취소
                             </button>
                             <button onClick={handleDelete} disabled={submitting}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                                className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                                 style={{ background: '#ef4444', color: '#fff' }}>
                                 {submitting ? '삭제 중...' : '삭제'}
                             </button>
@@ -570,12 +581,12 @@ function AdminBlogContent() {
                         </div>
                         <div className="flex gap-3 px-6 py-4" style={{ borderTop: '1px solid var(--border)' }}>
                             <button onClick={closeModal}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors"
+                                className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors cursor-pointer"
                                 style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
                                 취소
                             </button>
                             <button onClick={handleBatchDelete} disabled={submitting}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                                className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                                 style={{ background: '#ef4444', color: '#fff' }}>
                                 {submitting ? '삭제 중...' : `${selectedIds.size}개 삭제`}
                             </button>

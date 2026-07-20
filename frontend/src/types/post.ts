@@ -1,7 +1,7 @@
-export type PostCategoryCode = 'DEV' | 'PARENTING' | 'DAILY'
+export type PostCategoryCode = string
 export type PostStatusCode   = 'PUBLISHED' | 'DRAFT'
 
-export const CATEGORY_OPTIONS: { value: PostCategoryCode; label: string }[] = [
+export const CATEGORY_OPTIONS: { value: string; label: string }[] = [
     { value: 'DEV',       label: '개발' },
     { value: 'PARENTING', label: '육아' },
     { value: 'DAILY',     label: '일상' },
@@ -18,16 +18,21 @@ export const GRADIENT_PRESETS: { value: string; label: string }[] = [
     { value: 'from-lime-400 via-green-500 to-emerald-600', label: '그린' },
 ]
 
+export interface Category {
+    code: string
+    label: string
+    sortOrder: number
+}
+
 export interface Post {
     id: number
     slug: string
     title: string
     excerpt: string | null
     content: string | null
-    category: PostCategoryCode
+    category: string
     categoryLabel: string
     tags: string[]
-    emoji: string | null
     gradient: string | null
     featured: boolean
     status: PostStatusCode
@@ -50,7 +55,7 @@ export interface PostFormState {
     title: string
     excerpt: string
     content: string
-    category: PostCategoryCode
+    category: string
     tags: string          // 쉼표 구분 문자열로 입력
     gradient: string
     featured: boolean
@@ -62,9 +67,8 @@ export interface PostRequest {
     title: string
     excerpt?: string
     content?: string
-    category: PostCategoryCode
+    category: string
     tags?: string[]
-    emoji?: string
     gradient?: string
     featured: boolean
     status: PostStatusCode

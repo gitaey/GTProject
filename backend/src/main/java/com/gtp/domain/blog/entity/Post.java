@@ -38,18 +38,13 @@ public class Post {
     @Comment("포스트 본문 (마크다운)")
     private String content;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "category", nullable = false, length = 20)
-    @Comment("카테고리 (DEV: 개발, PARENTING: 육아, DAILY: 일상)")
-    private PostCategory category;
+    @Column(name = "category", nullable = false, length = 50)
+    @Comment("카테고리 코드 (tbl_category 참조)")
+    private String category;
 
     @Column(name = "tags", length = 500)
     @Comment("태그 목록 (쉼표 구분)")
     private String tags;
-
-    @Column(name = "emoji", length = 20)
-    @Comment("커버 이모지")
-    private String emoji;
 
     @Column(name = "gradient", length = 200)
     @Comment("Tailwind 그라디언트 클래스")
@@ -82,7 +77,7 @@ public class Post {
 
     /* 내용 수정 */
     public void update(String slug, String title, String excerpt, String content,
-                       PostCategory category, String tags, String emoji, String gradient,
+                       String category, String tags, String gradient,
                        boolean featured, PostStatus status) {
         this.slug     = slug;
         this.title    = title;
@@ -90,7 +85,6 @@ public class Post {
         this.content  = content;
         this.category = category;
         this.tags     = tags;
-        this.emoji    = emoji;
         this.gradient = gradient;
         this.featured = featured;
         this.status   = status;

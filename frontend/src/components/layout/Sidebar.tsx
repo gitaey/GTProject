@@ -37,8 +37,9 @@ const menuItems: MenuItem[] = [
         id: 'blog',
         label: '블로그',
         children: [
-            { id: 'blog-view',  label: '블로그 보기', href: '/blog' },
-            { id: 'blog-admin', label: '포스트 관리', href: '/admin/blog' },
+            { id: 'blog-view',     label: '블로그 보기',  href: '/blog' },
+            { id: 'blog-admin',    label: '포스트 관리',  href: '/admin/blog' },
+            { id: 'blog-category', label: '카테고리 관리', href: '/admin/blog/category' },
         ],
     },
     {

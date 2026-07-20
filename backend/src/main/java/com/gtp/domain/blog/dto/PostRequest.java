@@ -24,8 +24,6 @@ public class PostRequest {
 
     private List<String> tags;
 
-    private String emoji;
-
     private String gradient;
 
     private boolean featured;

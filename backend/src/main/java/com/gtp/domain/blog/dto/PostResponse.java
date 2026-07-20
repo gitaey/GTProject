@@ -19,7 +19,6 @@ public class PostResponse {
     private final String category;
     private final String categoryLabel;
     private final List<String> tags;
-    private final String emoji;
     private final String gradient;
     private final boolean featured;
     private final String status;
@@ -32,16 +31,15 @@ public class PostResponse {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private final LocalDateTime updatedAt;
 
-    public PostResponse(Post post) {
+    public PostResponse(Post post, String categoryLabel) {
         this.id            = post.getId();
         this.slug          = post.getSlug();
         this.title         = post.getTitle();
         this.excerpt       = post.getExcerpt();
         this.content       = post.getContent();
-        this.category      = post.getCategory().name();
-        this.categoryLabel = post.getCategory().getLabel();
+        this.category      = post.getCategory();
+        this.categoryLabel = categoryLabel;
         this.tags          = parseTags(post.getTags());
-        this.emoji         = post.getEmoji();
         this.gradient      = post.getGradient();
         this.featured      = post.isFeatured();
         this.status        = post.getStatus().name();
@@ -52,8 +50,8 @@ public class PostResponse {
     }
 
     /* content 제외한 요약 응답 (목록용) */
-    public static PostResponse summary(Post post) {
-        return new PostResponse(post) {
+    public static PostResponse summary(Post post, String categoryLabel) {
+        return new PostResponse(post, categoryLabel) {
             @Override public String getContent() { return null; }
         };
     }

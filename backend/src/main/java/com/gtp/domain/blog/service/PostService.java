@@ -3,7 +3,6 @@ package com.gtp.domain.blog.service;
 import com.gtp.domain.blog.dto.PostRequest;
 import com.gtp.domain.blog.dto.PostResponse;
 import com.gtp.domain.blog.entity.Post;
-import com.gtp.domain.blog.entity.PostCategory;
 import com.gtp.domain.blog.entity.PostStatus;
 import com.gtp.domain.blog.repository.PostRepository;
 import com.gtp.global.exception.CustomException;
@@ -15,19 +14,23 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 public class PostService {
 
-    private final PostRepository postRepository;
+    private final PostRepository  postRepository;
+    private final CategoryService categoryService;
 
     /* ── 공개 목록 조회 ── */
     @Transactional(readOnly = true)
-    public Page<PostResponse> getPosts(String categoryStr, String keyword, Pageable pageable) {
-        PostCategory category = parseCategory(categoryStr);
-        String kw = (keyword == null || keyword.isBlank()) ? null : keyword;
-        return postRepository.findPublished(category, kw, pageable)
-                .map(PostResponse::summary);
+    public Page<PostResponse> getPosts(String category, String keyword, Pageable pageable) {
+        String cat = (category == null || category.isBlank()) ? null : category.toUpperCase();
+        String kw  = (keyword  == null || keyword.isBlank())  ? null : keyword;
+        Map<String, String> labelMap = categoryService.getLabelMap();
+        return postRepository.findPublished(cat, kw, pageable)
+                .map(p -> PostResponse.summary(p, labelMap.getOrDefault(p.getCategory(), p.getCategory())));
     }
 
     /* ── 공개 단건 조회 (slug) ── */
@@ -35,17 +38,18 @@ public class PostService {
     public PostResponse getPost(String slug) {
         Post post = postRepository.findBySlugAndStatus(slug, PostStatus.PUBLISHED)
                 .orElseThrow(() -> new CustomException(ErrorCode.POST_NOT_FOUND));
-        return new PostResponse(post);
+        return new PostResponse(post, categoryService.getLabel(post.getCategory()));
     }
 
     /* ── 관리자 전체 목록 ── */
     @Transactional(readOnly = true)
     public Page<PostResponse> getAdminPosts(String categoryStr, String statusStr, String keyword, Pageable pageable) {
-        PostCategory category = parseCategory(categoryStr);
-        PostStatus   status   = parseStatus(statusStr);
-        String kw = (keyword == null || keyword.isBlank()) ? null : keyword;
-        return postRepository.findAll(category, status, kw, pageable)
-                .map(PostResponse::summary);
+        String cat    = (categoryStr == null || categoryStr.isBlank()) ? null : categoryStr.toUpperCase();
+        PostStatus status = (statusStr == null || statusStr.isBlank()) ? null : parseStatus(statusStr);
+        String kw     = (keyword == null || keyword.isBlank()) ? null : keyword;
+        Map<String, String> labelMap = categoryService.getLabelMap();
+        return postRepository.findAll(cat, status, kw, pageable)
+                .map(p -> PostResponse.summary(p, labelMap.getOrDefault(p.getCategory(), p.getCategory())));
     }
 
     /* ── 생성 ── */
@@ -56,22 +60,23 @@ public class PostService {
         }
 
         String authorId = getCurrentUserId();
+        String category = req.getCategory().toUpperCase();
 
         Post post = Post.builder()
                 .slug(req.getSlug())
                 .title(req.getTitle())
                 .excerpt(req.getExcerpt())
                 .content(req.getContent())
-                .category(parseCategory(req.getCategory()))
+                .category(category)
                 .tags(joinTags(req.getTags()))
-                .emoji(req.getEmoji())
                 .gradient(req.getGradient())
                 .featured(req.isFeatured())
                 .status(parseStatus(req.getStatus()))
                 .authorId(authorId)
                 .build();
 
-        return new PostResponse(postRepository.save(post));
+        Post saved = postRepository.save(post);
+        return new PostResponse(saved, categoryService.getLabel(saved.getCategory()));
     }
 
     /* ── 수정 ── */
@@ -88,22 +93,20 @@ public class PostService {
                 req.getTitle(),
                 req.getExcerpt(),
                 req.getContent(),
-                parseCategory(req.getCategory()),
+                req.getCategory().toUpperCase(),
                 joinTags(req.getTags()),
-                req.getEmoji(),
                 req.getGradient(),
                 req.isFeatured(),
                 parseStatus(req.getStatus())
         );
 
-        return new PostResponse(post);
+        return new PostResponse(post, categoryService.getLabel(post.getCategory()));
     }
 
     /* ── 삭제 ── */
     @Transactional
     public void deletePost(Long id) {
-        Post post = findById(id);
-        postRepository.delete(post);
+        postRepository.delete(findById(id));
     }
 
     /* ── 일괄 삭제 ── */
@@ -117,7 +120,7 @@ public class PostService {
     public PostResponse toggleFeatured(Long id) {
         Post post = findById(id);
         post.toggleFeatured();
-        return new PostResponse(post);
+        return new PostResponse(post, categoryService.getLabel(post.getCategory()));
     }
 
     /* ── 상태 토글 ── */
@@ -125,22 +128,13 @@ public class PostService {
     public PostResponse toggleStatus(Long id) {
         Post post = findById(id);
         post.toggleStatus();
-        return new PostResponse(post);
+        return new PostResponse(post, categoryService.getLabel(post.getCategory()));
     }
 
     /* ── 헬퍼 ── */
     private Post findById(Long id) {
         return postRepository.findById(id)
                 .orElseThrow(() -> new CustomException(ErrorCode.POST_NOT_FOUND));
-    }
-
-    private PostCategory parseCategory(String value) {
-        if (value == null || value.isBlank()) return null;
-        try {
-            return PostCategory.valueOf(value.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new CustomException(ErrorCode.INVALID_INPUT);
-        }
     }
 
     private PostStatus parseStatus(String value) {
