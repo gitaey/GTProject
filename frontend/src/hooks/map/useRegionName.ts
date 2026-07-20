@@ -36,7 +36,7 @@ export function useRegionName(map: Map | null): string {
         function handleMoveEnd() {
             if (timerRef.current) clearTimeout(timerRef.current)
             timerRef.current = setTimeout(() => {
-                const center = map.getView().getCenter()
+                const center = map!.getView().getCenter()
                 if (!center) return
                 const [lon, lat] = toLonLat(center, 'EPSG:3857')
                 fetchRegion(lon, lat)
