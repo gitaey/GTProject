@@ -168,6 +168,7 @@ public class BotMessageService {
 
     private String handleInfo(String name, String room, CharacterInfoResponse info) throws Exception {
         ArmoryProfile d  = info.getProfile();
+        if (d == null) return name + " 캐릭터를 찾을 수 없습니다.";
         ArmoryArkPassive ap = info.getArkPassive();
         ArmoryEngraving  en = info.getEngraving();
         ArmoryArkGrid    ag = info.getArkGrid();
