@@ -421,6 +421,12 @@ public class BotMessageService {
                 if (!tripodStr.isEmpty()) sb.append("   ").append(tripodStr).append("\n");
             }
         }
+
+        String skillCode = lostarkService.getSkillCode(name);
+        if (skillCode != null && !skillCode.isBlank()) {
+            sb.append("───────────────\n스킬코드: ").append(skillCode);
+        }
+
         return sb.toString().trim();
     }
 

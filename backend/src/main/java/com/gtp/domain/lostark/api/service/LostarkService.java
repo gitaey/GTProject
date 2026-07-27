@@ -1,10 +1,16 @@
 package com.gtp.domain.lostark.api.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gtp.domain.lostark.api.dto.armory.*;
 import com.gtp.global.exception.CustomException;
 import com.gtp.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jsoup.Connection;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
@@ -14,7 +20,10 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -174,6 +183,63 @@ public class LostarkService {
             log.error("LostArk 아크그리드 조회 오류: {}", e.getMessage());
             throw new CustomException(ErrorCode.LOSTARK_API_ERROR);
         }
+    }
+
+    // /스킬 - 공식 사이트 크롤링으로 스킬코드 조회
+    public String getSkillCode(String name) {
+        try {
+            String profileUrl = "https://lostark.game.onstove.com/Profile/Character/" + name;
+            String ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+            Connection.Response getResponse = Jsoup.connect(profileUrl)
+                    .userAgent(ua)
+                    .method(Connection.Method.GET)
+                    .timeout(10_000)
+                    .execute();
+
+            Map<String, String> cookies = getResponse.cookies();
+            String html = getResponse.body();
+
+            String memberNo = extractScriptVar(html, "_memberNo");
+            String worldNo = extractScriptVar(html, "_worldNo");
+            String pcId = extractScriptVar(html, "_pcId");
+
+            if (memberNo == null || worldNo == null || pcId == null) {
+                log.warn("스킬코드 변수 추출 실패 - name={}", name);
+                return null;
+            }
+
+            Connection.Response postResponse = Jsoup.connect("https://lostark.game.onstove.com/Profile/SkillRecommend")
+                    .userAgent(ua)
+                    .cookies(cookies)
+                    .header("Referer", profileUrl)
+                    .header("X-Requested-With", "XMLHttpRequest")
+                    .method(Connection.Method.POST)
+                    .data("memberNo", memberNo)
+                    .data("worldNo", worldNo)
+                    .data("pcId", pcId)
+                    .ignoreContentType(true)
+                    .timeout(10_000)
+                    .execute();
+
+            JsonNode json = new ObjectMapper().readTree(postResponse.body());
+            JsonNode contentNode = json.get("Content");
+            if (contentNode == null || contentNode.isNull()) return null;
+
+            Document resultDoc = Jsoup.parse(contentNode.asText());
+            Element codeEl = resultDoc.selectFirst(".code");
+            return codeEl != null ? codeEl.text().trim() : null;
+
+        } catch (Exception e) {
+            log.error("스킬코드 조회 오류: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private String extractScriptVar(String html, String varName) {
+        Pattern p = Pattern.compile("var\\s+" + Pattern.quote(varName) + "\\s*=\\s*['\"]([^'\"]+)['\"]");
+        Matcher m = p.matcher(html);
+        return m.find() ? m.group(1) : null;
     }
 
     // /정보 통합 조회 (프로필 + 아크패시브 + 각인 + 아크그리드) - 병렬 호출
