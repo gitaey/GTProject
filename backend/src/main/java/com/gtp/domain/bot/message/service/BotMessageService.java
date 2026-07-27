@@ -9,6 +9,7 @@ import com.gtp.domain.bot.message.dto.BotMessageRequest;
 import com.gtp.domain.bot.message.dto.BotMessageResult;
 import com.gtp.domain.bot.room.entity.BotRoomStatus;
 import com.gtp.domain.bot.room.repository.BotRoomRepository;
+import com.gtp.domain.bot.room.service.BotRoomService;
 import com.gtp.domain.lostark.api.dto.armory.*;
 import com.gtp.domain.lostark.api.service.LostarkService;
 import com.gtp.domain.lostark.raid.dto.CharacterScheduleItem;
@@ -35,6 +36,7 @@ public class BotMessageService {
     private final LostarkService lostarkService;
     private final GoogleSheetsService googleSheetsService;
     private final BotRoomRepository botRoomRepository;
+    private final BotRoomService botRoomService;
     private final BotLogRepository botLogRepository;
     private final ObjectMapper objectMapper;
 
@@ -53,6 +55,13 @@ public class BotMessageService {
         String sender = req.getSender() != null ? req.getSender() : "";
 
         if (!msg.startsWith("/")) return BotMessageResult.silent();
+
+        // 방 자동 등록/갱신
+        if (!room.isEmpty()) {
+            try { botRoomService.upsert(room); } catch (Exception e) {
+                log.warn("[BotMessage] 방 upsert 실패: {}", e.getMessage());
+            }
+        }
 
         // 방 차단 체크
         if (isBlocked(room)) return BotMessageResult.silent();
