@@ -19,4 +19,10 @@ public class BotMessageController {
         BotMessageResult result = botMessageService.handle(request);
         return ApiResponse.ok(result);
     }
+
+    @GetMapping
+    public ApiResponse<BotMessageResult> handleGet(@RequestParam String message) {
+        BotMessageResult result = botMessageService.handle(new BotMessageRequest("test", message, "테스터"));
+        return ApiResponse.ok(result);
+    }
 }

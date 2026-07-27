@@ -18,6 +18,8 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.http.*;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -188,7 +190,8 @@ public class LostarkService {
     // /스킬 - 공식 사이트 크롤링으로 스킬코드 조회
     public String getSkillCode(String name) {
         try {
-            String profileUrl = "https://lostark.game.onstove.com/Profile/Character/" + name;
+            String encodedName = URLEncoder.encode(name, StandardCharsets.UTF_8);
+            String profileUrl = "https://lostark.game.onstove.com/Profile/Character/" + encodedName;
             String ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
             Connection.Response getResponse = Jsoup.connect(profileUrl)
@@ -223,7 +226,7 @@ public class LostarkService {
                     .execute();
 
             JsonNode json = new ObjectMapper().readTree(postResponse.body());
-            JsonNode contentNode = json.get("Content");
+            JsonNode contentNode = json.get("content");
             if (contentNode == null || contentNode.isNull()) return null;
 
             Document resultDoc = Jsoup.parse(contentNode.asText());
