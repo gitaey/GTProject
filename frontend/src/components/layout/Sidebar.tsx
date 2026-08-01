@@ -53,6 +53,13 @@ const menuItems: MenuItem[] = [
         ],
     },
     {
+        id: 'geoserver',
+        label: 'GeoServer',
+        children: [
+            { id: 'geoserver-publish', label: '레이어 발행', href: '/admin/geoserver/publish' },
+        ],
+    },
+    {
         id: 'system',
         label: '시스템',
         children: [
@@ -61,7 +68,7 @@ const menuItems: MenuItem[] = [
     },
 ]
 
-const ADMIN_ONLY_IDS = new Set(['map-admin', 'bot', 'system'])
+const ADMIN_ONLY_IDS = new Set(['map-admin', 'bot', 'geoserver', 'system'])
 
 export default function Sidebar() {
     const pathname        = usePathname()
@@ -100,12 +107,12 @@ export default function Sidebar() {
             style={{ background: 'var(--bg-sidebar)', borderRight: '1px solid var(--border)' }}
         >
             {/* 로고 */}
-            <div className="px-4 py-4 flex items-center gap-2.5" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+            <Link href="/" className="px-4 py-4 flex items-center gap-2.5 cursor-pointer" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <div className="w-2 h-2 rounded-full shrink-0" style={{ background: 'var(--accent)' }} />
                 <span className="text-sm font-medium tracking-tight" style={{ color: 'var(--text-primary)' }}>
                     기빵 프로젝트
                 </span>
-            </div>
+            </Link>
 
             {/* 네비게이션 */}
             <nav className="flex-1 py-3 overflow-y-auto">
@@ -133,7 +140,7 @@ export default function Sidebar() {
                         <div key={item.id} className="mt-1">
                             <button
                                 onClick={() => setOpen(isGroupOpen ? null : item.id)}
-                                className="w-full flex items-center justify-between px-4 py-2 text-sm font-medium transition-colors text-left"
+                                className="w-full flex items-center justify-between px-4 py-2 text-sm font-medium transition-colors text-left cursor-pointer"
                                 style={{ color: isGroupActive ? 'var(--accent)' : 'var(--text-primary)' }}
                             >
                                 <span>{item.label}</span>

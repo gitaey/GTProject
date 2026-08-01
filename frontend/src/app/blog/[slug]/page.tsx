@@ -7,6 +7,11 @@ import { ArrowLeft, Tag, Calendar, BookOpen, LayoutDashboard, PenLine, Trash2, X
 import type { Post, PostCategoryCode, PostFormState, PostRequest, PostStatusCode } from '@/types/post'
 import { CATEGORY_OPTIONS, GRADIENT_PRESETS } from '@/types/post'
 import { useAuthStore, getToken } from '@/stores/authStore'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import rehypeHighlight from 'rehype-highlight'
+import rehypeRaw from 'rehype-raw'
+import 'highlight.js/styles/github-dark.css'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
@@ -16,21 +21,28 @@ const CATEGORY_BADGE: Record<string, string> = {
     DAILY:     'bg-amber-100 text-amber-600',
 }
 
-function SimpleMarkdown({ content }: { content: string }) {
-    const lines = content.split('\n')
+function PostContent({ content }: { content: string }) {
     return (
-        <div className="space-y-1">
-            {lines.map((line, i) => {
-                if (line.startsWith('## '))
-                    return <h2 key={i} className="text-xl font-bold text-gray-900 mt-8 mb-3 pb-2 border-b border-gray-100">{line.slice(3)}</h2>
-                if (line.startsWith('### '))
-                    return <h3 key={i} className="text-base font-semibold text-gray-800 mt-5 mb-2">{line.slice(4)}</h3>
-                if (line.startsWith('- '))
-                    return <li key={i} className="text-gray-600 text-sm leading-relaxed ml-4 list-disc">{line.slice(2)}</li>
-                if (line.trim() === '')
-                    return <div key={i} className="h-3" />
-                return <p key={i} className="text-gray-600 text-sm leading-7">{line}</p>
-            })}
+        <div className="prose prose-sm max-w-none
+            prose-headings:font-bold prose-headings:text-gray-900
+            prose-h1:text-2xl prose-h1:mt-8 prose-h1:mb-4
+            prose-h2:text-xl prose-h2:mt-8 prose-h2:mb-3 prose-h2:pb-2 prose-h2:border-b prose-h2:border-gray-200
+            prose-h3:text-base prose-h3:mt-5 prose-h3:mb-2
+            prose-p:text-gray-600 prose-p:leading-7 prose-p:my-2
+            prose-li:text-gray-600 prose-li:leading-relaxed
+            prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
+            prose-strong:text-gray-800 prose-strong:font-semibold
+            prose-code:text-pink-600 prose-code:bg-pink-50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-mono prose-code:before:content-none prose-code:after:content-none
+            prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-4
+            prose-blockquote:border-l-4 prose-blockquote:border-blue-300 prose-blockquote:bg-blue-50 prose-blockquote:pl-4 prose-blockquote:py-1 prose-blockquote:text-blue-800 prose-blockquote:italic
+            prose-table:w-full prose-th:bg-gray-100 prose-th:text-gray-700 prose-td:text-gray-600
+            prose-hr:border-gray-200">
+            <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight, rehypeRaw]}
+            >
+                {content}
+            </ReactMarkdown>
         </div>
     )
 }
@@ -222,7 +234,7 @@ export default function BlogPostPage() {
                     {/* 본문 */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
                         {post.content
-                            ? <SimpleMarkdown content={post.content} />
+                            ? <PostContent content={post.content} />
                             : <p className="text-gray-400 text-sm">본문이 없습니다.</p>
                         }
                     </div>

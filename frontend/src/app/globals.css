@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import 'ol/ol.css';
+@plugin "@tailwindcss/typography";
 
 :root {
     --bg-page: #F4F5F8;
@@ -41,7 +42,13 @@
     --accent-border: rgba(249, 115, 22, 0.35);
 }
 
+@keyframes shimmer {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
 @theme inline {
+    --animate-shimmer: shimmer 1.2s infinite;
     --color-background: var(--bg-page);
     --color-foreground: var(--text-primary);
     --font-sans: var(--font-geist-sans);

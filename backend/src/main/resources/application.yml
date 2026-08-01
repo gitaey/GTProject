@@ -42,3 +42,9 @@ discord:
 lostark:
   api:
     key: ${LOSTARK_API_KEY:}
+
+geoserver:
+  url: ${GEOSERVER_URL:https://geo.gitaey-dev.com/geoserver}
+  admin:
+    user: ${GEOSERVER_ADMIN_USER:admin}
+    password: ${GEOSERVER_ADMIN_PASSWORD:geoserver}
