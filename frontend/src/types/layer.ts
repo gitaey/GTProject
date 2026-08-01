@@ -46,6 +46,7 @@ export interface DbLayer {
     opacity: number
     visible: boolean
     sortOrder: number
+    groupId: number | null
     groupName: string | null
     description: string | null
     createdAt: string
