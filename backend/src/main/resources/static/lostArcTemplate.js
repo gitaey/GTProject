@@ -131,9 +131,20 @@ function markScheduleSent(scheduleId) {
 // ── 1분 주기 타이머 (자동 전송) ──────────────────────────────────
 function startDailyTimer() {
   var MINUTE_MS = 60 * 1000;
-  Log.d("startDailyTimer: 1분 간격 스케줄 체크 시작");
 
+  // 이전 타이머 취소 (컴파일 후에도 JVM 레벨에서 유지됨)
+  try {
+    var oldTimer = java.lang.System.getProperties().get("gtp_daily_timer");
+    if (oldTimer) {
+      oldTimer.cancel();
+      Log.d("startDailyTimer: 기존 타이머 취소");
+    }
+  } catch(e) {}
+
+  Log.d("startDailyTimer: 1분 간격 스케줄 체크 시작");
   var timer = new java.util.Timer(true);
+  java.lang.System.getProperties().put("gtp_daily_timer", timer);
+
   timer.scheduleAtFixedRate(new java.util.TimerTask({
     run: function() {
       try {
