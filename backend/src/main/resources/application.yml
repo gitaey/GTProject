@@ -48,3 +48,4 @@ geoserver:
   admin:
     user: ${GEOSERVER_ADMIN_USER:admin}
     password: ${GEOSERVER_ADMIN_PASSWORD:geoserver}
+  legend-layer: ${GEOSERVER_LEGEND_LAYER:gtp:tl_scco_ctprvn}
