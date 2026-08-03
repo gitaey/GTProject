@@ -104,7 +104,8 @@ export function useLayerManager(map: OLMap | null) {
         const allLayers = [...flattenGroupLayers(tree.groups), ...tree.ungroupedLayers]
 
         function buildLayers() {
-            olLayersRef.current.forEach(olLayer => { try { map!.removeLayer(olLayer) } catch {} })
+            const m = map!
+            olLayersRef.current.forEach(olLayer => { try { m.removeLayer(olLayer) } catch {} })
             olLayersRef.current.clear()
 
             allLayers.forEach(layer => {
@@ -119,7 +120,7 @@ export function useLayerManager(map: OLMap | null) {
                     getLayerOpacity(opacityMap, layer),
                     sldUrl,
                 )
-                map.addLayer(olLayer)
+                m.addLayer(olLayer)
                 olLayersRef.current.set(layer.id, olLayer)
             })
         }
