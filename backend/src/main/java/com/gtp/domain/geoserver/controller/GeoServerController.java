@@ -79,15 +79,23 @@ public class GeoServerController {
         return ApiResponse.ok(geoServerService.getStyleSld(name));
     }
 
-    /** 인증 불필요 — VWorld WMS SLD 파라미터용 공개 엔드포인트 */
+    /** 인증 불필요 — VWorld WMS SLD 파라미터용 공개 엔드포인트 (경로: /sld/{name}/{layers}) */
+    @GetMapping(value = "/sld/{name}/{layers}", produces = "application/xml")
+    public org.springframework.http.ResponseEntity<String> getPublicSldWithLayers(
+            @PathVariable String name,
+            @PathVariable String layers) throws Exception {
+        List<String> layerNames = Arrays.asList(layers.split(","));
+        String sld = geoServerService.getStyleSldForLayers(name, layerNames);
+        return org.springframework.http.ResponseEntity.ok()
+                .header("Access-Control-Allow-Origin", "*")
+                .body(sld);
+    }
+
+    /** 인증 불필요 — 레이어명 치환 없이 원본 반환 */
     @GetMapping(value = "/sld/{name}", produces = "application/xml")
     public org.springframework.http.ResponseEntity<String> getPublicSld(
-            @PathVariable String name,
-            @org.springframework.web.bind.annotation.RequestParam(required = false) String layers) throws Exception {
-        List<String> layerNames = (layers != null && !layers.isBlank())
-                ? Arrays.asList(layers.split(","))
-                : List.of(name);
-        String sld = geoServerService.getStyleSldForLayers(name, layerNames);
+            @PathVariable String name) throws Exception {
+        String sld = geoServerService.getStyleSld(name);
         return org.springframework.http.ResponseEntity.ok()
                 .header("Access-Control-Allow-Origin", "*")
                 .body(sld);

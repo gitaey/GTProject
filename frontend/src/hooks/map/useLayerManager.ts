@@ -112,7 +112,7 @@ export function useLayerManager(map: OLMap | null) {
                 // VWorld WMS + style_name: SLD URL 파라미터로 GeoServer 스타일 적용
                 let sldUrl: string | undefined
                 if (layer.type === 'WMS' && layer.url.includes('vworld.kr') && layer.styleName && layer.layerName) {
-                    sldUrl = `${API_URL}/api/geoserver/sld/${encodeURIComponent(layer.styleName)}?layers=${encodeURIComponent(layer.layerName)}`
+                    sldUrl = `${API_URL}/api/geoserver/sld/${encodeURIComponent(layer.styleName)}/${encodeURIComponent(layer.layerName)}`
                 }
                 const olLayer = createOLLayer(
                     layer,
