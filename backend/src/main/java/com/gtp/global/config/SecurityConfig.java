@@ -39,6 +39,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/users/**").authenticated()
                 .requestMatchers("/api/auth/me").authenticated()
                 .requestMatchers("/api/posts/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/geoserver/sld/**").permitAll()
                 .requestMatchers("/api/geoserver/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/layers", "/api/layers/tree", "/api/layers/tree/**").permitAll()
                 .requestMatchers("/api/layers/**").authenticated()

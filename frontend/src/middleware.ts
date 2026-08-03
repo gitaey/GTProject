@@ -22,5 +22,5 @@ export function middleware(request: NextRequest) {
 
 export const config = {
     /* _next, api, 정적 파일, favicon 제외한 모든 경로 */
-    matcher: ['/((?!_next/static|_next/image|favicon.ico|api).*)'],
+    matcher: ['/((?!_next/static|_next/image|favicon.ico|api|proxy).*)'],
 }

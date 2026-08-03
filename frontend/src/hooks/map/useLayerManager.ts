@@ -1,113 +1,146 @@
-// layerStore의 상태(visible/opacity)와 OpenLayers 레이어를 동기화하는 Hook
-// Store 상태가 바뀌면 실제 OL 레이어에 자동으로 반영됨
 import { useEffect, useRef } from 'react'
 import OLMap from 'ol/Map'
 import TileLayer from 'ol/layer/Tile'
 import ImageLayer from 'ol/layer/Image'
+import VectorLayer from 'ol/layer/Vector'
+import VectorSource from 'ol/source/Vector'
 import XYZ from 'ol/source/XYZ'
 import ImageWMS from 'ol/source/ImageWMS'
-import { useLayerStore } from '@/stores/map/layerStore'
-import { LayerItem, LayerGroup, isLayerGroup, flattenItems } from '@/types/layer'
+import GeoJSON from 'ol/format/GeoJSON'
+import { bbox as bboxStrategy } from 'ol/loadingstrategy'
+import { useLayerStore, flattenGroupLayers, getLayerVisible, getLayerOpacity } from '@/stores/map/layerStore'
+import { DbLayer } from '@/types/layer'
 import BaseLayer from 'ol/layer/Base'
 
-// 환경변수에서 VWorld API 키 가져옴 (! = null이 아님을 TypeScript에 보장)
-const API_KEY = process.env.NEXT_PUBLIC_VWORLD_API_KEY!
+const VWORLD_KEY = process.env.NEXT_PUBLIC_VWORLD_API_KEY ?? ''
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.gitaey-dev.com'
 
-// Record<키타입, 값타입>: "key는 string, value도 string인 객체" 타입
-// 레이어 id → VWorld WMTS 레이어명 매핑
-const VWORLD_LAYER_NAME: Record<string, string> = {
-    'base-normal': 'Base',
-    'base-satellite': 'Satellite',
-    'base-hybrid': 'Hybrid',
+function resolveUrl(url: string): string {
+    return url.replace('{VWORLD_KEY}', VWORLD_KEY)
 }
 
-// WMTS(XYZ) 소스 생성: VWorld 기본지도 타일 URL 생성
-function createXYZSource(layerId: string) {
-    return new XYZ({
-        url: `https://api.vworld.kr/req/wmts/1.0.0/${API_KEY}/${VWORLD_LAYER_NAME[layerId]}/{z}/{y}/{x}.png`,
-        projection: 'EPSG:3857',
-    })
-}
 
-// LayerItem 데이터로 실제 OL 레이어 인스턴스 생성
-// wmts-base → TileLayer(XYZ), wms → ImageLayer(WMS)
-function createOLLayer(item: LayerItem): BaseLayer {
-    if (item.type === 'wmts-base') {
-        return new TileLayer({
-            source: createXYZSource(item.id),
-            visible: item.visible,
-            opacity: item.opacity,
+function createOLLayer(layer: DbLayer, visible: boolean, opacity: number, sldUrl?: string): BaseLayer {
+    const url = resolveUrl(layer.url)
+
+    if (layer.type === 'WMS') {
+        const isVWorld = url.includes('vworld.kr')
+        const wmsParams: Record<string, string> = {
+            LAYERS: layer.layerName ?? '',
+            STYLES: '',
+            FORMAT: layer.format ?? 'image/png',
+            TRANSPARENT: 'TRUE',
+        }
+        if (isVWorld) {
+            wmsParams['key'] = VWORLD_KEY
+            if (sldUrl) wmsParams['SLD'] = sldUrl
+        } else {
+            wmsParams['STYLES'] = layer.styleName ?? ''
+        }
+
+        return new ImageLayer({
+            source: new ImageWMS({
+                url,
+                params: wmsParams,
+                ratio: 1,
+                ...(isVWorld ? {} : { serverType: 'geoserver' }),
+            }),
+            visible,
+            opacity,
+            minZoom: layer.minZoom ?? undefined,
+            maxZoom: layer.maxZoom ?? undefined,
         })
     }
-    return new ImageLayer({
-        source: new ImageWMS({
-            url: `https://api.vworld.kr/req/wms`,
-            params: {
-                SERVICE: 'WMS',
-                VERSION: '1.3.0',
-                REQUEST: 'GetMap',
-                FORMAT: 'image/png',
-                TRANSPARENT: 'TRUE',
-                // ?? = Nullish 병합 연산자(ES6): null/undefined면 오른쪽 값 사용
-                // || 와 달리 0이나 ''는 걸러내지 않음
-                LAYERS: item.wmsLayers ?? item.id,
-                STYLES: item.wmsStyles ?? item.id,
-                CRS: 'EPSG:3857',
-                KEY: API_KEY,
-                DOMAIN: typeof window !== 'undefined' ? window.location.hostname : '',
-            },
-            ratio: 1,
-            serverType: 'geoserver',
-        }),
-        visible: item.visible,
-        opacity: item.opacity,
-    })
-}
 
-// 레이어 트리에서 모든 LeafItem(LayerItem)을 평탄화해서 반환
-function flattenAll(tree: LayerGroup[]): LayerItem[] {
-    return flattenItems(tree.flatMap((g) => g.children))
+    if (layer.type === 'WFS') {
+        const layerName = layer.layerName ?? ''
+        const format = new GeoJSON()
+        const source = new VectorSource({ strategy: bboxStrategy })
+
+        source.setLoader((extent, _resolution, projection) => {
+            const url = `/proxy/wfs?TYPENAMES=${layerName}&BBOX=${extent.join(',')},EPSG:3857&SRSNAME=EPSG:3857`
+            fetch(url)
+                .then(r => r.json())
+                .then(data => {
+                    const features = format.readFeatures(data, { featureProjection: projection })
+                    source.addFeatures(features)
+                })
+                .catch(() => source.removeLoadedExtent(extent))
+        })
+
+        return new VectorLayer({
+            source,
+            visible,
+            opacity,
+            minZoom: layer.minZoom ?? undefined,
+            maxZoom: layer.maxZoom ?? undefined,
+        })
+    }
+
+    // XYZ, WMTS, TMS
+    return new TileLayer({
+        source: new XYZ({
+            url,
+            projection: layer.projection ?? 'EPSG:3857',
+            maxZoom: layer.maxZoom ?? 19,
+        }),
+        visible,
+        opacity,
+        minZoom: layer.minZoom ?? undefined,
+    })
 }
 
 export function useLayerManager(map: OLMap | null) {
-    const { tree } = useLayerStore()  // layerStore에서 트리 상태 구독
-    const layers = flattenAll(tree)   // 트리를 평탄화해서 LayerItem[] 추출
+    const { tree, loadTree } = useLayerStore()
+    const visibleMap = useLayerStore(s => s.visibleMap)
+    const opacityMap = useLayerStore(s => s.opacityMap)
+    const olLayersRef = useRef<Map<number, BaseLayer>>(new Map())
 
-    // key: 레이어 id, value: OL 레이어 인스턴스 → id로 빠르게 찾기 위해 사용
-    const olLayersRef = useRef<Map<string, BaseLayer>>(new Map())
+    useEffect(() => { loadTree() }, [loadTree])
 
-    // 지도 인스턴스가 생겼을 때 레이어를 지도에 등록
-    // [mapRef.current]: mapRef.current가 바뀔 때(지도 생성 시)만 실행
     useEffect(() => {
-        if (!map) return
+        if (!map || !tree) return
 
-        olLayersRef.current.clear()
+        const allLayers = [...flattenGroupLayers(tree.groups), ...tree.ungroupedLayers]
 
-        layers.forEach((item) => {
-            const olLayer = createOLLayer(item)       // OL 레이어 생성
-            map.addLayer(olLayer)                     // 지도에 추가
-            olLayersRef.current.set(item.id, olLayer) // id로 매핑 보관
-        })
+        function buildLayers() {
+            olLayersRef.current.forEach(olLayer => { try { map.removeLayer(olLayer) } catch {} })
+            olLayersRef.current.clear()
 
-        // cleanup: 컴포넌트 사라질 때 지도에서 레이어 전부 제거
+            allLayers.forEach(layer => {
+                // VWorld WMS + style_name: SLD URL 파라미터로 GeoServer 스타일 적용
+                let sldUrl: string | undefined
+                if (layer.type === 'WMS' && layer.url.includes('vworld.kr') && layer.styleName && layer.layerName) {
+                    sldUrl = `${API_URL}/api/geoserver/sld/${encodeURIComponent(layer.styleName)}?layers=${encodeURIComponent(layer.layerName)}`
+                }
+                const olLayer = createOLLayer(
+                    layer,
+                    getLayerVisible(visibleMap, layer),
+                    getLayerOpacity(opacityMap, layer),
+                    sldUrl,
+                )
+                map.addLayer(olLayer)
+                olLayersRef.current.set(layer.id, olLayer)
+            })
+        }
+
+        buildLayers()
         return () => {
-            olLayersRef.current.forEach((olLayer: BaseLayer) => {
-                try {
-                    map.removeLayer(olLayer)
-                } catch {}
+            olLayersRef.current.forEach(olLayer => {
+                try { map.removeLayer(olLayer) } catch {}
             })
             olLayersRef.current.clear()
         }
-    }, [map])
+    }, [map, tree])
 
-    // Store 상태가 바뀔 때마다 OL 레이어에 visible/opacity 동기화
-    // [layers]: layerStore의 tree가 바뀌면 layers도 바뀌고 이 useEffect가 실행됨
     useEffect(() => {
-        layers.forEach((item) => {
-            const olLayer = olLayersRef.current.get(item.id)  // id로 OL 레이어 꺼냄
+        if (!tree) return
+        const allLayers = [...flattenGroupLayers(tree.groups), ...tree.ungroupedLayers]
+        allLayers.forEach(layer => {
+            const olLayer = olLayersRef.current.get(layer.id)
             if (!olLayer) return
-            olLayer.setVisible(item.visible)   // Store의 visible 반영
-            olLayer.setOpacity(item.opacity)   // Store의 opacity 반영
+            olLayer.setVisible(getLayerVisible(visibleMap, layer))
+            olLayer.setOpacity(getLayerOpacity(opacityMap, layer))
         })
-    }, [layers])
+    }, [visibleMap, opacityMap])
 }
