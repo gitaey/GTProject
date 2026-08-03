@@ -20,7 +20,7 @@ function resolveUrl(url: string): string {
 }
 
 
-function createOLLayer(layer: DbLayer, visible: boolean, opacity: number, sldUrl?: string): BaseLayer {
+function createOLLayer(layer: DbLayer, visible: boolean, opacity: number, sldBody?: string): BaseLayer {
     const url = resolveUrl(layer.url)
 
     if (layer.type === 'WMS') {
@@ -33,7 +33,7 @@ function createOLLayer(layer: DbLayer, visible: boolean, opacity: number, sldUrl
         }
         if (isVWorld) {
             wmsParams['key'] = VWORLD_KEY
-            if (sldUrl) wmsParams['SLD'] = sldUrl
+            if (sldBody) wmsParams['SLD_BODY'] = sldBody
         } else {
             wmsParams['STYLES'] = layer.styleName ?? ''
         }
@@ -103,22 +103,33 @@ export function useLayerManager(map: OLMap | null) {
 
         const allLayers = [...flattenGroupLayers(tree.groups), ...tree.ungroupedLayers]
 
-        function buildLayers() {
+        async function buildLayers() {
             const m = map!
+            // VWorld WMS + style_name 레이어는 SLD_BODY로 스타일 적용
+            const sldMap = new Map<string, string>()
+            await Promise.all(
+                allLayers
+                    .filter(l => l.type === 'WMS' && l.url.includes('vworld.kr') && l.styleName && l.layerName)
+                    .map(async l => {
+                        try {
+                            const res = await fetch(
+                                `${API_URL}/api/geoserver/sld/${encodeURIComponent(l.styleName!)}/${encodeURIComponent(l.layerName!)}`,
+                            )
+                            if (res.ok) sldMap.set(l.id.toString(), await res.text())
+                        } catch {}
+                    })
+            )
+
             olLayersRef.current.forEach(olLayer => { try { m.removeLayer(olLayer) } catch {} })
             olLayersRef.current.clear()
 
             allLayers.forEach(layer => {
-                // VWorld WMS + style_name: SLD URL 파라미터로 GeoServer 스타일 적용
-                let sldUrl: string | undefined
-                if (layer.type === 'WMS' && layer.url.includes('vworld.kr') && layer.styleName && layer.layerName) {
-                    sldUrl = `${API_URL}/api/geoserver/sld/${encodeURIComponent(layer.styleName)}/${encodeURIComponent(layer.layerName)}`
-                }
+                const sldBody = sldMap.get(layer.id.toString())
                 const olLayer = createOLLayer(
                     layer,
                     getLayerVisible(visibleMap, layer),
                     getLayerOpacity(opacityMap, layer),
-                    sldUrl,
+                    sldBody,
                 )
                 m.addLayer(olLayer)
                 olLayersRef.current.set(layer.id, olLayer)
