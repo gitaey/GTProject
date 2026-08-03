@@ -35,6 +35,7 @@ function calcScale(resolution: number, center: number[]): string {
 export default function MapStatusBar({ map }: MapStatusBarProps) {
     const [coords, setCoords] = useState<Coords | null>(null)
     const [scale, setScale] = useState<string>('—')
+    const [zoom, setZoom] = useState<number | null>(null)
 
     useEffect(() => {
         if (!map) return
@@ -53,6 +54,7 @@ export default function MapStatusBar({ map }: MapStatusBarProps) {
             const res = map.getView().getResolution() ?? 0
             const center = map.getView().getCenter() ?? [0, 0]
             setScale(calcScale(res, center))
+            setZoom(map.getView().getZoom() ?? null)
         }
 
         map.on('pointermove', moveHandler)
@@ -92,6 +94,14 @@ export default function MapStatusBar({ map }: MapStatusBarProps) {
             <div className="flex items-center gap-1.5 px-3 border-r border-gray-200">
                 <span>축척</span>
                 <span className="text-amber-700 font-semibold">{scale}</span>
+            </div>
+
+            {/* 줌 레벨 */}
+            <div className="flex items-center gap-1.5 px-3">
+                <span>줌 레벨</span>
+                <span className="text-amber-700 font-semibold">
+                    {zoom !== null ? zoom.toFixed(1) : '—'}
+                </span>
             </div>
         </div>
     )

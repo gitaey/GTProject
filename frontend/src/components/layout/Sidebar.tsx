@@ -57,6 +57,7 @@ const menuItems: MenuItem[] = [
         label: 'GeoServer',
         children: [
             { id: 'geoserver-publish', label: '레이어 발행', href: '/admin/geoserver/publish' },
+            { id: 'geoserver-styles', label: '스타일 관리', href: '/admin/geoserver/styles' },
         ],
     },
     {

@@ -97,7 +97,7 @@ function LayerRow({ layer, depth = 0, permissionIds, onTogglePermission, onEdit,
                 {layer.type}
             </span>
 
-            <span className="hidden lg:block text-xs flex-shrink-0" style={{ color: 'var(--text-faint)' }}>
+            <span className="hidden lg:block text-xs flex-shrink-0 w-16 text-center" style={{ color: 'var(--text-faint)' }}>
                 {layer.sourceType}
             </span>
 
