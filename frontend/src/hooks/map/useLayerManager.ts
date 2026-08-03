@@ -104,7 +104,7 @@ export function useLayerManager(map: OLMap | null) {
         const allLayers = [...flattenGroupLayers(tree.groups), ...tree.ungroupedLayers]
 
         function buildLayers() {
-            olLayersRef.current.forEach(olLayer => { try { map.removeLayer(olLayer) } catch {} })
+            olLayersRef.current.forEach(olLayer => { try { map!.removeLayer(olLayer) } catch {} })
             olLayersRef.current.clear()
 
             allLayers.forEach(layer => {
