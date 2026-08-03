@@ -13,7 +13,7 @@ export function useRegionName(map: Map | null): { region: string; loading: boole
 
         async function fetchRegion(lon: number, lat: number) {
             try {
-                const url = `/api/region?lon=${lon}&lat=${lat}`
+                const url = `/proxy/region?lon=${lon}&lat=${lat}`
                 const res = await fetch(url)
                 const json = await res.json()
 
