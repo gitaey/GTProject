@@ -20,7 +20,7 @@ services:
     build: ./bot
     container_name: gtp-bot
     ports:
-      - "8081:8081"
+      - "49093:8081"
     environment:
       DB_URL: ${DB_URL}
       DB_USERNAME: ${DB_USERNAME}

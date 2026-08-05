@@ -38,3 +38,4 @@ discord:
 lostark:
   api:
     key: ${LOSTARK_API_KEY:}
+

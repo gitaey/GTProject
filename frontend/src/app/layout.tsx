@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-    title: '기빵 프로젝트',
+    title: 'GTP',
     description: '기빵 프로젝트',
 }
 

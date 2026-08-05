@@ -192,9 +192,9 @@ const DOMAIN = NODE_ENV === 'production' ? 'https://gitaey-dev.com' : 'http://lo
 ### 커밋 메시지
 한글로 작성. `추가/수정/삭제/리팩토링 + 설명` 형식.
 
-### Git Push
-- **사용자가 명시적으로 "푸시해줘"라고 요청할 때만 `git push` 실행**
-- 커밋 후 자동 푸시 금지
+### Git 커밋 & 푸시
+- **사용자가 명시적으로 요청할 때만 `git commit` 및 `git push` 실행**
+- 코드 수정 후 자동 커밋/푸시 금지
 
 ---
 
@@ -217,6 +217,48 @@ const DOMAIN = NODE_ENV === 'production' ? 'https://gitaey-dev.com' : 'http://lo
 | `/admin/geoserver/publish` | GeoServer 레이어 배포 |
 | `/admin/geoserver/styles` | GeoServer SLD 스타일 관리 |
 | `/admin/user` | 회원 관리 |
+
+---
+
+## 서버 구조
+
+### 기본 정보
+- **OS**: CentOS Linux 7
+- **SSH 포트**: 19922
+- **프로젝트 경로**: `/gtp/GTProject/`
+
+### 도메인 → 포트 매핑 (Nginx)
+| 도메인 | 포트 | 서비스 |
+|---|---|---|
+| `gitaey-dev.com` | 49092 | 프론트엔드 (Next.js) |
+| `api.gitaey-dev.com` | 49090 | 백엔드 (Spring Boot) |
+| `geo.gitaey-dev.com` | 49094 | GeoServer |
+| `sisnet.kr` | 8081 | SISNET_HOMPAGE Tomcat (별개 서비스) |
+| bot (내부용) | 49093 | 기빵봇 (Spring Boot) |
+
+### Docker 컨테이너 (`/gtp/docker/docker-compose.yml`)
+| 컨테이너 | 이미지 | 포트 |
+|---|---|---|
+| gtp-nginx | nginx:alpine | host network |
+| gtp-frontend | node:18 | 49092:3000 |
+| gtp-backend | gtp-backend:latest | 49090:8080 |
+| gtp-postgres | postgis/postgis:16-3.4 | 49091:5432 |
+| gtp-bot | gtp-bot:latest | 49093:8081 |
+| gtp-geoserver | kartoza/geoserver:2.24.0 | 49094:8080 |
+
+- 환경변수: `/gtp/docker/.env`
+- Nginx 설정: `/gtp/nginx/conf.d/gtp.conf`
+- Google 인증: `/gtp/google-credentials.json`
+
+### CI/CD
+- GitHub Actions (`appleboy/ssh-action`) → SSH로 서버 접속 → git pull → docker build/run
+- 워크플로우: `.github/workflows/deploy-backend.yml`, `deploy-frontend.yml`, `deploy-bot.yml`
+- GitHub Secrets: `SERVER_HOST`, `SERVER_USER`, `SSH_PRIVATE_KEY`
+
+### 봇 서비스 배포 시 주의사항
+- **포트 8081은 SISNET_HOMPAGE Tomcat이 점유 중** → 봇은 **49093** 포트 사용 (`49093:8081`)
+- GeoServer는 **49094** 포트 사용 (`49094:8080`)
+- `bot/src/main/resources/application.yml`의 서버 포트는 8081 유지 (컨테이너 내부 포트)
 
 ---
 
