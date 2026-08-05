@@ -45,6 +45,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/layers/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/layer-groups").permitAll()
                 .requestMatchers("/api/layer-groups/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/bot-log/**").permitAll()
+                .requestMatchers("/api/bot/**").authenticated()
                 .anyRequest().permitAll()
             )
             .addFilterBefore(new JwtFilter(jwtUtil), UsernamePasswordAuthenticationFilter.class);
