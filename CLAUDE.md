@@ -187,6 +187,7 @@ const DOMAIN = NODE_ENV === 'production' ? 'https://gitaey-dev.com' : 'http://lo
 ### TypeScript
 - 모든 파라미터에 타입 명시 (implicit any 금지)
 - `interface` 우선 (`type`보다)
+- **프론트엔드 파일 수정 후 반드시 `npx tsc --noEmit`으로 타입 에러 확인 후 완료 선언**
 
 ### 커밋 메시지
 한글로 작성. `추가/수정/삭제/리팩토링 + 설명` 형식.

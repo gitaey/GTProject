@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import Map from 'ol/Map'
 import VectorLayer from 'ol/layer/Vector'
 import VectorSource from 'ol/source/Vector'
+import type { Geometry } from 'ol/geom'
 import GeoJSON from 'ol/format/GeoJSON'
 import Feature from 'ol/Feature'
 import Point from 'ol/geom/Point'
@@ -55,7 +56,7 @@ function makePinStyle(title?: string): Style[] {
 }
 
 export function useParcelHighlight(map: Map | null) {
-    const layerRef = useRef<VectorLayer | null>(null)
+    const layerRef = useRef<VectorLayer<Feature<Geometry>> | null>(null)
     const mapRef = useRef(map)
     mapRef.current = map
 
@@ -76,8 +77,8 @@ export function useParcelHighlight(map: Map | null) {
             const pinFeature = new Feature({ geometry: new Point(fromLonLat([lon, lat])) })
             pinFeature.setStyle(makePinStyle(title))
 
-            const source = new VectorSource({ features: [pinFeature] })
-            const layer = new VectorLayer({ source, zIndex: 200 })
+            const source = new VectorSource<Feature<Geometry>>({ features: [pinFeature as Feature<Geometry>] })
+            const layer = new VectorLayer<Feature<Geometry>>({ source, zIndex: 200 })
             currentMap.addLayer(layer)
             layerRef.current = layer
 

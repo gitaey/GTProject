@@ -97,7 +97,7 @@ export const useLayerStore = create<LayerStore>((set, get) => ({
         try {
             const role = getCurrentRole()
             const token = getToken()
-            const authHeaders = token ? { Authorization: `Bearer ${token}` } : {}
+            const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
 
             // 1) user-access 커스텀 설정 확인
             let treeUrl = role
