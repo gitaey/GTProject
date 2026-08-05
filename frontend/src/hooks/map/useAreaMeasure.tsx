@@ -135,7 +135,7 @@ export function useAreaMeasure(map: Map | null, activeTool: MapTool) {
             geom.on('change', () => {
                 const interior = geom.getInteriorPoint().getCoordinates()
                 const area = getArea(geom, { projection: 'EPSG:5186' })
-                root.render(<MeasureTooltip value={formatArea(area)} />)
+                root.render(<MeasureTooltip value={formatArea(area)} hint="우클릭으로 종료" />)
                 overlay.setPosition([interior[0], interior[1]])
             })
 

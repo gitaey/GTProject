@@ -80,7 +80,7 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Google Sheets API -->
+        <!-- Google Sheets API (GoogleSheetsService, 레이드 일정) -->
         <dependency>
             <groupId>com.google.apis</groupId>
             <artifactId>google-api-services-sheets</artifactId>
@@ -92,14 +92,7 @@
             <version>1.23.0</version>
         </dependency>
 
-        <!-- Discord JDA -->
-        <dependency>
-            <groupId>net.dv8tion</groupId>
-            <artifactId>JDA</artifactId>
-            <version>5.2.1</version>
-        </dependency>
-
-        <!-- Jsoup HTML 크롤링 -->
+        <!-- jsoup (LostarkService 로펙 크롤링) -->
         <dependency>
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>

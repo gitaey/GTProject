@@ -24,3 +24,6 @@ yarn-debug.log*
 .DS_Store
 Thumbs.db
 backend/src/main/resources/google-credentials.json
+bot/src/main/resources/google-credentials.json
+backend/src/main/resources/application-local.yml
+bot/src/main/resources/application-local.yml

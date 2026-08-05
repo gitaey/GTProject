@@ -81,24 +81,20 @@ public class GeoServerController {
 
     /** 인증 불필요 — VWorld WMS SLD 파라미터용 공개 엔드포인트 (경로: /sld/{name}/{layers}) */
     @GetMapping(value = "/sld/{name}/{layers}", produces = "application/xml")
-    public org.springframework.http.ResponseEntity<String> getPublicSldWithLayers(
+    public ResponseEntity<String> getPublicSldWithLayers(
             @PathVariable String name,
             @PathVariable String layers) throws Exception {
         List<String> layerNames = Arrays.asList(layers.split(","));
         String sld = geoServerService.getStyleSldForLayers(name, layerNames);
-        return org.springframework.http.ResponseEntity.ok()
-                .header("Access-Control-Allow-Origin", "*")
-                .body(sld);
+        return ResponseEntity.ok(sld);
     }
 
     /** 인증 불필요 — 레이어명 치환 없이 원본 반환 */
     @GetMapping(value = "/sld/{name}", produces = "application/xml")
-    public org.springframework.http.ResponseEntity<String> getPublicSld(
+    public ResponseEntity<String> getPublicSld(
             @PathVariable String name) throws Exception {
         String sld = geoServerService.getStyleSld(name);
-        return org.springframework.http.ResponseEntity.ok()
-                .header("Access-Control-Allow-Origin", "*")
-                .body(sld);
+        return ResponseEntity.ok(sld);
     }
 
     @PostMapping("/styles")

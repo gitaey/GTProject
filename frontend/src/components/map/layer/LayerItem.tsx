@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { DbLayer, DbLayerGroup } from '@/types/layer'
 import { useLayerStore, flattenGroupLayers, getLayerVisible, getLayerOpacity } from '@/stores/map/layerStore'
@@ -21,22 +21,61 @@ const GROUP_INDENT = [10, 18, 30, 42]
 const LAYER_INDENT = [18, 28, 40, 52]
 const CTRL_INDENT  = [32, 42, 54, 66]
 
-interface LegendEntry { url: string; label: string }
+interface VWorldLegendItem {
+    title: string
+    fillColor: string
+    fillOpacity: number
+    strokeColor: string
+    strokeOpacity: number
+    patternUrl?: string
+}
 
-function getLegendEntries(layer: DbLayer): LegendEntry[] {
-    if (layer.type !== 'WMS' || !layer.layerName) return []
-    if (layer.url.includes('vworld.kr')) {
-        if (!layer.styleName) return []
-        const LAYER_LABELS: Record<string, string> = {
-            'lp_pa_cbnd_bubun': '부번',
-            'lp_pa_cbnd_bonbun': '본번',
-            'lt_c_spbd': '건물',
+function hexToRgba(hex: string, opacity: number): string {
+    const h = hex.replace('#', '')
+    const r = parseInt(h.slice(0, 2), 16)
+    const g = parseInt(h.slice(2, 4), 16)
+    const b = parseInt(h.slice(4, 6), 16)
+    return `rgba(${r},${g},${b},${opacity})`
+}
+
+function parseVWorldLegendStyle(xml: string): VWorldLegendItem[] {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(xml, 'application/xml')
+    const rules = Array.from(doc.querySelectorAll('Rule'))
+    const grouped = new Map<string, VWorldLegendItem>()
+
+    for (const rule of rules) {
+        const title = rule.querySelector('Title')?.textContent?.trim() ?? ''
+        if (!title) continue
+
+        const fillColor = rule.querySelector('Fill > CssParameter[name="fill"]')?.textContent?.trim() ?? '#ffffff'
+        const fillOpacity = parseFloat(rule.querySelector('Fill > CssParameter[name="fill-opacity"]')?.textContent ?? '0')
+        const strokeColor = rule.querySelector('Stroke > CssParameter[name="stroke"]')?.textContent?.trim() ?? '#000000'
+        const strokeOpacity = parseFloat(rule.querySelector('Stroke > CssParameter[name="stroke-opacity"]')?.textContent ?? '1')
+        const patternUrl = rule.querySelector('OnlineResource')?.getAttribute('xlink:href') ?? undefined
+
+        if (!grouped.has(title)) {
+            grouped.set(title, { title, fillColor, fillOpacity, strokeColor, strokeOpacity, patternUrl: patternUrl || undefined })
+        } else {
+            const existing = grouped.get(title)!
+            if (patternUrl) existing.patternUrl = patternUrl
         }
-        return layer.layerName.split(',').map(name => ({
-            url: `/proxy/geoserver/legend/${encodeURIComponent(layer.styleName!)}`,
-            label: LAYER_LABELS[name.trim()] ?? name.trim(),
-        }))
     }
+
+    return [...grouped.values()]
+}
+
+async function fetchVWorldLegend(layerName: string): Promise<VWorldLegendItem[]> {
+    const res = await fetch(`/proxy/vworld/legend-style?layer=${encodeURIComponent(layerName)}`)
+    if (!res.ok) return []
+    const xml = await res.text()
+    return parseVWorldLegendStyle(xml)
+}
+
+interface GsLegendEntry { url: string; label: string }
+
+function getGsLegendEntries(layer: DbLayer): GsLegendEntry[] {
+    if (layer.type !== 'WMS' || !layer.layerName || layer.url.includes('vworld.kr')) return []
     const style = layer.styleName ? `&STYLE=${encodeURIComponent(layer.styleName)}` : ''
     return [{
         url: `${GS_URL}/ows?service=WMS&version=1.1.0&request=GetLegendGraphic&format=image%2Fpng&width=20&height=20&LAYER=${encodeURIComponent(layer.layerName)}${style}`,
@@ -44,15 +83,69 @@ function getLegendEntries(layer: DbLayer): LegendEntry[] {
     }]
 }
 
+function LayerLegend({ layer, ctrlIndent }: { layer: DbLayer; ctrlIndent: number }) {
+    const isVWorld = layer.url.includes('vworld.kr')
+    const [vworldItems, setVworldItems] = useState<VWorldLegendItem[][]>([])
+
+    useEffect(() => {
+        if (!isVWorld || !layer.layerName) return
+        const names = layer.layerName.split(',').map(n => n.trim())
+        Promise.all(names.map(fetchVWorldLegend)).then(setVworldItems)
+    }, [isVWorld, layer.layerName])
+
+    const gsEntries = getGsLegendEntries(layer)
+    const hasLegend = isVWorld ? vworldItems.some(items => items.length > 0) : gsEntries.length > 0
+
+    if (!hasLegend && !isVWorld) return null
+    if (isVWorld && vworldItems.length === 0) return null
+
+    const allVWorldItems = vworldItems.flat()
+    if (isVWorld && allVWorldItems.length === 0) return null
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {isVWorld ? allVWorldItems.map((item, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '10.5px', color: '#94a3b8', flexShrink: 0, minWidth: '34px' }}>
+                        {i === 0 ? '범례' : ''}
+                    </span>
+                    <div style={{ width: '20px', height: '20px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{
+                            width: '14px',
+                            height: '14px',
+                            border: `1px solid ${hexToRgba(item.strokeColor, item.strokeOpacity)}`,
+                            backgroundColor: hexToRgba(item.fillColor, item.fillOpacity),
+                            backgroundImage: item.patternUrl ? `url(${item.patternUrl})` : undefined,
+                            backgroundSize: 'auto',
+                        }} />
+                    </div>
+                    <span style={{ fontSize: '10.5px', color: '#64748b' }}>{item.title}</span>
+                </div>
+            )) : gsEntries.map((entry, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '10.5px', color: '#94a3b8', flexShrink: 0, minWidth: '34px' }}>
+                        {i === 0 ? '범례' : ''}
+                    </span>
+                    <div style={{ width: '20px', height: '20px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={entry.url} alt={entry.label} style={{ display: 'block', width: '20px', height: '20px' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                    </div>
+                    <span style={{ fontSize: '10.5px', color: '#64748b' }}>{entry.label}</span>
+                </div>
+            ))}
+        </div>
+    )
+}
+
 export default function LayerItem({ node, depth = 0 }: Props) {
-    const { toggleLayer, toggleGroup, setOpacity } = useLayerStore()
+    const { toggleLayer, toggleGroup, setOpacity, toggleExpanded, isExpanded } = useLayerStore()
     const visibleMap = useLayerStore(s => s.visibleMap)
     const opacityMap = useLayerStore(s => s.opacityMap)
-    const [expanded, setExpanded] = useState(true)
 
     const di = Math.min(depth, DEPTH_COLORS.length - 1)
 
     if (isGroup(node)) {
+        const expanded = isExpanded(node.id)
         const layers = [...node.layers, ...flattenGroupLayers(node.children)]
         const allVisible = layers.length > 0 && layers.every(l => getLayerVisible(visibleMap, l))
         const someVisible = layers.some(l => getLayerVisible(visibleMap, l))
@@ -69,7 +162,7 @@ export default function LayerItem({ node, depth = 0 }: Props) {
                         borderBottom: expanded ? '0.5px solid #e2e8f0' : 'none',
                         cursor: 'pointer',
                     }}
-                    onClick={() => setExpanded(p => !p)}
+                    onClick={() => toggleExpanded(node.id)}
                 >
                     {depth > 0 && (
                         <div style={{
@@ -107,7 +200,6 @@ export default function LayerItem({ node, depth = 0 }: Props) {
                         {node.children.map(child => (
                             <LayerItem key={child.id} node={child} depth={depth + 1} />
                         ))}
-                        {/* 하위 그룹이 있는 경우, 직속 레이어 위에 구분선 */}
                         {node.layers.length > 0 && (
                             <div style={node.children.length > 0 ? { borderTop: '0.5px solid #e2e8f0' } : {}}>
                                 {node.layers.map(layer => (
@@ -123,7 +215,7 @@ export default function LayerItem({ node, depth = 0 }: Props) {
 
     const visible = getLayerVisible(visibleMap, node)
     const opacity = getLayerOpacity(opacityMap, node)
-    const legendEntries = getLegendEntries(node)
+    const [detailOpen, setDetailOpen] = useState(false)
 
     return (
         <div style={{ background: '#fff' }}>
@@ -132,7 +224,7 @@ export default function LayerItem({ node, depth = 0 }: Props) {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '7px',
-                    padding: `4px 10px 4px ${LAYER_INDENT[di]}px`,
+                    padding: `4px 6px 4px ${LAYER_INDENT[di]}px`,
                     cursor: 'pointer',
                 }}
                 onClick={() => toggleLayer(node.id)}
@@ -157,9 +249,30 @@ export default function LayerItem({ node, depth = 0 }: Props) {
                 }}>
                     {node.name}
                 </span>
+                <button
+                    onClick={e => { e.stopPropagation(); setDetailOpen(p => !p) }}
+                    style={{
+                        flexShrink: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '4px',
+                        border: 'none',
+                        background: 'transparent',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        padding: 0,
+                        transition: 'transform 0.15s',
+                        transform: detailOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    }}
+                >
+                    <ChevronDown size={11} />
+                </button>
             </div>
 
-            {visible && (
+            {visible && detailOpen && (
                 <div style={{
                     paddingBottom: '7px',
                     paddingLeft: `${CTRL_INDENT[di]}px`,
@@ -188,25 +301,7 @@ export default function LayerItem({ node, depth = 0 }: Props) {
                             {Math.round(opacity * 100)}
                         </span>
                     </div>
-                    {legendEntries.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                            {legendEntries.map((entry, i) => (
-                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ fontSize: '10.5px', color: '#94a3b8', flexShrink: 0, minWidth: '34px' }}>
-                                        {i === 0 ? '범례' : ''}
-                                    </span>
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                        src={entry.url}
-                                        alt={entry.label}
-                                        style={{ display: 'block', width: '16px', height: '16px', flexShrink: 0 }}
-                                        onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                                    />
-                                    <span style={{ fontSize: '10.5px', color: '#64748b' }}>{entry.label}</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                    <LayerLegend layer={node} ctrlIndent={CTRL_INDENT[di]} />
                 </div>
             )}
         </div>

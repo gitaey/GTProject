@@ -8,19 +8,18 @@ import XYZ from 'ol/source/XYZ'
 import ImageWMS from 'ol/source/ImageWMS'
 import GeoJSON from 'ol/format/GeoJSON'
 import { bbox as bboxStrategy } from 'ol/loadingstrategy'
-import { useLayerStore, flattenGroupLayers, getLayerVisible, getLayerOpacity } from '@/stores/map/layerStore'
+import { useLayerStore, flattenGroupLayers, getLayerVisible, getLayerOpacity, getBasemapVisibility } from '@/stores/map/layerStore'
 import { DbLayer } from '@/types/layer'
 import BaseLayer from 'ol/layer/Base'
 
 const VWORLD_KEY = process.env.NEXT_PUBLIC_VWORLD_API_KEY ?? ''
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.gitaey-dev.com'
 
 function resolveUrl(url: string): string {
     return url.replace('{VWORLD_KEY}', VWORLD_KEY)
 }
 
 
-function createOLLayer(layer: DbLayer, visible: boolean, opacity: number, sldBody?: string): BaseLayer {
+function createOLLayer(layer: DbLayer, visible: boolean, opacity: number): BaseLayer {
     const url = resolveUrl(layer.url)
 
     if (layer.type === 'WMS') {
@@ -33,7 +32,6 @@ function createOLLayer(layer: DbLayer, visible: boolean, opacity: number, sldBod
         }
         if (isVWorld) {
             wmsParams['key'] = VWORLD_KEY
-            if (sldBody) wmsParams['SLD_BODY'] = sldBody
         } else {
             wmsParams['STYLES'] = layer.styleName ?? ''
         }
@@ -94,7 +92,14 @@ export function useLayerManager(map: OLMap | null) {
     const { tree, loadTree } = useLayerStore()
     const visibleMap = useLayerStore(s => s.visibleMap)
     const opacityMap = useLayerStore(s => s.opacityMap)
+    const basemapMode = useLayerStore(s => s.basemapMode)
     const olLayersRef = useRef<Map<number, BaseLayer>>(new Map())
+
+    function resolveVisible(layer: DbLayer): boolean {
+        const basemapOverride = getBasemapVisibility(layer, basemapMode)
+        if (basemapOverride !== null) return basemapOverride
+        return getLayerVisible(visibleMap, layer)
+    }
 
     useEffect(() => { loadTree() }, [loadTree])
 
@@ -103,34 +108,12 @@ export function useLayerManager(map: OLMap | null) {
 
         const allLayers = [...flattenGroupLayers(tree.groups), ...tree.ungroupedLayers]
 
-        async function buildLayers() {
+        function buildLayers() {
             const m = map!
-            // VWorld WMS + style_name 레이어는 SLD_BODY로 스타일 적용
-            const sldMap = new Map<string, string>()
-            await Promise.all(
-                allLayers
-                    .filter(l => l.type === 'WMS' && l.url.includes('vworld.kr') && l.styleName && l.layerName)
-                    .map(async l => {
-                        try {
-                            const res = await fetch(
-                                `${API_URL}/api/geoserver/sld/${encodeURIComponent(l.styleName!)}/${encodeURIComponent(l.layerName!)}`,
-                            )
-                            if (res.ok) sldMap.set(l.id.toString(), await res.text())
-                        } catch {}
-                    })
-            )
-
             olLayersRef.current.forEach(olLayer => { try { m.removeLayer(olLayer) } catch {} })
             olLayersRef.current.clear()
-
             allLayers.forEach(layer => {
-                const sldBody = sldMap.get(layer.id.toString())
-                const olLayer = createOLLayer(
-                    layer,
-                    getLayerVisible(visibleMap, layer),
-                    getLayerOpacity(opacityMap, layer),
-                    sldBody,
-                )
+                const olLayer = createOLLayer(layer, resolveVisible(layer), getLayerOpacity(opacityMap, layer))
                 m.addLayer(olLayer)
                 olLayersRef.current.set(layer.id, olLayer)
             })
@@ -151,8 +134,8 @@ export function useLayerManager(map: OLMap | null) {
         allLayers.forEach(layer => {
             const olLayer = olLayersRef.current.get(layer.id)
             if (!olLayer) return
-            olLayer.setVisible(getLayerVisible(visibleMap, layer))
+            olLayer.setVisible(resolveVisible(layer))
             olLayer.setOpacity(getLayerOpacity(opacityMap, layer))
         })
-    }, [visibleMap, opacityMap])
+    }, [visibleMap, opacityMap, basemapMode])
 }

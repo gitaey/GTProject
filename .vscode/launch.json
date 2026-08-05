@@ -1,6 +1,7 @@
 {
     "version": "0.2.0",
     "configurations": [
+        
         {
             "type": "node",
             "name": "GTP Frontend",
@@ -9,11 +10,20 @@
             "runtimeArgs": ["run", "dev"],
             "cwd": "${workspaceFolder}/frontend",
             "console": "integratedTerminal",
-            // "serverReadyAction": {
-            //     "pattern": "Local:\\s+(https?://\\S+)",
-            //     "uriFormat": "%s",
-            //     "action": "openExternally"
-            // }
+        },
+        {
+            "type": "java",
+            "name": "GTP Bot",
+            "request": "launch",
+            "mainClass": "com.gtp.BotApplication",
+            "projectName": "bot",
+            "cwd": "${workspaceFolder}/bot",
+            "vmArgs": "-Dfile.encoding=UTF-8 -Dspring.profiles.active=local",
+            "console": "integratedTerminal",
+            "shortenCommandLine": "jarmanifest",
+            "env": {
+                "SPRING_PROFILES_ACTIVE": "local"
+            }
         },
         {
             "type": "java",
@@ -23,6 +33,7 @@
             "projectName": "gtp",
             "cwd": "${workspaceFolder}/backend",
             "vmArgs": "-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dspring.profiles.active=local",
+            "console": "integratedTerminal",
             "shortenCommandLine": "jarmanifest",
             "env": {
                 "SPRING_DEVTOOLS_RESTART_ENABLED": "true",
@@ -34,6 +45,10 @@
         {
             "name": "GTP Full Stack",
             "configurations": ["GTP Backend", "GTP Frontend"]
+        },
+        {
+            "name": "GTP All",
+            "configurations": ["GTP Backend", "GTP Bot", "GTP Frontend"]
         }
     ]
 }

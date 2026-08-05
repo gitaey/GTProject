@@ -5,9 +5,13 @@ import { create } from 'zustand'
 // 유니온 타입: 현재 선택된 도구를 나타냄. 나열된 값 중 하나만 허용
 export type MapTool =
     | 'none'
+    | 'select'
     | 'draw-point'
     | 'draw-line'
     | 'draw-polygon'
+    | 'draw-circle'
+    | 'draw-box'
+    | 'draw-text'
     | 'measure-distance'
     | 'measure-area'
     | 'radius-search'
@@ -28,10 +32,30 @@ export const onClear = (fn: ClearListener) => {
 }
 
 // Store 인터페이스: 상태와 액션(함수)의 구조 정의
+export interface FlyToRequest {
+    lon: number
+    lat: number
+    zoom?: number
+}
+
+// 필지 하이라이트: Zustand 상태를 거치지 않고 직접 콜백 호출 (지연 최소화)
+let parcelHighlighter: ((lon: number, lat: number, title?: string) => void) | null = null
+
+export const registerParcelHighlighter = (fn: typeof parcelHighlighter) => {
+    parcelHighlighter = fn
+}
+
+export const highlightParcel = (lon: number, lat: number, title?: string) => {
+    parcelHighlighter?.(lon, lat, title)
+}
+
 interface MapStore {
     activeTool: MapTool
     setActiveTool: (tool: MapTool) => void
     clearAll: () => void
+    flyToRequest: FlyToRequest | null
+    flyTo: (req: FlyToRequest) => void
+    clearFlyTo: () => void
 }
 
 // create<MapStore>(): Zustand Store 생성
@@ -47,4 +71,7 @@ export const useMapStore = create<MapStore>((set) => ({
         set({ activeTool: 'none' })
         clearListeners.forEach((fn) => fn())  // 등록된 구독자(각 훅) 전부 호출
     },
+    flyToRequest: null,
+    flyTo: (req) => set({ flyToRequest: req }),
+    clearFlyTo: () => set({ flyToRequest: null }),
 }))

@@ -149,7 +149,7 @@ export function useDistanceMeasure(map: Map | null, activeTool: MapTool) {
 
                 // 합계 툴팁
                 const totalDist = getLength(new LineString(coords), { projection: 'EPSG:3857' })
-                root.render(<MeasureTooltip value={`합계: ${formatDistance(totalDist)}`} />)
+                root.render(<MeasureTooltip value={`합계: ${formatDistance(totalDist)}`} hint="우클릭으로 종료" />)
                 overlay.setPosition(last)
 
                 // 구간 툴팁 추가

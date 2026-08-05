@@ -26,7 +26,10 @@
       "mcp__dbeaver__list_tables",
       "mcp__dbeaver__get_table_schema",
       "mcp__dbeaver__execute_query",
-      "mcp__dbeaver__get_database_stats"
+      "mcp__dbeaver__write_query",
+      "mcp__dbeaver__get_database_stats",
+      "Bash",
+      "PowerShell"
     ]
   }
 }

@@ -4,11 +4,15 @@ import com.gtp.domain.map.dto.*;
 import com.gtp.domain.map.entity.Layer;
 import com.gtp.domain.map.entity.LayerGroup;
 import com.gtp.domain.map.entity.LayerPermissionAccess;
+import com.gtp.domain.map.entity.LayerUserAccess;
 import com.gtp.domain.map.repository.LayerPermissionAccessRepository;
 import com.gtp.domain.map.repository.LayerRepository;
 import com.gtp.domain.map.repository.LayerUserAccessRepository;
+import com.gtp.domain.member.user.entity.User;
+import com.gtp.domain.member.user.repository.UserRepository;
 import com.gtp.global.exception.CustomException;
 import com.gtp.global.exception.ErrorCode;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +28,8 @@ public class LayerService {
     private final LayerGroupService layerGroupService;
     private final LayerPermissionAccessRepository permissionAccessRepository;
     private final LayerUserAccessRepository userAccessRepository;
+    private final UserRepository userRepository;
+    private final EntityManager entityManager;
 
     @Transactional(readOnly = true)
     public List<LayerResponse> getAll() {
@@ -69,11 +75,6 @@ public class LayerService {
 
     @Transactional(readOnly = true)
     public LayerTreeResponse getTreeForPermission(String permission) {
-        // SUPER_ADMIN, MAP_ADMIN은 전체
-        if ("SUPER_ADMIN".equals(permission) || "MAP_ADMIN".equals(permission)) {
-            return getTree();
-        }
-
         // 해당 Permission이 접근 가능한 layer id 목록
         Set<Long> allowedIds = permissionAccessRepository.findByPermission(permission)
                 .stream().map(a -> a.getLayer().getId()).collect(Collectors.toSet());
@@ -96,7 +97,7 @@ public class LayerService {
             }
         }
 
-        // 레이어가 하나도 없는 그룹 제거 후 트리 구성
+        // 트리 구성
         List<LayerGroupResponse> roots = new ArrayList<>();
         for (LayerGroupResponse node : nodeMap.values()) {
             if (node.getParentId() == null) {
@@ -107,6 +108,9 @@ public class LayerService {
                 roots.add(node);
             }
         }
+
+        // 접근 가능한 레이어가 하나도 없는 그룹 재귀적으로 제거
+        roots = filterEmptyGroups(roots);
 
         return new LayerTreeResponse(roots, ungrouped);
     }
@@ -190,12 +194,55 @@ public class LayerService {
     @Transactional
     public void setPermissionLayers(String permission, List<Long> layerIds) {
         permissionAccessRepository.deleteByPermission(permission);
+        entityManager.flush();
         for (Long layerId : layerIds) {
             Layer layer = findById(layerId);
             permissionAccessRepository.save(
                     LayerPermissionAccess.builder().permission(permission).layer(layer).build()
             );
         }
+    }
+
+    // User-level 접근 설정
+    @Transactional(readOnly = true)
+    public List<Long> getUserLayerIds(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        List<LayerUserAccess> accesses = userAccessRepository.findByUser(user);
+        if (accesses.isEmpty()) return null; // null = 커스텀 설정 없음 (role 기반 폴백)
+        return accesses.stream().map(a -> a.getLayer().getId()).toList();
+    }
+
+    @Transactional
+    public void setUserLayers(String userId, List<Long> layerIds) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        userAccessRepository.deleteByUser(user);
+        entityManager.flush();
+        for (Long layerId : layerIds) {
+            Layer layer = findById(layerId);
+            userAccessRepository.save(LayerUserAccess.builder().user(user).layer(layer).build());
+        }
+    }
+
+    @Transactional
+    public void clearUserLayers(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        userAccessRepository.deleteByUser(user);
+    }
+
+    private List<LayerGroupResponse> filterEmptyGroups(List<LayerGroupResponse> groups) {
+        List<LayerGroupResponse> result = new ArrayList<>();
+        for (LayerGroupResponse g : groups) {
+            List<LayerGroupResponse> filteredChildren = filterEmptyGroups(g.getChildren());
+            g.getChildren().clear();
+            g.getChildren().addAll(filteredChildren);
+            if (!g.getLayers().isEmpty() || !g.getChildren().isEmpty()) {
+                result.add(g);
+            }
+        }
+        return result;
     }
 
     public Layer findById(Long id) {

@@ -4,18 +4,17 @@
   "files.autoSave": "onFocusChange",
   "files.autoSaveDelay": 1000,
   "java.configuration.updateBuildConfiguration": "automatic",
-  "terminal.integrated.defaultProfile.windows": "Git Bash",
+  "terminal.integrated.defaultProfile.windows": "mPowerShell",
   "terminal.integrated.profiles.windows": {
     "mPowerShell": {
       "source": "PowerShell",
       "args": [
         "-NoExit",
-        "-Command ",
-        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::InputEncoding = [System.Text.Encoding]::UTF8"
+        "-Command",
+        "chcp 65001 | Out-Null; [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::InputEncoding = [System.Text.Encoding]::UTF8"
       ]
     }
   },
-  "terminal.integrated.defaultProfile.windows": "mPowerShell",
   "terminal.integrated.env.windows": {
     "JAVA_TOOL_OPTIONS": "-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"
   },

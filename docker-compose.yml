@@ -1,0 +1,31 @@
+services:
+
+  backend:
+    build: ./backend
+    container_name: gtp-backend
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      GEOSERVER_URL: ${GEOSERVER_URL}
+      GEOSERVER_ADMIN_USER: ${GEOSERVER_ADMIN_USER}
+      GEOSERVER_ADMIN_PASSWORD: ${GEOSERVER_ADMIN_PASSWORD}
+      LOSTARK_API_KEY: ${LOSTARK_API_KEY}
+    restart: unless-stopped
+
+  bot:
+    build: ./bot
+    container_name: gtp-bot
+    ports:
+      - "8081:8081"
+    environment:
+      DB_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+      GOOGLE_CREDENTIALS_JSON: ${GOOGLE_CREDENTIALS_JSON}
+      LOSTARK_API_KEY: ${LOSTARK_API_KEY}
+    restart: unless-stopped

@@ -1,11 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
 import {
     ChevronDown, ChevronRight, GripVertical, Layers, Pencil,
-    Plus, Save, Trash2, X, Eye, EyeOff, FolderPlus,
+    Plus, Save, Trash2, X, FolderPlus,
 } from 'lucide-react'
 import {
     DndContext, DragEndEvent, DragOverlay, DragStartEvent,
@@ -21,6 +21,7 @@ import {
     PERMISSION_OPTIONS,
 } from '@/types/layer'
 import { getToken } from '@/stores/authStore'
+import { useLayerStore } from '@/stores/map/layerStore'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
@@ -57,14 +58,40 @@ interface LayerRowProps {
     depth?: number
     permissionIds: Set<number> | null
     onTogglePermission?: (id: number) => void
+    onToggleVisible?: (id: number, visible: boolean) => void
+    onUpdateLayer?: (id: number, patch: Partial<Pick<DbLayer, 'opacity' | 'minZoom' | 'maxZoom'>>) => void
     onEdit: (l: DbLayer) => void
     onDelete: (l: DbLayer) => void
     isDragOverlay?: boolean
 }
 
-function LayerRow({ layer, depth = 0, permissionIds, onTogglePermission, onEdit, onDelete, isDragOverlay }: LayerRowProps) {
+const inlineInputStyle: React.CSSProperties = {
+    width: '56px', padding: '4px 6px', fontSize: '12px', textAlign: 'center',
+    background: 'var(--bg-page)', border: '1px solid var(--border)',
+    borderRadius: '4px', color: 'var(--text-primary)', outline: 'none',
+}
+
+function LayerRow({ layer, depth = 0, permissionIds, onTogglePermission, onToggleVisible, onUpdateLayer, onEdit, onDelete, isDragOverlay }: LayerRowProps) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
         useSortable({ id: `layer-${layer.id}`, data: { type: 'layer', layer } })
+
+    const [opacity, setOpacity]   = useState(Math.round((layer.opacity ?? 1) * 100))
+    const [minZoom, setMinZoom]   = useState<string>(layer.minZoom != null ? String(layer.minZoom) : '')
+    const [maxZoom, setMaxZoom]   = useState<string>(layer.maxZoom != null ? String(layer.maxZoom) : '')
+
+    useEffect(() => { setOpacity(Math.round((layer.opacity ?? 1) * 100)) }, [layer.opacity])
+    useEffect(() => { setMinZoom(layer.minZoom != null ? String(layer.minZoom) : '') }, [layer.minZoom])
+    useEffect(() => { setMaxZoom(layer.maxZoom != null ? String(layer.maxZoom) : '') }, [layer.maxZoom])
+
+    const saveOpacity = (val: number) => {
+        const clamped = Math.min(100, Math.max(0, val))
+        setOpacity(clamped)
+        onUpdateLayer?.(layer.id, { opacity: clamped / 100 })
+    }
+    const saveZoom = (field: 'minZoom' | 'maxZoom', raw: string) => {
+        const num = raw === '' ? null : Number(raw)
+        onUpdateLayer?.(layer.id, { [field]: num })
+    }
 
     const style: React.CSSProperties = {
         transform: CSS.Transform.toString(transform),
@@ -75,7 +102,7 @@ function LayerRow({ layer, depth = 0, permissionIds, onTogglePermission, onEdit,
 
     return (
         <div ref={setNodeRef}
-            className="flex items-center gap-2 pr-3 py-2.5 group/row"
+            className="flex items-center gap-5 pr-4 py-3 group/row"
             style={{ ...style, borderBottom: '1px solid var(--border-subtle)' }}>
 
             <div {...listeners} {...attributes}
@@ -84,51 +111,96 @@ function LayerRow({ layer, depth = 0, permissionIds, onTogglePermission, onEdit,
                 <GripVertical size={13} />
             </div>
 
-            {layer.visible
-                ? <Eye size={13} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
-                : <EyeOff size={13} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />}
+            <input
+                type="checkbox"
+                checked={permissionIds !== null ? permissionIds.has(layer.id) : layer.visible}
+                onChange={e => {
+                    e.stopPropagation()
+                    if (permissionIds !== null) onTogglePermission?.(layer.id)
+                    else onToggleVisible?.(layer.id, e.target.checked)
+                }}
+                onClick={e => e.stopPropagation()}
+                className="w-3.5 h-3.5 flex-shrink-0 cursor-pointer"
+                style={{ accentColor: 'var(--accent)' }} />
 
-            <span className="flex-1 text-sm truncate font-medium" style={{ color: 'var(--text-primary)' }}>
+            <span className="text-sm truncate font-medium" style={{ color: 'var(--text-primary)', minWidth: 0, flex: 1 }}>
                 {layer.name}
             </span>
 
-            <span className="text-xs px-1.5 py-0.5 rounded font-mono flex-shrink-0"
-                style={{ background: `${TYPE_COLOR[layer.type]}22`, color: TYPE_COLOR[layer.type] }}>
-                {layer.type}
-            </span>
+            {permissionIds === null && (
+                <>
+                    {/* 인라인 편집: 불투명도 / 최소줌 / 최대줌 — 항상 표시 */}
+                    <div className="flex items-center gap-4 flex-shrink-0">
+                        <div className="flex items-center gap-1">
+                            <span className="text-xs" style={{ color: 'var(--text-faint)' }}>투명도</span>
+                            <input type="number" min={0} max={100} value={opacity}
+                                style={inlineInputStyle}
+                                onChange={e => setOpacity(Number(e.target.value))}
+                                onBlur={e => saveOpacity(Number(e.target.value))}
+                                onKeyDown={e => e.key === 'Enter' && saveOpacity(Number((e.target as HTMLInputElement).value))}
+                                onClick={e => e.stopPropagation()} />
+                            <span className="text-xs" style={{ color: 'var(--text-faint)' }}>%</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <span className="text-xs" style={{ color: 'var(--text-faint)' }}>줌</span>
+                            <input type="number" min={0} max={22} placeholder="min" value={minZoom}
+                                style={inlineInputStyle}
+                                onChange={e => setMinZoom(e.target.value)}
+                                onBlur={e => saveZoom('minZoom', e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && saveZoom('minZoom', (e.target as HTMLInputElement).value)}
+                                onClick={e => e.stopPropagation()} />
+                            <span className="text-xs" style={{ color: 'var(--text-faint)' }}>~</span>
+                            <input type="number" min={0} max={22} placeholder="max" value={maxZoom}
+                                style={inlineInputStyle}
+                                onChange={e => setMaxZoom(e.target.value)}
+                                onBlur={e => saveZoom('maxZoom', e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && saveZoom('maxZoom', (e.target as HTMLInputElement).value)}
+                                onClick={e => e.stopPropagation()} />
+                        </div>
+                    </div>
 
-            <span className="hidden lg:block text-xs flex-shrink-0 w-16 text-center" style={{ color: 'var(--text-faint)' }}>
-                {layer.sourceType}
-            </span>
+                    <span className="hidden lg:block text-xs flex-shrink-0 w-16 text-center" style={{ color: 'var(--text-faint)' }}>
+                        {layer.sourceType}
+                    </span>
 
-            {permissionIds !== null ? (
-                <input type="checkbox" checked={permissionIds.has(layer.id)}
-                    onChange={() => onTogglePermission?.(layer.id)}
-                    className="w-4 h-4 flex-shrink-0 cursor-pointer"
-                    style={{ accentColor: 'var(--accent)' }} />
-            ) : (
-                <div className="flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity flex-shrink-0">
-                    <button onClick={() => onEdit(layer)}
-                        className="p-1.5 rounded cursor-pointer" style={{ color: 'var(--text-faint)' }}>
-                        <Pencil size={13} />
-                    </button>
-                    <button onClick={() => onDelete(layer)}
-                        className="p-1.5 rounded cursor-pointer" style={{ color: 'var(--text-faint)' }}>
-                        <Trash2 size={13} />
-                    </button>
-                </div>
+                    <span className="text-xs px-1.5 py-0.5 rounded font-mono flex-shrink-0"
+                        style={{ background: `${TYPE_COLOR[layer.type]}22`, color: TYPE_COLOR[layer.type] }}>
+                        {layer.type}
+                    </span>
+
+                    {/* 편집/삭제 — 항상 표시, 제일 오른쪽 */}
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                        <button onClick={() => onEdit(layer)}
+                            className="p-1.5 rounded cursor-pointer" style={{ color: 'var(--text-faint)' }}>
+                            <Pencil size={13} />
+                        </button>
+                        <button onClick={() => onDelete(layer)}
+                            className="p-1.5 rounded cursor-pointer" style={{ color: 'var(--text-faint)' }}>
+                            <Trash2 size={13} />
+                        </button>
+                    </div>
+                </>
             )}
+
+            {permissionIds === null && null /* badges moved inside the else branch above */}
         </div>
     )
 }
 
 // ─── Sortable Group Row ────────────────────────────────────────────────────
 
+function flattenGroupAllLayers(group: DbLayerGroup): DbLayer[] {
+    return [...group.layers, ...group.children.flatMap(flattenGroupAllLayers)]
+}
+
 interface GroupNodeProps {
     group: DbLayerGroup
     depth?: number
     permissionIds: Set<number> | null
     onTogglePermission?: (id: number) => void
+    onToggleGroupPermission?: (ids: number[], allSelected: boolean) => void
+    onToggleVisible?: (id: number, visible: boolean) => void
+    onUpdateLayer?: (id: number, patch: Partial<Pick<DbLayer, 'opacity' | 'minZoom' | 'maxZoom'>>) => void
     onEditLayer: (l: DbLayer) => void
     onDeleteLayer: (l: DbLayer) => void
     onEditGroup: (g: DbLayerGroup) => void
@@ -138,11 +210,24 @@ interface GroupNodeProps {
 }
 
 function GroupNode({
-    group, depth = 0, permissionIds, onTogglePermission,
+    group, depth = 0, permissionIds, onTogglePermission, onToggleGroupPermission,
+    onToggleVisible, onUpdateLayer,
     onEditLayer, onDeleteLayer, onEditGroup, onDeleteGroup, onAddLayerToGroup, onAddGroupToGroup,
 }: GroupNodeProps) {
-    const [expanded, setExpanded] = useState(true)
+    const { toggleExpanded, isExpanded } = useLayerStore()
+    const expanded = isExpanded(group.id)
     const layerIds = group.layers.map(l => `layer-${l.id}`)
+
+    const allLeafLayers = flattenGroupAllLayers(group)
+    const allLeafIds = allLeafLayers.map(l => l.id)
+
+    // 권한 탭 체크박스 상태
+    const allPermSelected = permissionIds !== null && allLeafIds.length > 0 && allLeafIds.every(id => permissionIds.has(id))
+    const somePermSelected = permissionIds !== null && allLeafIds.some(id => permissionIds.has(id))
+
+    // 트리 탭 체크박스 상태
+    const allVisible = permissionIds === null && allLeafIds.length > 0 && allLeafLayers.every(l => l.visible)
+    const someVisible = permissionIds === null && allLeafLayers.some(l => l.visible)
 
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
         useSortable({ id: `group-${group.id}`, data: { type: 'group', group } })
@@ -168,10 +253,29 @@ function GroupNode({
                     <GripVertical size={13} />
                 </div>
 
-                <button onClick={() => setExpanded(e => !e)} className="cursor-pointer flex-shrink-0"
+                <button onClick={() => toggleExpanded(group.id)} className="cursor-pointer flex-shrink-0"
                     style={{ color: 'var(--text-secondary)' }}>
                     {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 </button>
+
+                {/* 그룹 전체 선택 체크박스 */}
+                {permissionIds !== null ? (
+                    <input type="checkbox"
+                        checked={allPermSelected}
+                        ref={el => { if (el) el.indeterminate = !allPermSelected && somePermSelected }}
+                        onChange={() => onToggleGroupPermission?.(allLeafIds, allPermSelected)}
+                        onClick={e => e.stopPropagation()}
+                        className="w-4 h-4 flex-shrink-0 cursor-pointer"
+                        style={{ accentColor: 'var(--accent)' }} />
+                ) : (
+                    <input type="checkbox"
+                        checked={allVisible}
+                        ref={el => { if (el) el.indeterminate = !allVisible && someVisible }}
+                        onChange={() => allLeafLayers.forEach(l => onToggleVisible?.(l.id, !allVisible))}
+                        onClick={e => e.stopPropagation()}
+                        className="w-3.5 h-3.5 flex-shrink-0 cursor-pointer"
+                        style={{ accentColor: 'var(--accent)' }} />
+                )}
 
                 <span className="flex-1 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                     {group.name}
@@ -210,6 +314,8 @@ function GroupNode({
                         {group.children.map(child => (
                             <GroupNode key={child.id} group={child} depth={depth + 1}
                                 permissionIds={permissionIds} onTogglePermission={onTogglePermission}
+                                onToggleGroupPermission={onToggleGroupPermission}
+                                onToggleVisible={onToggleVisible} onUpdateLayer={onUpdateLayer}
                                 onEditLayer={onEditLayer} onDeleteLayer={onDeleteLayer}
                                 onEditGroup={onEditGroup} onDeleteGroup={onDeleteGroup}
                                 onAddLayerToGroup={onAddLayerToGroup}
@@ -222,6 +328,7 @@ function GroupNode({
                         {group.layers.map(layer => (
                             <LayerRow key={layer.id} layer={layer} depth={depth + 1}
                                 permissionIds={permissionIds} onTogglePermission={onTogglePermission}
+                                onToggleVisible={onToggleVisible} onUpdateLayer={onUpdateLayer}
                                 onEdit={onEditLayer} onDelete={onDeleteLayer} />
                         ))}
                     </SortableContext>
@@ -369,6 +476,18 @@ function LayerModal({ mode, layer, groups, defaultGroupId, onClose, onSaved }: {
                             <input type="number" min={0} max={1} step={0.1} value={form.opacity}
                                 onChange={e => sf('opacity', Number(e.target.value))}
                                 className="w-full px-3 py-2 text-sm focus:outline-none" style={inputStyle} />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>최소 줌</label>
+                            <input type="number" min={0} max={22} value={form.minZoom} onChange={e => sf('minZoom', e.target.value)}
+                                placeholder="0" className="w-full px-3 py-2 text-sm focus:outline-none" style={inputStyle} />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>최대 줌</label>
+                            <input type="number" min={0} max={22} value={form.maxZoom} onChange={e => sf('maxZoom', e.target.value)}
+                                placeholder="22" className="w-full px-3 py-2 text-sm focus:outline-none" style={inputStyle} />
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -580,6 +699,16 @@ export default function LayerPage() {
         collect(tree.groups)
     }
 
+    const togglePermGroup = (ids: number[], allSelected: boolean) => {
+        setPermIds(prev => {
+            const next = new Set(prev)
+            if (allSelected) ids.forEach(id => next.delete(id))
+            else ids.forEach(id => next.add(id))
+            return next
+        })
+        setPermDirty(true)
+    }
+
     const togglePermLayer = (id: number) => {
         setPermIds(prev => {
             const next = new Set(prev)
@@ -773,6 +902,78 @@ export default function LayerPage() {
         }
     }
 
+    const handleUpdateLayer = useCallback(async (id: number, patch: Partial<Pick<DbLayer, 'opacity' | 'minZoom' | 'maxZoom'>>) => {
+        if (!tree) return
+        const findLayer = (groups: DbLayerGroup[]): DbLayer | null => {
+            for (const g of groups) {
+                const found = g.layers.find(l => l.id === id) ?? findLayer(g.children)
+                if (found) return found
+            }
+            return null
+        }
+        const layer = findLayer(tree.groups) ?? tree.ungroupedLayers.find(l => l.id === id)
+        if (!layer) return
+        const updated = { ...layer, ...patch }
+        setTree(prev => {
+            if (!prev) return prev
+            const next: LayerTreeResponse = JSON.parse(JSON.stringify(prev))
+            const update = (layers: DbLayer[]) => layers.forEach(l => { if (l.id === id) Object.assign(l, patch) })
+            const walk = (groups: DbLayerGroup[]) => groups.forEach(g => { update(g.layers); walk(g.children) })
+            walk(next.groups); update(next.ungroupedLayers)
+            return next
+        })
+        try {
+            await apiFetch(`/api/layers/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    name: updated.name, type: updated.type, sourceType: updated.sourceType,
+                    url: updated.url, layerName: updated.layerName ?? null, styleName: updated.styleName ?? null,
+                    styleConfig: updated.styleConfig ?? null, format: updated.format ?? null,
+                    projection: updated.projection ?? null, minZoom: updated.minZoom ?? null,
+                    maxZoom: updated.maxZoom ?? null, opacity: updated.opacity, visible: updated.visible,
+                    sortOrder: updated.sortOrder, groupId: updated.groupId ?? null, description: updated.description ?? null,
+                }),
+            })
+        } catch { loadTree() }
+    }, [tree, loadTree])
+
+    const handleToggleVisible = async (id: number, visible: boolean) => {
+        if (!tree) return
+        // 낙관적 업데이트
+        setTree(prev => {
+            if (!prev) return prev
+            const next: LayerTreeResponse = JSON.parse(JSON.stringify(prev))
+            const update = (layers: DbLayer[]) => layers.forEach(l => { if (l.id === id) l.visible = visible })
+            const walk = (groups: DbLayerGroup[]) => groups.forEach(g => { update(g.layers); walk(g.children) })
+            walk(next.groups)
+            update(next.ungroupedLayers)
+            return next
+        })
+        // 현재 레이어 데이터 찾기
+        const findLayer = (groups: DbLayerGroup[]): DbLayer | null => {
+            for (const g of groups) {
+                const found = g.layers.find(l => l.id === id) ?? findLayer(g.children)
+                if (found) return found
+            }
+            return null
+        }
+        const layer = findLayer(tree.groups) ?? tree.ungroupedLayers.find(l => l.id === id)
+        if (!layer) return
+        try {
+            await apiFetch(`/api/layers/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    name: layer.name, type: layer.type, sourceType: layer.sourceType,
+                    url: layer.url, layerName: layer.layerName ?? null, styleName: layer.styleName ?? null,
+                    styleConfig: layer.styleConfig ?? null, format: layer.format ?? null,
+                    projection: layer.projection ?? null, minZoom: layer.minZoom ?? null,
+                    maxZoom: layer.maxZoom ?? null, opacity: layer.opacity, visible,
+                    sortOrder: layer.sortOrder, groupId: layer.groupId ?? null, description: layer.description ?? null,
+                }),
+            })
+        } catch { loadTree() }
+    }
+
     const handleDeleteLayer = async (layer: DbLayer) => {
         await apiFetch(`/api/layers/${layer.id}`, { method: 'DELETE' })
         setDeleteModal(null)
@@ -848,8 +1049,27 @@ export default function LayerPage() {
                         style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
 
                         {tab === 'permission' && (
-                            <div className="px-4 py-3 flex items-center gap-2"
+                            <div className="px-4 py-3 flex items-center gap-3"
                                 style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-hover)' }}>
+                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={allLayers.length > 0 && allLayers.every(l => permIds.has(l.id))}
+                                        ref={el => {
+                                            if (el) el.indeterminate =
+                                                allLayers.some(l => permIds.has(l.id)) &&
+                                                !allLayers.every(l => permIds.has(l.id))
+                                        }}
+                                        onChange={e => {
+                                            const allIds = allLayers.map(l => l.id)
+                                            setPermIds(e.target.checked ? new Set(allIds) : new Set())
+                                            setPermDirty(true)
+                                        }}
+                                        className="w-4 h-4 cursor-pointer"
+                                        style={{ accentColor: 'var(--accent)' }}
+                                    />
+                                    <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>전체선택</span>
+                                </label>
                                 <span className="text-xs" style={{ color: 'var(--text-faint)' }}>
                                     체크된 레이어만 해당 권한 사용자에게 표시됩니다.
                                 </span>
@@ -881,6 +1101,9 @@ export default function LayerPage() {
                                         <GroupNode key={group.id} group={group}
                                             permissionIds={tab === 'permission' ? permIds : null}
                                             onTogglePermission={togglePermLayer}
+                                            onToggleGroupPermission={tab === 'permission' ? togglePermGroup : undefined}
+                                            onToggleVisible={tab === 'tree' ? handleToggleVisible : undefined}
+                                            onUpdateLayer={tab === 'tree' ? handleUpdateLayer : undefined}
                                             onEditLayer={l => setLayerModal({ mode: 'edit', layer: l })}
                                             onDeleteLayer={l => setDeleteModal({ type: 'layer', item: l })}
                                             onEditGroup={g => setGroupModal({ mode: 'edit', group: g })}
@@ -904,6 +1127,8 @@ export default function LayerPage() {
                                                 <LayerRow key={layer.id} layer={layer}
                                                     permissionIds={tab === 'permission' ? permIds : null}
                                                     onTogglePermission={togglePermLayer}
+                                                    onToggleVisible={tab === 'tree' ? handleToggleVisible : undefined}
+                                                    onUpdateLayer={tab === 'tree' ? handleUpdateLayer : undefined}
                                                     onEdit={l => setLayerModal({ mode: 'edit', layer: l })}
                                                     onDelete={l => setDeleteModal({ type: 'layer', item: l })} />
                                             ))}

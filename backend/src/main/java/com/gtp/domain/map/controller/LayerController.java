@@ -5,6 +5,8 @@ import com.gtp.domain.map.service.LayerService;
 import com.gtp.global.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -63,5 +65,30 @@ public class LayerController {
                                                   @RequestBody List<Long> layerIds) {
         layerService.setPermissionLayers(permission, layerIds);
         return ApiResponse.ok(null);
+    }
+
+    @GetMapping("/user-access")
+    public ApiResponse<List<Long>> getUserLayers() {
+        String userId = currentUserId();
+        return ApiResponse.ok(layerService.getUserLayerIds(userId));
+    }
+
+    @PutMapping("/user-access")
+    public ApiResponse<Void> setUserLayers(@RequestBody List<Long> layerIds) {
+        String userId = currentUserId();
+        layerService.setUserLayers(userId, layerIds);
+        return ApiResponse.ok(null);
+    }
+
+    @DeleteMapping("/user-access")
+    public ApiResponse<Void> clearUserLayers() {
+        String userId = currentUserId();
+        layerService.clearUserLayers(userId);
+        return ApiResponse.ok(null);
+    }
+
+    private String currentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return (String) auth.getPrincipal();
     }
 }
