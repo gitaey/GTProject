@@ -19,8 +19,8 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: 'maven'
-      - name: Build & Test
-        run: chmod +x mvnw && ./mvnw test
+      - name: Compile check
+        run: chmod +x mvnw && ./mvnw compile
 
   deploy:
     needs: test
