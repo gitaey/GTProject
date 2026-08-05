@@ -192,6 +192,10 @@ const DOMAIN = NODE_ENV === 'production' ? 'https://gitaey-dev.com' : 'http://lo
 ### 커밋 메시지
 한글로 작성. `추가/수정/삭제/리팩토링 + 설명` 형식.
 
+### Git Push
+- **사용자가 명시적으로 "푸시해줘"라고 요청할 때만 `git push` 실행**
+- 커밋 후 자동 푸시 금지
+
 ---
 
 ## 페이지(라우트) 목록
