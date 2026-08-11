@@ -49,7 +49,7 @@ public class GeoTiffService {
             Path filePath = uploadPath.toAbsolutePath().resolve(storedName);
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
             convertToCog(filePath);
-            double[] wgs84 = getWgs84Bounds(storedName);
+            double[] wgs84 = getWgs84Bounds(filePath);
 
             GeoTiffFile entity = GeoTiffFile.builder()
                     .originalName(originalName)
@@ -120,31 +120,35 @@ public class GeoTiffService {
         tryTitilerCogConvert(srcPath);
     }
 
-    private double[] getWgs84Bounds(String filename) {
-        String script = String.format("""
-            import rasterio
-            from rasterio.warp import transform_bounds
-            with rasterio.open('/data/%s') as r:
-                b = transform_bounds(r.crs, 'EPSG:4326', *r.bounds)
-                print(f'{b[0]},{b[1]},{b[2]},{b[3]}')
-            """, filename);
+    private double[] getWgs84Bounds(Path filePath) {
         try {
-            ProcessBuilder pb = new ProcessBuilder("docker", "exec", "gtp-titiler-local", "python", "-c", script);
+            ProcessBuilder pb = new ProcessBuilder("gdalinfo", "-json", filePath.toString());
             pb.redirectErrorStream(true);
             Process p = pb.start();
             String output = new String(p.getInputStream().readAllBytes()).trim();
             p.waitFor();
-            String[] parts = output.split(",");
-            if (parts.length == 4) {
-                return new double[]{
-                    Double.parseDouble(parts[0]), Double.parseDouble(parts[1]),
-                    Double.parseDouble(parts[2]), Double.parseDouble(parts[3])
-                };
+            // wgs84Extent: {"type":"Polygon","coordinates":[[[minLon,minLat],[maxLon,minLat],[maxLon,maxLat],[minLon,maxLat],[minLon,minLat]]]}
+            int idx = output.indexOf("\"wgs84Extent\"");
+            if (idx < 0) return null;
+            String sub = output.substring(idx);
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("\\[([\\-0-9.]+),([\\-0-9.]+)\\]")
+                .matcher(sub);
+            double minLon = Double.MAX_VALUE, minLat = Double.MAX_VALUE;
+            double maxLon = -Double.MAX_VALUE, maxLat = -Double.MAX_VALUE;
+            while (m.find()) {
+                double lon = Double.parseDouble(m.group(1));
+                double lat = Double.parseDouble(m.group(2));
+                minLon = Math.min(minLon, lon); maxLon = Math.max(maxLon, lon);
+                minLat = Math.min(minLat, lat); maxLat = Math.max(maxLat, lat);
             }
+            if (minLon == Double.MAX_VALUE) return null;
+            log.info("WGS84 bounds: [{}, {}, {}, {}]", minLon, minLat, maxLon, maxLat);
+            return new double[]{minLon, minLat, maxLon, maxLat};
         } catch (Exception e) {
             log.warn("WGS84 bounds 계산 실패: {}", e.getMessage());
+            return null;
         }
-        return null;
     }
 
     private boolean tryGdalTranslate(Path srcPath) {
