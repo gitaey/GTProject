@@ -12,8 +12,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    # Docker CI/CD 배포 테스트
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect

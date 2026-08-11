@@ -29,8 +29,9 @@ export function useGeoTiffLayer(map: OlMap | null) {
       ? transformExtent([item.minLon, item.minLat, item.maxLon, item.maxLat], 'EPSG:4326', 'EPSG:3857')
       : undefined
 
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || ''
     const layer = new TileLayer({
-      source: new XYZ({ url: item.tileUrl, crossOrigin: 'anonymous' }),
+      source: new XYZ({ url: `${apiBase}${item.tileUrl}`, crossOrigin: 'anonymous' }),
       zIndex: 150,
       extent: layerExtent,
     })
