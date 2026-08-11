@@ -5,11 +5,17 @@
 //   모바일 (<768px):  hidden → 표시 안 함 (MobileLayerButton 사용)
 //   태블릿 (768px~):  absolute → 지도 위에 떠서 겹침 (지도 크기 유지)
 //   데스크탑 (1024px+): lg:relative lg:flex-shrink-0 → 지도 옆에 고정 (지도가 줄어듦)
+import OlMap from 'ol/Map'
 import { usePanelStore } from '@/stores/map/panelStore'
 import LayerPanel from './LayerPanel'
 import EtcPanel from './EtcPanel'
+import ImagePanel from './ImagePanel'
 
-export default function PanelLeft() {
+interface PanelLeftProps {
+    map?: OlMap | null
+}
+
+export default function PanelLeft({ map }: PanelLeftProps) {
     const { activePanel } = usePanelStore()
 
     if (!activePanel) return null
@@ -22,6 +28,7 @@ export default function PanelLeft() {
             lg:relative lg:flex-shrink-0 lg:shadow-none
         `}>
             {activePanel === 'layer'   && <LayerPanel />}
+            {activePanel === 'image'   && <ImagePanel map={map ?? null} />}
             {activePanel === 'etc'     && <EtcPanel />}
         </div>
     )

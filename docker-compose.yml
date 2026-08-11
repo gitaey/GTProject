@@ -29,3 +29,37 @@ services:
       GOOGLE_CREDENTIALS_JSON: ${GOOGLE_CREDENTIALS_JSON}
       LOSTARK_API_KEY: ${LOSTARK_API_KEY}
     restart: unless-stopped
+
+  titiler:
+    image: ghcr.io/developmentseed/titiler
+    container_name: gtp-titiler
+    ports:
+      - "49095:8000"
+    volumes:
+      - /gtp/geotiff:/data
+    environment:
+      - CPL_TMPDIR=/tmp
+      - GDAL_CACHEMAX=200
+      - VSI_CACHE=TRUE
+      - VSI_CACHE_SIZE=1000000
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: gtp-backend
+    ports:
+      - "8080:8080"
+    volumes:
+      - /gtp/geotiff:/data/geotiff
+    environment:
+      DB_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      GEOSERVER_URL: ${GEOSERVER_URL}
+      GEOSERVER_ADMIN_USER: ${GEOSERVER_ADMIN_USER}
+      GEOSERVER_ADMIN_PASSWORD: ${GEOSERVER_ADMIN_PASSWORD}
+      LOSTARK_API_KEY: ${LOSTARK_API_KEY}
+      GEOTIFF_UPLOAD_DIR: /data/geotiff
+      TITILER_URL: http://gtp-titiler:8000
+    restart: unless-stopped

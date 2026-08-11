@@ -28,3 +28,6 @@ bot/src/main/resources/google-credentials.json
 backend/src/main/resources/application-local.yml
 bot/src/main/resources/application-local.yml
 bot/target/
+
+# GeoTIFF 업로드 디렉토리
+geotiff-uploads/

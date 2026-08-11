@@ -68,7 +68,7 @@ export default function MapView({ center, zoom, className }: MapViewProps) {
 
             <div className="relative flex flex-1 overflow-hidden">
                 <NavLeft />
-                <PanelLeft />
+                <PanelLeft map={mapRef} />
 
                 <div className="relative flex-1 h-full"
                     onMouseMove={hint ? (e) => {

@@ -34,6 +34,11 @@ public enum ErrorCode {
     LAYER_NOT_FOUND(HttpStatus.NOT_FOUND, "레이어를 찾을 수 없습니다."),
     LAYER_GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "레이어 그룹을 찾을 수 없습니다."),
 
+    // GeoTIFF 관련
+    GEOTIFF_NOT_FOUND(HttpStatus.NOT_FOUND, "GeoTIFF 파일을 찾을 수 없습니다."),
+    INVALID_FILE_TYPE(HttpStatus.BAD_REQUEST, "GeoTIFF(.tif, .tiff) 파일만 업로드 가능합니다."),
+    FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "파일 업로드에 실패했습니다."),
+
     // 인증 관련
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다."),
     ACCOUNT_INACTIVE(HttpStatus.FORBIDDEN, "비활성화된 계정입니다."),
