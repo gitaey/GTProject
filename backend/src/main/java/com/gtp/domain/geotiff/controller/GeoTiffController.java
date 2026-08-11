@@ -5,6 +5,8 @@ import com.gtp.domain.geotiff.dto.GeoTiffUploadResponse;
 import com.gtp.domain.geotiff.service.GeoTiffService;
 import com.gtp.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -35,5 +37,16 @@ public class GeoTiffController {
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         geoTiffService.delete(id);
         return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @GetMapping("/tiles/{id}/{z}/{x}/{y}.png")
+    public ResponseEntity<byte[]> getTile(
+            @PathVariable Long id,
+            @PathVariable int z,
+            @PathVariable int x,
+            @PathVariable int y) {
+        byte[] tile = geoTiffService.getTile(id, z, x, y);
+        if (tile == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        return ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).body(tile);
     }
 }

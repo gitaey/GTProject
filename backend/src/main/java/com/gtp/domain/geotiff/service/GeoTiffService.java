@@ -65,7 +65,7 @@ public class GeoTiffService {
 
             GeoTiffFile saved = geoTiffFileRepository.save(entity);
 
-            String tileUrl = buildTileUrl(storedName);
+            String tileUrl = buildTileUrl(storedName, saved.getId());
 
             return GeoTiffUploadResponse.builder()
                     .id(saved.getId())
@@ -89,7 +89,7 @@ public class GeoTiffService {
                 .map(f -> GeoTiffListItem.builder()
                         .id(f.getId())
                         .originalName(f.getOriginalName())
-                        .tileUrl(buildTileUrl(f.getStoredName()))
+                        .tileUrl(buildTileUrl(f.getStoredName(), f.getId()))
                         .uploadedAt(f.getUploadedAt())
                         .fileSize(f.getFileSize())
                         .minLon(f.getMinLon())
@@ -208,7 +208,24 @@ public class GeoTiffService {
         }
     }
 
-    private String buildTileUrl(String storedName) {
-        return titilerUrl + "/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=file:///data/" + storedName;
+    public byte[] getTile(Long id, int z, int x, int y) {
+        GeoTiffFile file = geoTiffFileRepository.findById(id).orElse(null);
+        if (file == null) return null;
+        String url = titilerUrl + "/cog/tiles/WebMercatorQuad/" + z + "/" + x + "/" + y
+                + ".png?url=file:///data/" + file.getStoredName();
+        try {
+            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(30000);
+            if (conn.getResponseCode() != 200) return null;
+            return conn.getInputStream().readAllBytes();
+        } catch (Exception e) {
+            log.warn("타일 요청 실패 z={} x={} y={}: {}", z, x, y, e.getMessage());
+            return null;
+        }
+    }
+
+    private String buildTileUrl(String storedName, Long id) {
+        return "/api/geotiff/tiles/" + id + "/{z}/{x}/{y}.png";
     }
 }
