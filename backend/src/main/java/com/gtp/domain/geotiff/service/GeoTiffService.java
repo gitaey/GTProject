@@ -139,6 +139,7 @@ public class GeoTiffService {
             while (m.find()) {
                 double lon = Double.parseDouble(m.group(1));
                 double lat = Double.parseDouble(m.group(2));
+                if (lon < -180 || lon > 180 || lat < -90 || lat > 90) continue;
                 minLon = Math.min(minLon, lon); maxLon = Math.max(maxLon, lon);
                 minLat = Math.min(minLat, lat); maxLat = Math.max(maxLat, lat);
             }
