@@ -132,7 +132,7 @@ public class GeoTiffService {
             if (idx < 0) return null;
             String sub = output.substring(idx);
             java.util.regex.Matcher m = java.util.regex.Pattern
-                .compile("\\[([\\-0-9.]+),([\\-0-9.]+)\\]")
+                .compile("\\[\\s*([\\-0-9.]+)\\s*,\\s*([\\-0-9.]+)\\s*\\]")
                 .matcher(sub);
             double minLon = Double.MAX_VALUE, minLat = Double.MAX_VALUE;
             double maxLon = -Double.MAX_VALUE, maxLat = -Double.MAX_VALUE;
