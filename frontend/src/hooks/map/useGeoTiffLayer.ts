@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useCallback } from 'react'
+import { useCallback } from 'react'
 import OlMap from 'ol/Map'
 import TileLayer from 'ol/layer/Tile'
 import XYZ from 'ol/source/XYZ'
@@ -19,12 +19,13 @@ export interface GeoTiffItem {
   maxLat?: number
 }
 
-export function useGeoTiffLayer(map: OlMap | null) {
-  const layerMap = useRef<Map<number, TileLayer<XYZ>>>(new Map())
+// 패널 언마운트 시에도 레이어 상태 유지
+const layerMap = new Map<number, TileLayer<XYZ>>()
 
+export function useGeoTiffLayer(map: OlMap | null) {
   const addLayer = useCallback(async (item: GeoTiffItem) => {
     if (!map) return
-    if (layerMap.current.has(item.id)) return
+    if (layerMap.has(item.id)) return
 
     const layerExtent = (item.minLon != null && item.minLat != null && item.maxLon != null && item.maxLat != null)
       ? transformExtent([item.minLon, item.minLat, item.maxLon, item.maxLat], 'EPSG:4326', 'EPSG:3857')
@@ -33,11 +34,11 @@ export function useGeoTiffLayer(map: OlMap | null) {
     const apiBase = process.env.NEXT_PUBLIC_API_URL || ''
     const layer = new TileLayer({
       source: new XYZ({ url: `${apiBase}${item.tileUrl}`, crossOrigin: 'anonymous' }),
-      zIndex: 150,
+      zIndex: 5,
       extent: layerExtent,
     })
     map.addLayer(layer)
-    layerMap.current.set(item.id, layer)
+    layerMap.set(item.id, layer)
 
     // 백엔드에서 받은 WGS84 bounds로 지도 이동
     if (item.minLon != null && item.minLat != null && item.maxLon != null && item.maxLat != null) {
@@ -52,14 +53,14 @@ export function useGeoTiffLayer(map: OlMap | null) {
 
   const removeLayer = useCallback((id: number) => {
     if (!map) return
-    const layer = layerMap.current.get(id)
+    const layer = layerMap.get(id)
     if (!layer) return
     map.removeLayer(layer)
-    layerMap.current.delete(id)
+    layerMap.delete(id)
   }, [map])
 
   const isVisible = useCallback((id: number): boolean => {
-    return layerMap.current.has(id)
+    return layerMap.has(id)
   }, [])
 
   return { addLayer, removeLayer, isVisible }

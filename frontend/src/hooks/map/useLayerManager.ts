@@ -45,6 +45,7 @@ function createOLLayer(layer: DbLayer, visible: boolean, opacity: number): BaseL
             }),
             visible,
             opacity,
+            zIndex: 10,
             minZoom: layer.minZoom ?? undefined,
             maxZoom: layer.maxZoom ?? undefined,
         })
@@ -70,6 +71,7 @@ function createOLLayer(layer: DbLayer, visible: boolean, opacity: number): BaseL
             source,
             visible,
             opacity,
+            zIndex: 10,
             minZoom: layer.minZoom ?? undefined,
             maxZoom: layer.maxZoom ?? undefined,
         })

@@ -136,7 +136,7 @@ public class GeoTiffService {
         GeoTiffFile file = geoTiffFileRepository.findById(id).orElse(null);
         if (file == null || !"READY".equals(file.getStatus())) return null;
         String url = titilerUrl + "/cog/tiles/WebMercatorQuad/" + z + "/" + x + "/" + y
-                + ".png?url=file:///data/" + file.getStoredName();
+                + ".png?url=file:///data/" + file.getStoredName() + "&nodata=0";
         try {
             java.net.HttpURLConnection conn = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
             conn.setConnectTimeout(5000);
