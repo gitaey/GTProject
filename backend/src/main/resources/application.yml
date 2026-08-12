@@ -16,7 +16,7 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
+        format_sql: false
 
   servlet:
     multipart:
@@ -58,6 +58,7 @@ geotiff:
 
 titiler:
   url: ${TITILER_URL:http://localhost:8000}
+  container-name: ${TITILER_CONTAINER_NAME:gtp-titiler-local}
 
 geoserver:
   url: ${GEOSERVER_URL:https://geo.gitaey-dev.com/geoserver}

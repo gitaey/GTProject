@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface GeoTiffFileRepository extends JpaRepository<GeoTiffFile, Long> {
     List<GeoTiffFile> findAllByOrderByUploadedAtDesc();
+    List<GeoTiffFile> findAllByUploadedByOrderByUploadedAtDesc(String uploadedBy);
 }

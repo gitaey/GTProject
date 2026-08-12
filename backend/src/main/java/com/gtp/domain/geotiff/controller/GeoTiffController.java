@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -31,7 +33,10 @@ public class GeoTiffController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<GeoTiffListItem>>> findAll() {
-        return ResponseEntity.ok(ApiResponse.ok(geoTiffService.findAll()));
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String userId = (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName()))
+                ? auth.getName() : null;
+        return ResponseEntity.ok(ApiResponse.ok(geoTiffService.findAll(userId)));
     }
 
     @GetMapping("/{id}/status")
@@ -42,6 +47,12 @@ public class GeoTiffController {
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         geoTiffService.delete(id);
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @PostMapping("/{id}/reprocess-bounds")
+    public ResponseEntity<ApiResponse<Void>> reprocessBounds(@PathVariable Long id) {
+        geoTiffService.reprocessBounds(id);
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
 

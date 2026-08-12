@@ -64,7 +64,7 @@ export default function LoginPage() {
             }
 
             setAuth(user, token)
-            router.push('/')
+            router.push(userInfo.role === 'MAP_USER' ? '/map' : '/')
         } catch {
             setError('서버에 연결할 수 없습니다.')
         } finally {

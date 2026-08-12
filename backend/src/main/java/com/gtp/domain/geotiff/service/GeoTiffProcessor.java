@@ -23,6 +23,9 @@ public class GeoTiffProcessor {
     @Value("${titiler.url:http://localhost:8000}")
     private String titilerUrl;
 
+    @Value("${titiler.container-name:gtp-titiler-local}")
+    private String titilerContainerName;
+
     @Async
     public void process(Long id, Path filePath) {
         GeoTiffFile file = repository.findById(id).orElse(null);
@@ -94,7 +97,7 @@ public class GeoTiffProcessor {
             print('done')
             """, filename, filename);
         try {
-            ProcessBuilder pb = new ProcessBuilder("docker", "exec", "gtp-titiler-local", "python", "-c", script);
+            ProcessBuilder pb = new ProcessBuilder("docker", "exec", titilerContainerName, "python", "-c", script);
             pb.redirectErrorStream(true);
             int exitCode = pb.start().waitFor();
             if (exitCode == 0) {
@@ -110,6 +113,13 @@ public class GeoTiffProcessor {
     }
 
     private double[] getWgs84Bounds(Path filePath) {
+        double[] fromGdalinfo = getWgs84BoundsFromGdalinfo(filePath);
+        if (fromGdalinfo != null) return fromGdalinfo;
+        log.info("gdalinfo bounds 없음 → titiler /cog/info 폴백: {}", filePath.getFileName());
+        return getWgs84BoundsFromTitiler(filePath);
+    }
+
+    private double[] getWgs84BoundsFromGdalinfo(Path filePath) {
         try {
             ProcessBuilder pb = new ProcessBuilder("gdalinfo", "-json", filePath.toString());
             pb.redirectErrorStream(true);
@@ -120,7 +130,7 @@ public class GeoTiffProcessor {
             if (idx < 0) return null;
             String sub = output.substring(idx);
             java.util.regex.Matcher m = java.util.regex.Pattern
-                .compile("\\[\\s*([\\-0-9.]+)\\s*,\\s*([\\-0-9.]+)\\s*\\]")
+                .compile("\\[\\s*([\\-0-9.eE+]+)\\s*,\\s*([\\-0-9.eE+]+)\\s*\\]")
                 .matcher(sub);
             double minLon = Double.MAX_VALUE, minLat = Double.MAX_VALUE;
             double maxLon = -Double.MAX_VALUE, maxLat = -Double.MAX_VALUE;
@@ -132,10 +142,56 @@ public class GeoTiffProcessor {
                 minLat = Math.min(minLat, lat); maxLat = Math.max(maxLat, lat);
             }
             if (minLon == Double.MAX_VALUE) return null;
-            log.info("WGS84 bounds: [{}, {}, {}, {}]", minLon, minLat, maxLon, maxLat);
+            log.info("WGS84 bounds (gdalinfo): [{}, {}, {}, {}]", minLon, minLat, maxLon, maxLat);
             return new double[]{minLon, minLat, maxLon, maxLat};
         } catch (Exception e) {
-            log.warn("WGS84 bounds 계산 실패: {}", e.getMessage());
+            log.warn("gdalinfo bounds 실패: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private double[] getWgs84BoundsFromTitiler(Path filePath) {
+        String filename = filePath.getFileName().toString();
+        String script = String.format("""
+            import rasterio, json
+            from rasterio.crs import CRS
+            from rasterio.warp import transform_bounds
+            try:
+                with rasterio.open('/data/%s') as r:
+                    bounds = transform_bounds(r.crs, CRS.from_epsg(4326), *r.bounds)
+                    print(json.dumps({'minLon': bounds[0], 'minLat': bounds[1], 'maxLon': bounds[2], 'maxLat': bounds[3]}))
+            except Exception as e:
+                print(json.dumps({'error': str(e)}))
+            """, filename);
+        try {
+            ProcessBuilder pb = new ProcessBuilder("docker", "exec", titilerContainerName, "python", "-c", script);
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            String output = new String(p.getInputStream().readAllBytes()).trim();
+            p.waitFor();
+
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("\"minLon\":\\s*([\\-0-9.eE+]+).*?\"minLat\":\\s*([\\-0-9.eE+]+).*?\"maxLon\":\\s*([\\-0-9.eE+]+).*?\"maxLat\":\\s*([\\-0-9.eE+]+)")
+                .matcher(output);
+            if (!m.find()) {
+                log.warn("titiler bounds 파싱 실패: {}", output);
+                return null;
+            }
+            double minLon = Double.parseDouble(m.group(1));
+            double minLat = Double.parseDouble(m.group(2));
+            double maxLon = Double.parseDouble(m.group(3));
+            double maxLat = Double.parseDouble(m.group(4));
+            if (minLon < -180 || maxLon > 180 || minLat < -90 || maxLat > 90) {
+                log.warn("titiler bounds 범위 초과: [{}, {}, {}, {}]", minLon, minLat, maxLon, maxLat);
+                return null;
+            }
+            log.info("WGS84 bounds (titiler docker exec): [{}, {}, {}, {}]", minLon, minLat, maxLon, maxLat);
+            return new double[]{minLon, minLat, maxLon, maxLat};
+        } catch (IOException e) {
+            log.warn("titiler docker exec 실패: {}", e.getMessage());
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             return null;
         }
     }

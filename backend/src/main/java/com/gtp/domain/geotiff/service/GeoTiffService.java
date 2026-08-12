@@ -78,8 +78,11 @@ public class GeoTiffService {
         }
     }
 
-    public List<GeoTiffListItem> findAll() {
-        return geoTiffFileRepository.findAllByOrderByUploadedAtDesc().stream()
+    public List<GeoTiffListItem> findAll(String uploadedBy) {
+        List<GeoTiffFile> files = (uploadedBy != null && !uploadedBy.isBlank())
+                ? geoTiffFileRepository.findAllByUploadedByOrderByUploadedAtDesc(uploadedBy)
+                : geoTiffFileRepository.findAllByOrderByUploadedAtDesc();
+        return files.stream()
                 .map(f -> GeoTiffListItem.builder()
                         .id(f.getId())
                         .originalName(f.getOriginalName())
@@ -108,6 +111,14 @@ public class GeoTiffService {
                 .maxLon(file.getMaxLon())
                 .maxLat(file.getMaxLat())
                 .build();
+    }
+
+    public void reprocessBounds(Long id) {
+        GeoTiffFile file = geoTiffFileRepository.findById(id)
+                .orElseThrow(() -> new CustomException(ErrorCode.GEOTIFF_NOT_FOUND));
+        file.updateProcessing();
+        geoTiffFileRepository.save(file);
+        geoTiffProcessor.process(id, Paths.get(file.getFilePath()));
     }
 
     public void delete(Long id) {

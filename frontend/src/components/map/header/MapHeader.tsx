@@ -212,7 +212,7 @@ export default function MapHeader() {
                     style={{ background: 'linear-gradient(135deg, #F26722 0%, #E04E0A 100%)', boxShadow: '0 2px 6px rgba(242,103,34,0.35)' }}>
                     🗺
                 </div>
-                GT-Map
+                SIS-Map
                 <span className="text-xs font-normal text-gray-400">GIS</span>
             </div>
 

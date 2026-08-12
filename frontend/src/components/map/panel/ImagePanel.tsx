@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Eye, EyeOff, Trash2, Upload, Loader2, AlertCircle } from 'lucide-react'
+import { Trash2, Upload, Loader2, AlertCircle, RefreshCw } from 'lucide-react'
 import OlMap from 'ol/Map'
 import { useGeoTiffLayer, GeoTiffItem } from '@/hooks/map/useGeoTiffLayer'
-import { getToken } from '@/stores/authStore'
+import { getToken, useAuthStore } from '@/stores/authStore'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
@@ -32,6 +32,7 @@ export default function ImagePanel({ map }: ImagePanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { addLayer, removeLayer } = useGeoTiffLayer(map)
+  const user = useAuthStore(s => s.user)
 
   const fetchList = useCallback(async () => {
     try {
@@ -91,6 +92,7 @@ export default function ImagePanel({ map }: ImagePanelProps) {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      if (user?.userId) formData.append('uploadedBy', user.userId)
       const res = await fetch(`${API}/api/geotiff/upload`, {
         method: 'POST',
         headers: authHeaders(),
@@ -108,6 +110,12 @@ export default function ImagePanel({ map }: ImagePanelProps) {
     } finally {
       setUploading(false)
     }
+  }, [startPolling])
+
+  const handleReprocessBounds = useCallback(async (id: number) => {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, status: 'PROCESSING' } : i))
+    await fetch(`${API}/api/geotiff/${id}/reprocess-bounds`, { method: 'POST', headers: authHeaders() })
+    startPolling()
   }, [startPolling])
 
   const handleDelete = useCallback(async (id: number) => {
@@ -136,14 +144,14 @@ export default function ImagePanel({ map }: ImagePanelProps) {
   }, [handleUpload])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#1e293b' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>
       {/* 헤더 */}
       <div style={{
         padding: '10px 10px 10px 12px',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        borderBottom: '1px solid #e5e7eb',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
       }}>
-        <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#f1f5f9' }}>항공영상</span>
+        <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#374151' }}>항공영상</span>
       </div>
 
       {/* 업로드 영역 */}
@@ -154,21 +162,21 @@ export default function ImagePanel({ map }: ImagePanelProps) {
           onDrop={onDrop}
           onClick={() => !uploading && fileInputRef.current?.click()}
           style={{
-            border: `1.5px dashed ${dragging ? '#F26722' : 'rgba(255,255,255,0.18)'}`,
-            borderRadius: '8px',
+            border: `1.5px dashed ${dragging ? '#F26722' : '#d1d5db'}`,
+            borderRadius: '7px',
             padding: '14px 10px',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
             cursor: uploading ? 'default' : 'pointer',
-            background: dragging ? 'rgba(242,103,34,0.08)' : 'rgba(255,255,255,0.03)',
+            background: dragging ? 'rgba(242,103,34,0.05)' : '#f9fafb',
             transition: 'border-color 0.15s, background 0.15s',
           }}
         >
           {uploading ? (
-            <Loader2 size={20} color="#F26722" style={{ animation: 'spin 0.8s linear infinite' }} />
+            <Loader2 size={18} color="#F26722" style={{ animation: 'spin 0.8s linear infinite' }} />
           ) : (
-            <Upload size={18} color="#64748b" />
+            <Upload size={16} color="#9ca3af" />
           )}
-          <span style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', lineHeight: 1.4 }}>
+          <span style={{ fontSize: '11px', color: '#9ca3af', textAlign: 'center', lineHeight: 1.4 }}>
             {uploading ? '업로드 중...' : '.tif / .tiff 파일을 드래그하거나 클릭'}
           </span>
         </div>
@@ -186,13 +194,13 @@ export default function ImagePanel({ map }: ImagePanelProps) {
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '32px 0' }}>
             <div style={{
-              width: '20px', height: '20px', borderRadius: '50%',
+              width: '18px', height: '18px', borderRadius: '50%',
               border: '2px solid #F26722', borderTopColor: 'transparent',
               animation: 'spin 0.8s linear infinite',
             }} />
           </div>
         ) : items.length === 0 ? (
-          <div style={{ padding: '24px 16px', textAlign: 'center', color: '#475569', fontSize: '11.5px' }}>
+          <div style={{ padding: '24px 16px', textAlign: 'center', color: '#9ca3af', fontSize: '11.5px' }}>
             업로드된 파일 없음
           </div>
         ) : items.map(item => {
@@ -203,20 +211,32 @@ export default function ImagePanel({ map }: ImagePanelProps) {
             <div key={item.id} style={{
               display: 'flex', alignItems: 'center', gap: '6px',
               padding: '7px 10px 7px 12px',
-              borderBottom: '1px solid rgba(255,255,255,0.05)',
-              background: active ? 'rgba(242,103,34,0.07)' : 'transparent',
+              borderBottom: '1px solid #f3f4f6',
+              background: active ? 'rgba(242,103,34,0.04)' : 'transparent',
             }}>
+              {/* 체크박스 (가시성 토글) */}
+              <input
+                type="checkbox"
+                checked={active}
+                disabled={isProcessing || isFailed}
+                onChange={() => toggleVisibility(item)}
+                style={{
+                  width: '13px', height: '13px', flexShrink: 0,
+                  accentColor: '#F26722', cursor: isProcessing || isFailed ? 'default' : 'pointer',
+                }}
+              />
+
               {/* 파일명 + 크기 + 상태 */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
                   fontSize: '11.5px',
-                  color: isFailed ? '#ef4444' : active ? '#f1f5f9' : '#94a3b8',
+                  color: isFailed ? '#ef4444' : active ? '#111827' : '#374151',
                   fontWeight: active ? 500 : 400,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
                   {item.originalName}
                 </div>
-                <div style={{ fontSize: '10.5px', color: '#475569', marginTop: '1px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ fontSize: '10.5px', color: '#9ca3af', marginTop: '1px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   {formatFileSize(item.fileSize)}
                   {isProcessing && (
                     <span style={{ color: '#F26722', display: 'flex', alignItems: 'center', gap: '3px' }}>
@@ -233,19 +253,21 @@ export default function ImagePanel({ map }: ImagePanelProps) {
                 </div>
               </div>
 
-              {/* 가시성 토글 */}
-              <button
-                onClick={() => toggleVisibility(item)}
-                title={isProcessing ? '변환 중' : active ? '숨기기' : '표시'}
-                disabled={isProcessing || isFailed}
-                style={{
-                  background: 'none', border: 'none', padding: '3px', display: 'flex', flexShrink: 0,
-                  cursor: isProcessing || isFailed ? 'default' : 'pointer',
-                  color: isProcessing || isFailed ? '#334155' : active ? '#F26722' : '#475569',
-                }}
-              >
-                {active ? <Eye size={14} /> : <EyeOff size={14} />}
-              </button>
+              {/* bounds 없는 READY 항목: 재처리 버튼 */}
+              {item.status === 'READY' && item.minLon == null && (
+                <button
+                  onClick={() => handleReprocessBounds(item.id)}
+                  title="좌표 재추출"
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer', padding: '3px',
+                    color: '#9ca3af', display: 'flex', flexShrink: 0,
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#F26722')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#9ca3af')}
+                >
+                  <RefreshCw size={12} />
+                </button>
+              )}
 
               {/* 삭제 */}
               <button
@@ -253,10 +275,10 @@ export default function ImagePanel({ map }: ImagePanelProps) {
                 title="삭제"
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer', padding: '3px',
-                  color: '#475569', display: 'flex', flexShrink: 0,
+                  color: '#d1d5db', display: 'flex', flexShrink: 0,
                 }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#475569')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#d1d5db')}
               >
                 <Trash2 size={13} />
               </button>

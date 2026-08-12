@@ -25,11 +25,13 @@ export const useAuthStore = create<AuthState>()(
             setAuth: (user, token) => {
                 /* Next.js 미들웨어에서 읽을 수 있도록 쿠키에도 저장 */
                 document.cookie = `token=${token}; path=/; max-age=86400; SameSite=Lax`
+                document.cookie = `role=${user.role}; path=/; max-age=86400; SameSite=Lax`
                 set({ user, token })
             },
 
             clearAuth: () => {
                 document.cookie = 'token=; path=/; max-age=0'
+                document.cookie = 'role=; path=/; max-age=0'
                 set({ user: null, token: null })
             },
         }),

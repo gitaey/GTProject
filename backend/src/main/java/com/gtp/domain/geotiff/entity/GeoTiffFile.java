@@ -53,6 +53,11 @@ public class GeoTiffFile {
         this.status = "READY";
     }
 
+    public void updateProcessing() {
+        this.status = "PROCESSING";
+        this.errorMessage = null;
+    }
+
     public void updateFailed(String errorMessage) {
         this.status = "FAILED";
         this.errorMessage = errorMessage;
