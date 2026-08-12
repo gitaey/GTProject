@@ -80,7 +80,7 @@ export default function LoginPage() {
                     <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4" style={{ background: 'var(--accent-bg)', border: '1px solid var(--accent-border)' }}>
                         <Shield size={24} style={{ color: 'var(--accent)' }} />
                     </div>
-                    <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>GT Project</h1>
+                    <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>SIS Project</h1>
                     <p className="text-sm mt-1" style={{ color: 'var(--text-faint)' }}>관리자 대시보드</p>
                 </div>
 
