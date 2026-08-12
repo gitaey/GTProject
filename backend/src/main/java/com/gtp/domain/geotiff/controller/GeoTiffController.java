@@ -1,6 +1,7 @@
 package com.gtp.domain.geotiff.controller;
 
 import com.gtp.domain.geotiff.dto.GeoTiffListItem;
+import com.gtp.domain.geotiff.dto.GeoTiffStatusResponse;
 import com.gtp.domain.geotiff.dto.GeoTiffUploadResponse;
 import com.gtp.domain.geotiff.service.GeoTiffService;
 import com.gtp.global.response.ApiResponse;
@@ -31,6 +32,11 @@ public class GeoTiffController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<GeoTiffListItem>>> findAll() {
         return ResponseEntity.ok(ApiResponse.ok(geoTiffService.findAll()));
+    }
+
+    @GetMapping("/{id}/status")
+    public ResponseEntity<ApiResponse<GeoTiffStatusResponse>> getStatus(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok(geoTiffService.getStatus(id)));
     }
 
     @DeleteMapping("/{id}")

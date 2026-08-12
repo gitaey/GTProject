@@ -78,7 +78,7 @@ export default function MapStatusBar({ map }: MapStatusBarProps) {
             <div className="flex items-center gap-1.5 px-3 border-r border-gray-200">
                 <span>경위도</span>
                 <span className="text-amber-700 font-semibold">
-                    {coords ? `${coords.lon.toFixed(6)}, ${coords.lat.toFixed(6)}` : '—'}
+                    {coords ? `${coords.lon.toFixed(6)} ${coords.lat.toFixed(6)}` : '—'}
                 </span>
             </div>
 
@@ -86,7 +86,7 @@ export default function MapStatusBar({ map }: MapStatusBarProps) {
             <div className="flex items-center gap-1.5 px-3 border-r border-gray-200">
                 <span>EPSG:5186</span>
                 <span className="text-amber-700 font-semibold">
-                    {coords ? `${Math.round(coords.x).toLocaleString('ko-KR')}, ${Math.round(coords.y).toLocaleString('ko-KR')}` : '—'}
+                    {coords ? `${Math.round(coords.x).toLocaleString('ko-KR')} ${Math.round(coords.y).toLocaleString('ko-KR')}` : '—'}
                 </span>
             </div>
 

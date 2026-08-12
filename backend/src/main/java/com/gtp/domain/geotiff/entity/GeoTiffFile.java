@@ -38,4 +38,23 @@ public class GeoTiffFile {
     private Double minLat;
     private Double maxLon;
     private Double maxLat;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private String status = "PROCESSING";
+
+    private String errorMessage;
+
+    public void updateReady(Double minLon, Double minLat, Double maxLon, Double maxLat) {
+        this.minLon = minLon;
+        this.minLat = minLat;
+        this.maxLon = maxLon;
+        this.maxLat = maxLat;
+        this.status = "READY";
+    }
+
+    public void updateFailed(String errorMessage) {
+        this.status = "FAILED";
+        this.errorMessage = errorMessage;
+    }
 }

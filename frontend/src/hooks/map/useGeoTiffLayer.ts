@@ -12,6 +12,7 @@ export interface GeoTiffItem {
   tileUrl: string
   uploadedAt: string
   fileSize: number
+  status: string
   minLon?: number
   minLat?: number
   maxLon?: number

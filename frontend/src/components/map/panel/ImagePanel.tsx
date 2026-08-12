@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Eye, EyeOff, Trash2, Upload, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Trash2, Upload, Loader2, AlertCircle } from 'lucide-react'
 import OlMap from 'ol/Map'
 import { useGeoTiffLayer, GeoTiffItem } from '@/hooks/map/useGeoTiffLayer'
 import { getToken } from '@/stores/authStore'
@@ -10,7 +10,13 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 interface ImagePanelProps {
@@ -24,13 +30,12 @@ export default function ImagePanel({ map }: ImagePanelProps) {
   const [dragging, setDragging] = useState(false)
   const [visibleIds, setVisibleIds] = useState<Set<number>>(new Set())
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { addLayer, removeLayer, isVisible } = useGeoTiffLayer(map)
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const { addLayer, removeLayer } = useGeoTiffLayer(map)
 
   const fetchList = useCallback(async () => {
     try {
-      const token = getToken()
-      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
-      const res = await fetch(`${API}/api/geotiff`, { headers })
+      const res = await fetch(`${API}/api/geotiff`, { headers: authHeaders() })
       const json = await res.json()
       if (json.success) setItems(json.data ?? [])
     } finally {
@@ -40,32 +45,80 @@ export default function ImagePanel({ map }: ImagePanelProps) {
 
   useEffect(() => { fetchList() }, [fetchList])
 
+  // PROCESSING 상태 항목이 있으면 3초마다 상태 폴링
+  const startPolling = useCallback(() => {
+    if (pollingRef.current) return
+    pollingRef.current = setInterval(async () => {
+      setItems(prev => {
+        const processing = prev.filter(i => i.status === 'PROCESSING')
+        if (processing.length === 0) {
+          clearInterval(pollingRef.current!)
+          pollingRef.current = null
+          return prev
+        }
+        // 비동기 상태 체크 (setState 내부라서 side effect로 처리)
+        processing.forEach(async item => {
+          try {
+            const res = await fetch(`${API}/api/geotiff/${item.id}/status`, { headers: authHeaders() })
+            const json = await res.json()
+            if (!json.success) return
+            const s = json.data
+            if (s.status !== 'PROCESSING') {
+              setItems(cur => cur.map(i => i.id === item.id ? {
+                ...i,
+                status: s.status,
+                tileUrl: s.tileUrl ?? i.tileUrl,
+                minLon: s.minLon, minLat: s.minLat,
+                maxLon: s.maxLon, maxLat: s.maxLat,
+              } : i))
+            }
+          } catch {}
+        })
+        return prev
+      })
+    }, 3000)
+  }, [])
+
+  useEffect(() => {
+    if (items.some(i => i.status === 'PROCESSING')) startPolling()
+  }, [items, startPolling])
+
+  useEffect(() => () => { if (pollingRef.current) clearInterval(pollingRef.current) }, [])
+
   const handleUpload = useCallback(async (file: File) => {
     if (!file.name.match(/\.tiff?$/i)) return
     setUploading(true)
     try {
-      const token = getToken()
-      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
       const formData = new FormData()
       formData.append('file', file)
-      const res = await fetch(`${API}/api/geotiff/upload`, { method: 'POST', headers, body: formData })
+      const res = await fetch(`${API}/api/geotiff/upload`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: formData,
+      })
       const json = await res.json()
-      if (json.success) await fetchList()
+      if (json.success) {
+        const newItem: GeoTiffItem = {
+          ...json.data,
+          tileUrl: json.data.tileUrl ?? `/api/geotiff/tiles/${json.data.id}/{z}/{x}/{y}.png`,
+        }
+        setItems(prev => [newItem, ...prev])
+        startPolling()
+      }
     } finally {
       setUploading(false)
     }
-  }, [fetchList])
+  }, [startPolling])
 
   const handleDelete = useCallback(async (id: number) => {
-    const token = getToken()
-    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
-    await fetch(`${API}/api/geotiff/${id}`, { method: 'DELETE', headers })
+    await fetch(`${API}/api/geotiff/${id}`, { method: 'DELETE', headers: authHeaders() })
     removeLayer(id)
     setVisibleIds(prev => { const next = new Set(prev); next.delete(id); return next })
     setItems(prev => prev.filter(i => i.id !== id))
   }, [removeLayer])
 
   const toggleVisibility = useCallback((item: GeoTiffItem) => {
+    if (item.status !== 'READY') return
     if (visibleIds.has(item.id)) {
       removeLayer(item.id)
       setVisibleIds(prev => { const next = new Set(prev); next.delete(item.id); return next })
@@ -144,6 +197,8 @@ export default function ImagePanel({ map }: ImagePanelProps) {
           </div>
         ) : items.map(item => {
           const active = visibleIds.has(item.id)
+          const isProcessing = item.status === 'PROCESSING'
+          const isFailed = item.status === 'FAILED'
           return (
             <div key={item.id} style={{
               display: 'flex', alignItems: 'center', gap: '6px',
@@ -151,28 +206,42 @@ export default function ImagePanel({ map }: ImagePanelProps) {
               borderBottom: '1px solid rgba(255,255,255,0.05)',
               background: active ? 'rgba(242,103,34,0.07)' : 'transparent',
             }}>
-              {/* 파일명 + 크기 */}
+              {/* 파일명 + 크기 + 상태 */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
                   fontSize: '11.5px',
-                  color: active ? '#f1f5f9' : '#94a3b8',
+                  color: isFailed ? '#ef4444' : active ? '#f1f5f9' : '#94a3b8',
                   fontWeight: active ? 500 : 400,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
                   {item.originalName}
                 </div>
-                <div style={{ fontSize: '10.5px', color: '#475569', marginTop: '1px' }}>
+                <div style={{ fontSize: '10.5px', color: '#475569', marginTop: '1px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   {formatFileSize(item.fileSize)}
+                  {isProcessing && (
+                    <span style={{ color: '#F26722', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <Loader2 size={9} style={{ animation: 'spin 0.8s linear infinite' }} />
+                      변환 중
+                    </span>
+                  )}
+                  {isFailed && (
+                    <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <AlertCircle size={9} />
+                      실패
+                    </span>
+                  )}
                 </div>
               </div>
 
               {/* 가시성 토글 */}
               <button
                 onClick={() => toggleVisibility(item)}
-                title={active ? '숨기기' : '표시'}
+                title={isProcessing ? '변환 중' : active ? '숨기기' : '표시'}
+                disabled={isProcessing || isFailed}
                 style={{
-                  background: 'none', border: 'none', cursor: 'pointer', padding: '3px',
-                  color: active ? '#F26722' : '#475569', display: 'flex', flexShrink: 0,
+                  background: 'none', border: 'none', padding: '3px', display: 'flex', flexShrink: 0,
+                  cursor: isProcessing || isFailed ? 'default' : 'pointer',
+                  color: isProcessing || isFailed ? '#334155' : active ? '#F26722' : '#475569',
                 }}
               >
                 {active ? <Eye size={14} /> : <EyeOff size={14} />}

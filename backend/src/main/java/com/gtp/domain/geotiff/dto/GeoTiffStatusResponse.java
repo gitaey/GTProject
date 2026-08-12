@@ -5,21 +5,17 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class GeoTiffListItem {
+public class GeoTiffStatusResponse {
     private Long id;
-    private String originalName;
+    private String status;
+    private String errorMessage;
     private String tileUrl;
-    private LocalDateTime uploadedAt;
-    private Long fileSize;
     private Double minLon;
     private Double minLat;
     private Double maxLon;
     private Double maxLat;
-    private String status;
 }

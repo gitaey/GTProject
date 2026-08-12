@@ -21,4 +21,5 @@ public class GeoTiffUploadResponse {
     private Double minLat;
     private Double maxLon;
     private Double maxLat;
+    private String status;
 }
