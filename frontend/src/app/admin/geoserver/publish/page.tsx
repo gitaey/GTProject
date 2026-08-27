@@ -51,22 +51,26 @@ export default function GeoServerPublishPage() {
     const [publishing, setPublishing] = useState(false)
     const [results, setResults]       = useState<{ layer: string; success: boolean; message: string }[]>([])
     const [error, setError]           = useState<string | null>(null)
+    const [wsError, setWsError]       = useState<string | null>(null)
     const [filter, setFilter]         = useState<'all' | 'published' | 'unpublished'>('all')
 
-    useEffect(() => {
+    const loadWorkspaces = () => {
         setLoadingWs(true)
+        setWsError(null)
         apiFetch<{ workspaces: string[] }>('/api/geoserver/workspaces')
             .then(d => setWorkspaces(d.workspaces))
-            .catch(() => {})
+            .catch(e => setWsError(e instanceof Error ? e.message : 'GeoServer 작업공간을 불러오지 못했습니다.'))
             .finally(() => setLoadingWs(false))
-    }, [])
+    }
+
+    useEffect(() => { loadWorkspaces() }, [])
 
     useEffect(() => {
         if (!workspace) { setDatastores([]); setDatastore(''); return }
         setLoadingDs(true)
         apiFetch<{ datastores: string[] }>(`/api/geoserver/workspaces/${workspace}/datastores`)
             .then(d => { setDatastores(d.datastores); setDatastore('') })
-            .catch(() => {})
+            .catch(e => setError(e instanceof Error ? e.message : '저장소를 불러오지 못했습니다.'))
             .finally(() => setLoadingDs(false))
     }, [workspace])
 
@@ -134,6 +138,17 @@ export default function GeoServerPublishPage() {
                         </p>
                     </div>
 
+                    {/* workspace 에러 */}
+                    {wsError && (
+                        <div className="px-4 py-3 rounded-lg text-sm flex items-center justify-between"
+                            style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>
+                            <span>GeoServer 연결 실패: {wsError}</span>
+                            <button onClick={loadWorkspaces} className="ml-4 text-xs underline cursor-pointer" style={{ color: '#ef4444' }}>
+                                재시도
+                            </button>
+                        </div>
+                    )}
+
                     {/* 선택 영역 */}
                     <div className="rounded-xl p-5 flex flex-wrap items-end gap-4"
                         style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
@@ -141,7 +156,7 @@ export default function GeoServerPublishPage() {
                             <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>작업공간</label>
                             <div className="relative">
                                 <select value={workspace} onChange={e => setWorkspace(e.target.value)} disabled={loadingWs} style={selectStyle}>
-                                    <option value="">{loadingWs ? '불러오는 중...' : '선택'}</option>
+                                    <option value="">{loadingWs ? '불러오는 중...' : wsError ? '불러오기 실패' : '선택'}</option>
                                     {workspaces.map(w => <option key={w} value={w}>{w}</option>)}
                                 </select>
                                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-faint)' }} />

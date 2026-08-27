@@ -15,6 +15,7 @@ interface LoginResponse {
     nickname: string | null
     role: string
     roleLabel: string
+    permission: string | null
 }
 
 interface ApiResponse<T> {
@@ -56,11 +57,12 @@ export default function LoginPage() {
 
             const { token, ...userInfo } = json.data
             const user: AuthUser = {
-                userId:    userInfo.userId,
-                userName:  userInfo.userName,
-                nickname:  userInfo.nickname,
-                role:      userInfo.role,
-                roleLabel: userInfo.roleLabel,
+                userId:     userInfo.userId,
+                userName:   userInfo.userName,
+                nickname:   userInfo.nickname,
+                role:       userInfo.role,
+                roleLabel:  userInfo.roleLabel,
+                permission: userInfo.permission ?? null,
             }
 
             setAuth(user, token)

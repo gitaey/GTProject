@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import ThemeProvider from '@/components/ThemeProvider'
+import AccessLogTracker from '@/components/layout/AccessLogTracker'
+import MenuLoader from '@/components/layout/MenuLoader'
 import './globals.css'
 
 const geistSans = Geist({
@@ -26,7 +28,11 @@ export default function RootLayout({
     return (
         <html lang="ko" suppressHydrationWarning>
             <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-                <ThemeProvider>{children}</ThemeProvider>
+                <ThemeProvider>
+                    <AccessLogTracker />
+                    <MenuLoader />
+                    {children}
+                </ThemeProvider>
             </body>
         </html>
     )

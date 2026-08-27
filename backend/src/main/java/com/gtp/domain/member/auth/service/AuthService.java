@@ -60,7 +60,8 @@ public class AuthService {
                 user.getUserName(),
                 user.getNickname(),
                 user.getRole().name(),
-                user.getRole().getLabel()
+                user.getRole().getLabel(),
+                user.getPermission() != null ? user.getPermission().name() : null
         );
     }
 }

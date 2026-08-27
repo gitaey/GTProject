@@ -148,10 +148,10 @@ export default function ImagePanel({ map }: ImagePanelProps) {
       {/* 헤더 */}
       <div style={{
         padding: '10px 10px 10px 12px',
-        borderBottom: '1px solid #e5e7eb',
+        borderBottom: '2px solid #F26722',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
       }}>
-        <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#374151' }}>항공영상</span>
+        <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#F26722' }}>항공영상</span>
       </div>
 
       {/* 업로드 영역 */}

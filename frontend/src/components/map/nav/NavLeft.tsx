@@ -5,20 +5,26 @@
 // hidden md:flex → 모바일에서는 숨김, 태블릿부터 표시
 import { LucideIcon, Layers, Aperture, MoreHorizontal, Settings } from 'lucide-react'
 import { usePanelStore, PanelType } from '@/stores/map/panelStore'
+import { useMenuStore } from '@/stores/menuStore'
 
-const NAV_ITEMS: { type: PanelType; label: string; icon: LucideIcon }[] = [
-    { type: 'layer', label: '레이어', icon: Layers },
-    { type: 'image', label: '영상',   icon: Aperture },
-    { type: 'etc',   label: '기타',   icon: MoreHorizontal },
+const NAV_ITEMS: { type: PanelType; label: string; icon: LucideIcon; menuId: string }[] = [
+    { type: 'layer', label: '레이어', icon: Layers,         menuId: 'map.panel.layer' },
+    { type: 'image', label: 'TIFF',   icon: Aperture,       menuId: 'map.panel.image' },
+    { type: 'etc',   label: '기타',   icon: MoreHorizontal, menuId: 'map.panel.etc'   },
 ]
 
 export default function NavLeft() {
     const { activePanel, togglePanel } = usePanelStore()
+    const { isAllowed, loaded } = useMenuStore()
+
+    const visibleItems = loaded
+        ? NAV_ITEMS.filter(item => isAllowed(item.menuId))
+        : NAV_ITEMS
 
     return (
         // hidden md:flex → 모바일(768px 미만)에서 숨김
         <div className="hidden md:flex flex-col items-center w-14 bg-white border-r border-gray-200 py-2 gap-1 flex-shrink-0">
-            {NAV_ITEMS.map((item) => {
+            {visibleItems.map((item) => {
                 const Icon = item.icon
                 return (
                     <button

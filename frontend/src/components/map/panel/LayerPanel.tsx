@@ -61,7 +61,7 @@ function SettingGroupNode({
             <div className="flex items-center gap-1.5 py-1.5"
                 style={{ paddingLeft: `${groupIndent}px`, paddingRight: '12px' }}>
                 <button onClick={() => setOpen(p => !p)} className="flex-shrink-0"
-                    style={{ color: '#64748b', width: `${S_CHEV}px`, display: 'flex', alignItems: 'center' }}>
+                    style={{ color: '#94a3b8', width: `${S_CHEV}px`, display: 'flex', alignItems: 'center' }}>
                     {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                 </button>
                 <input type="checkbox"
@@ -71,7 +71,7 @@ function SettingGroupNode({
                     onClick={e => e.stopPropagation()}
                     style={{ width: '13px', height: '13px', accentColor: '#F26722', flexShrink: 0, cursor: 'pointer' }}
                 />
-                <span style={{ fontSize: depth === 0 ? '12px' : '11.5px', fontWeight: depth === 0 ? 600 : 500, color: '#f1f5f9', flex: 1 }}>
+                <span style={{ fontSize: depth === 0 ? '12px' : '11.5px', fontWeight: depth === 0 ? 600 : 500, color: depth === 0 ? '#0f172a' : '#334155', flex: 1 }}>
                     {group.name}
                 </span>
             </div>
@@ -88,7 +88,7 @@ function SettingGroupNode({
                                 onChange={() => onToggle(layer.id)}
                                 style={{ width: '13px', height: '13px', accentColor: '#F26722', flexShrink: 0, cursor: 'pointer' }}
                             />
-                            <span style={{ fontSize: '11.5px', color: selectedIds.has(layer.id) ? '#cbd5e1' : '#64748b' }}>
+                            <span style={{ fontSize: '11.5px', color: selectedIds.has(layer.id) ? '#0f172a' : '#94a3b8' }}>
                                 {layer.name}
                             </span>
                         </div>
@@ -176,16 +176,16 @@ function LayerSettingsPanel({ onClose }: { onClose: () => void }) {
     return (
         <div style={{
             position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-            background: '#1e293b', zIndex: 10,
+            background: '#fff', zIndex: 10,
             display: 'flex', flexDirection: 'column',
         }}>
             {/* 헤더 */}
             <div style={{
                 padding: '10px 10px 10px 12px',
-                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                borderBottom: '1px solid #e2e8f0',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
             }}>
-                <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#f1f5f9' }}>레이어 설정</span>
+                <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#0f172a' }}>레이어 설정</span>
                 <button onClick={onClose} style={{ color: '#94a3b8', cursor: 'pointer', display: 'flex' }}>
                     <X size={14} />
                 </button>
@@ -195,7 +195,7 @@ function LayerSettingsPanel({ onClose }: { onClose: () => void }) {
             {!loading && (
                 <div style={{
                     padding: '8px 12px',
-                    borderBottom: '1px solid rgba(255,255,255,0.06)',
+                    borderBottom: '1px solid #e2e8f0',
                     display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0,
                 }}>
                     <input type="checkbox"
@@ -207,7 +207,7 @@ function LayerSettingsPanel({ onClose }: { onClose: () => void }) {
                         }}
                         style={{ width: '13px', height: '13px', accentColor: '#F26722', cursor: 'pointer' }}
                     />
-                    <span style={{ fontSize: '11px', color: '#94a3b8', flex: 1 }}>전체선택</span>
+                    <span style={{ fontSize: '11px', color: '#64748b', flex: 1 }}>전체선택</span>
                     <span style={{ fontSize: '11px', color: '#F26722', fontWeight: 500 }}>
                         {selectedIds.size}개 선택
                     </span>
@@ -237,7 +237,7 @@ function LayerSettingsPanel({ onClose }: { onClose: () => void }) {
                                     onChange={() => toggle(layer.id)}
                                     style={{ width: '13px', height: '13px', accentColor: '#F26722', cursor: 'pointer' }}
                                 />
-                                <span style={{ fontSize: '11.5px', color: selectedIds.has(layer.id) ? '#e2e8f0' : '#94a3b8' }}>
+                                <span style={{ fontSize: '11.5px', color: selectedIds.has(layer.id) ? '#0f172a' : '#94a3b8' }}>
                                     {layer.name}
                                 </span>
                             </div>
@@ -249,7 +249,7 @@ function LayerSettingsPanel({ onClose }: { onClose: () => void }) {
             {/* 하단 버튼 */}
             <div style={{
                 padding: '10px 12px',
-                borderTop: '1px solid rgba(255,255,255,0.08)',
+                borderTop: '1px solid #e2e8f0',
                 display: 'flex', gap: '6px', flexShrink: 0,
             }}>
                 {hasCustom && (
@@ -257,8 +257,8 @@ function LayerSettingsPanel({ onClose }: { onClose: () => void }) {
                         style={{
                             display: 'flex', alignItems: 'center', gap: '4px',
                             padding: '6px 10px', borderRadius: '6px', fontSize: '11.5px',
-                            background: 'rgba(255,255,255,0.06)', color: '#94a3b8',
-                            border: 'none', cursor: 'pointer',
+                            background: '#f1f5f9', color: '#64748b',
+                            border: '1px solid #e2e8f0', cursor: 'pointer',
                         }}>
                         <RotateCcw size={11} /> 초기화
                     </button>
@@ -287,23 +287,24 @@ export default function LayerPanel() {
             {/* 헤더 */}
             <div style={{
                 padding: '10px 10px 10px 12px',
-                background: '#1e293b',
+                background: '#fff',
+                borderBottom: '2px solid #F26722',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
             }}>
-                <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#f1f5f9' }}>레이어</span>
+                <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#F26722' }}>레이어</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
                     <button onClick={loadTree}
                         className="p-1 rounded transition-colors cursor-pointer"
-                        style={{ color: '#94a3b8' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+                        style={{ color: '#64748b' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#e2e8f0')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                         title="새로고침">
                         <RefreshCw size={14} />
                     </button>
                     <button onClick={() => setSettingsOpen(true)}
                         className="p-1 rounded transition-colors cursor-pointer"
-                        style={{ color: settingsOpen ? '#F26722' : '#94a3b8' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+                        style={{ color: settingsOpen ? '#F26722' : '#64748b' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#e2e8f0')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                         title="레이어 설정">
                         <Settings size={14} />
@@ -312,7 +313,7 @@ export default function LayerPanel() {
             </div>
 
             {/* 레이어 트리 */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ paddingTop: '4px', paddingBottom: '8px' }}>
+            <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ paddingBottom: '8px' }}>
                 {tree?.groups.map(group => (
                     <LayerItem key={group.id} node={group} />
                 ))}

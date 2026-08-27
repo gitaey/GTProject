@@ -7,6 +7,7 @@ export interface AuthUser {
     nickname: string | null
     role: string
     roleLabel: string
+    permission: string | null
 }
 
 interface AuthState {

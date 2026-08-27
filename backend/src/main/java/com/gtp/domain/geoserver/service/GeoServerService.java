@@ -37,7 +37,9 @@ public class GeoServerService {
     private String legendLayer;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build();
 
     private String basicAuth() {
         return "Basic " + Base64.getEncoder().encodeToString((adminUser + ":" + adminPassword).getBytes());
@@ -50,9 +52,19 @@ public class GeoServerService {
                 .header("Accept", "application/json");
     }
 
+    private void checkStatus(HttpResponse<String> res, String context) {
+        int code = res.statusCode();
+        if (code < 200 || code >= 300) {
+            String preview = res.body() == null ? "" : res.body().substring(0, Math.min(200, res.body().length()));
+            log.error("[GeoServer] {} → HTTP {} : {}", context, code, preview);
+            throw new RuntimeException("GeoServer " + context + " 실패 (HTTP " + code + ")");
+        }
+    }
+
     public List<String> getWorkspaces() throws Exception {
         HttpRequest req = baseRequest("/workspaces").GET().build();
         HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+        checkStatus(res, "작업공간 조회");
         JsonNode root = objectMapper.readTree(res.body());
         List<String> names = new ArrayList<>();
         JsonNode ws = root.path("workspaces").path("workspace");
@@ -65,6 +77,7 @@ public class GeoServerService {
     public List<String> getDatastores(String workspace) throws Exception {
         HttpRequest req = baseRequest("/workspaces/" + workspace + "/datastores").GET().build();
         HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+        checkStatus(res, "저장소 조회");
         JsonNode root = objectMapper.readTree(res.body());
         List<String> names = new ArrayList<>();
         JsonNode ds = root.path("dataStores").path("dataStore");
@@ -78,8 +91,8 @@ public class GeoServerService {
         // 발행된 레이어 목록
         HttpRequest publishedReq = baseRequest("/workspaces/" + workspace + "/datastores/" + datastore + "/featuretypes?list=published").GET().build();
         HttpResponse<String> publishedRes = httpClient.send(publishedReq, HttpResponse.BodyHandlers.ofString());
+        checkStatus(publishedRes, "발행된 레이어 조회");
         log.info("[GeoServer] published response: {}", publishedRes.body());
-        // published: {"featureTypes":""} 또는 {"featureTypes":{"featureType":[...]}}
         Set<String> published = new HashSet<>();
         JsonNode pubRoot = objectMapper.readTree(publishedRes.body());
         JsonNode pubList = pubRoot.path("featureTypes").path("featureType");
@@ -90,6 +103,7 @@ public class GeoServerService {
         // available: {"list":{"string":[...]}}
         HttpRequest allReq = baseRequest("/workspaces/" + workspace + "/datastores/" + datastore + "/featuretypes?list=available").GET().build();
         HttpResponse<String> allRes = httpClient.send(allReq, HttpResponse.BodyHandlers.ofString());
+        checkStatus(allRes, "사용 가능한 레이어 조회");
         log.info("[GeoServer] available response: {}", allRes.body());
         JsonNode allRoot = objectMapper.readTree(allRes.body());
         JsonNode allList = allRoot.path("list").path("string");
@@ -115,6 +129,7 @@ public class GeoServerService {
     public List<com.gtp.domain.geoserver.dto.LayerWithStyle> getWorkspaceLayers(String workspace) throws Exception {
         HttpRequest req = baseRequest("/workspaces/" + workspace + "/layers").GET().build();
         HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+        checkStatus(res, "워크스페이스 레이어 조회");
         JsonNode root = objectMapper.readTree(res.body());
         List<String> names = new ArrayList<>();
         JsonNode layers = root.path("layers").path("layer");
@@ -146,6 +161,7 @@ public class GeoServerService {
     public List<String> getStyles() throws Exception {
         HttpRequest req = baseRequest("/styles").GET().build();
         HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+        checkStatus(res, "스타일 목록 조회");
         JsonNode root = objectMapper.readTree(res.body());
         List<String> names = new ArrayList<>();
         JsonNode styles = root.path("styles").path("style");

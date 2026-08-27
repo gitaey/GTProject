@@ -1,65 +1,102 @@
 services:
+  nginx:
+    image: nginx:alpine
+    container_name: gtp-nginx
+    restart: always
+    privileged: true
+    volumes:
+      - /gtp/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /gtp/nginx/conf.d:/etc/nginx/conf.d
+      - /etc/letsencrypt:/ssl/letsencrypt:ro
+      - /project/WAS/SISNET_HOMPAGE/conf/ssl:/ssl/sisnet:ro
+    network_mode: host
+
+  frontend:
+    image: node:18
+    container_name: gtp-frontend
+    restart: always
+    working_dir: /app
+    command: sh -c "npm start"
+    environment:
+      NODE_ENV: production
+    ports:
+      - "49092:3000"
+    volumes:
+      - /gtp/GTProject/frontend:/app
 
   backend:
-    build: ./backend
+    build:
+      context: /gtp/GTProject/backend
+      dockerfile: Dockerfile
+    image: gtp-backend:latest
     container_name: gtp-backend
+    restart: always
+    env_file:
+      - .env
     ports:
-      - "8080:8080"
-    environment:
-      DB_URL: ${DB_URL}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET}
-      GEOSERVER_URL: ${GEOSERVER_URL}
-      GEOSERVER_ADMIN_USER: ${GEOSERVER_ADMIN_USER}
-      GEOSERVER_ADMIN_PASSWORD: ${GEOSERVER_ADMIN_PASSWORD}
-      LOSTARK_API_KEY: ${LOSTARK_API_KEY}
-    restart: unless-stopped
+      - "49090:8080"
+    extra_hosts:
+      - "host-gateway:host-gateway"
+    depends_on:
+      - postgres
+    volumes:
+      - /gtp/geotiff:/data/geotiff
 
   bot:
-    build: ./bot
+    build:
+      context: /gtp/GTProject/bot
+      dockerfile: Dockerfile
+    image: gtp-bot:latest
     container_name: gtp-bot
+    restart: always
+    env_file:
+      - .env
     ports:
       - "49093:8081"
-    environment:
-      DB_URL: ${DB_URL}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
-      GOOGLE_CREDENTIALS_JSON: ${GOOGLE_CREDENTIALS_JSON}
-      LOSTARK_API_KEY: ${LOSTARK_API_KEY}
-    restart: unless-stopped
 
-  titiler:
-    image: ghcr.io/developmentseed/titiler
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: gtp-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: gtpdb
+      POSTGRES_USER: gtp
+      POSTGRES_PASSWORD: 4fkdgodu!@
+    ports:
+      - "49091:5432"
+    volumes:
+      - ef0f7095a5dd69f7a51266f462d0d0b13df9c0b5ac70a7cc5f3a63b201ef78fc:/var/lib/postgresql/data
+
+  geoserver:
+    image: kartoza/geoserver:2.25.2
+    container_name: gtp-geoserver
+    restart: always
+    environment:
+      GEOSERVER_ADMIN_USER: admin
+      GEOSERVER_ADMIN_PASSWORD: sis3047!@
+      INITIAL_MEMORY: 512M
+      MAXIMUM_MEMORY: 1G
+      GEOSERVER_CSRF_WHITELIST: gitaey-dev.com
+    ports:
+      - "49094:8080"
+    volumes:
+      - geoserver-data:/opt/geoserver/data_dir
+      - /usr/share/fonts:/usr/share/fonts/host:ro
+    depends_on:
+      - postgres
+
+  gtp-titiler:
+    image: ghcr.io/developmentseed/titiler:latest
     container_name: gtp-titiler
     ports:
       - "49095:8000"
+    environment:
+      - PORT=8000
     volumes:
       - /gtp/geotiff:/data
-    environment:
-      - CPL_TMPDIR=/tmp
-      - GDAL_CACHEMAX=200
-      - VSI_CACHE=TRUE
-      - VSI_CACHE_SIZE=1000000
     restart: unless-stopped
 
-  backend:
-    build: ./backend
-    container_name: gtp-backend
-    ports:
-      - "8080:8080"
-    volumes:
-      - /gtp/geotiff:/data/geotiff
-    environment:
-      DB_URL: ${DB_URL}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET}
-      GEOSERVER_URL: ${GEOSERVER_URL}
-      GEOSERVER_ADMIN_USER: ${GEOSERVER_ADMIN_USER}
-      GEOSERVER_ADMIN_PASSWORD: ${GEOSERVER_ADMIN_PASSWORD}
-      LOSTARK_API_KEY: ${LOSTARK_API_KEY}
-      GEOTIFF_UPLOAD_DIR: /data/geotiff
-      TITILER_URL: http://gtp-titiler:8000
-    restart: unless-stopped
+volumes:
+  ef0f7095a5dd69f7a51266f462d0d0b13df9c0b5ac70a7cc5f3a63b201ef78fc:
+    external: true
+  geoserver-data:

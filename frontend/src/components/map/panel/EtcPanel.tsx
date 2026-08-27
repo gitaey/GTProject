@@ -71,8 +71,12 @@ export default function EtcPanel() {
 
     return (
         <div className="flex flex-col h-full">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-                <span className="text-sm font-semibold text-gray-700">기타 기능</span>
+            <div style={{
+                padding: '10px 10px 10px 12px',
+                borderBottom: '2px solid #F26722',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
+            }}>
+                <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#F26722' }}>기타 기능</span>
             </div>
 
             <div className="flex flex-col gap-4 p-4">

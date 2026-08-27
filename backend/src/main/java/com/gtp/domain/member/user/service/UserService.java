@@ -138,7 +138,7 @@ public class UserService {
     }
 
     private void validatePermission(Role role, Permission permission) {
-        if (role == Role.SUPER_ADMIN) return;
+        if (role == Role.SUPER_ADMIN || role == Role.MAP_ADMIN) return;
         if (permission == null) throw new CustomException(ErrorCode.PERMISSION_REQUIRED);
         if (!permission.belongsTo(role)) throw new CustomException(ErrorCode.INVALID_PERMISSION);
     }

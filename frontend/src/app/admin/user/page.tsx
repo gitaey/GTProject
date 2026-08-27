@@ -559,6 +559,13 @@ export default function UserManagementPage() {
                                     슈퍼관리자는 모든 기능에 접근 가능하며 세부 권한이 없습니다.
                                 </div>
                             )}
+                            {form.role === 'MAP_ADMIN' && (
+                                <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs"
+                                    style={{ background: 'rgba(242,103,34,0.08)', border: '1px solid rgba(242,103,34,0.2)', color: '#F26722' }}>
+                                    <ShieldAlert size={14} />
+                                    지도관리자는 세부 권한 없이 지도 관리 기능에 접근합니다.
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex gap-3 px-6 py-4" style={{ borderTop: '1px solid var(--border)' }}>

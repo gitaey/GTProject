@@ -64,5 +64,5 @@ geoserver:
   url: ${GEOSERVER_URL:https://geo.gitaey-dev.com/geoserver}
   admin:
     user: ${GEOSERVER_ADMIN_USER:admin}
-    password: ${GEOSERVER_ADMIN_PASSWORD:geoserver}
+    password: ${GEOSERVER_ADMIN_PASSWORD:sis3047!@}
   legend-layer: ${GEOSERVER_LEGEND_LAYER:gtp:tl_scco_ctprvn}

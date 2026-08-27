@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { useMapStore, MapTool } from '@/stores/map/mapStore'
 import { useDrawStore, PRESET_COLORS } from '@/stores/map/drawStore'
+import { useMenuStore } from '@/stores/menuStore'
 import Map from 'ol/Map'
 
 // ── 상수 ──────────────────────────────────────────────────────────────────────
@@ -238,10 +239,20 @@ function DrawPanel() {
 
 export default function MapToolbar({ map }: { map: Map | null }) {
     const { activeTool, setActiveTool, clearAll } = useMapStore()
+    const { isAllowed, loaded } = useMenuStore()
     const [drawOpen, setDrawOpen] = useState(false)
     const panelRef = useRef<HTMLDivElement>(null)
 
     const isAnyDraw = isDrawMode(activeTool) || isSelectMode(activeTool)
+
+    // loaded가 false(미로그인/미로드)면 전부 표시
+    const show = (menuId: string) => !loaded || isAllowed(menuId)
+
+    const showDraw    = show('map.tool.draw')
+    const showMeasD   = show('map.tool.measure-distance')
+    const showMeasA   = show('map.tool.measure-area')
+    const showRadius  = show('map.tool.radius-search')
+    const showToolGrp = showDraw || showMeasD || showMeasA || showRadius
 
     function zoom(delta: number) {
         if (!map) return
@@ -253,49 +264,67 @@ export default function MapToolbar({ map }: { map: Map | null }) {
         <div className="absolute top-4 right-3 z-10 flex flex-col gap-2 select-none">
 
             {/* ── 줌 ── */}
-            <div className="flex flex-col rounded-md overflow-hidden" style={SHADOW}>
-                <Tip label="확대"><TBtn onClick={() => zoom(1)} cls="rounded-t-md border-b border-gray-100"><Plus size={16} /></TBtn></Tip>
-                <Tip label="축소"><TBtn onClick={() => zoom(-1)} cls="rounded-b-md"><Minus size={16} /></TBtn></Tip>
-            </div>
+            {show('map.tool.zoom') && (
+                <div className="flex flex-col rounded-md overflow-hidden" style={SHADOW}>
+                    <Tip label="확대"><TBtn onClick={() => zoom(1)} cls="rounded-t-md border-b border-gray-100"><Plus size={16} /></TBtn></Tip>
+                    <Tip label="축소"><TBtn onClick={() => zoom(-1)} cls="rounded-b-md"><Minus size={16} /></TBtn></Tip>
+                </div>
+            )}
 
-            {/* ── 도구 (그리기 + 측정) ── overflow-hidden 없이 bg+rounded만 → 패널이 잘리지 않음 */}
-            <div ref={panelRef} className="relative flex flex-col bg-white rounded-md" style={SHADOW}>
-                <Tip label={drawOpen ? '' : '그리기'}>
-                    <TBtn active={isAnyDraw || drawOpen} onClick={() => setDrawOpen(p => !p)} cls="rounded-t-md border-b border-gray-100">
-                        <PenLine size={15} />
-                    </TBtn>
-                </Tip>
-                <Tip label="거리측정">
-                    <TBtn active={activeTool === 'measure-distance'} onClick={() => setActiveTool('measure-distance')} cls="border-b border-gray-100">
-                        <Ruler size={15} />
-                    </TBtn>
-                </Tip>
-                <Tip label="면적측정">
-                    <TBtn active={activeTool === 'measure-area'} onClick={() => setActiveTool('measure-area')} cls="border-b border-gray-100">
-                        <SquareDashed size={15} />
-                    </TBtn>
-                </Tip>
-                <Tip label="반경검색">
-                    <TBtn active={activeTool === 'radius-search'} onClick={() => setActiveTool('radius-search')} cls="rounded-b-md">
-                        <CircleDot size={15} />
-                    </TBtn>
-                </Tip>
-                {drawOpen && (
-                    <div className="absolute right-11 top-0 z-50">
-                        <DrawPanel />
-                    </div>
-                )}
-            </div>
+            {/* ── 도구 (그리기 + 측정) ── */}
+            {showToolGrp && (
+                <div ref={panelRef} className="relative flex flex-col bg-white rounded-md" style={SHADOW}>
+                    {showDraw && (
+                        <Tip label={drawOpen ? '' : '그리기'}>
+                            <TBtn active={isAnyDraw || drawOpen} onClick={() => setDrawOpen(p => !p)}
+                                cls={`rounded-t-md ${(showMeasD || showMeasA || showRadius) ? 'border-b border-gray-100' : 'rounded-b-md'}`}>
+                                <PenLine size={15} />
+                            </TBtn>
+                        </Tip>
+                    )}
+                    {showMeasD && (
+                        <Tip label="거리측정">
+                            <TBtn active={activeTool === 'measure-distance'} onClick={() => setActiveTool('measure-distance')}
+                                cls={`${!showDraw ? 'rounded-t-md' : ''} ${(showMeasA || showRadius) ? 'border-b border-gray-100' : 'rounded-b-md'}`}>
+                                <Ruler size={15} />
+                            </TBtn>
+                        </Tip>
+                    )}
+                    {showMeasA && (
+                        <Tip label="면적측정">
+                            <TBtn active={activeTool === 'measure-area'} onClick={() => setActiveTool('measure-area')}
+                                cls={`${!showDraw && !showMeasD ? 'rounded-t-md' : ''} ${showRadius ? 'border-b border-gray-100' : 'rounded-b-md'}`}>
+                                <SquareDashed size={15} />
+                            </TBtn>
+                        </Tip>
+                    )}
+                    {showRadius && (
+                        <Tip label="반경검색">
+                            <TBtn active={activeTool === 'radius-search'} onClick={() => setActiveTool('radius-search')}
+                                cls={`${!showDraw && !showMeasD && !showMeasA ? 'rounded-t-md' : ''} rounded-b-md`}>
+                                <CircleDot size={15} />
+                            </TBtn>
+                        </Tip>
+                    )}
+                    {drawOpen && showDraw && (
+                        <div className="absolute right-11 top-0 z-50">
+                            <DrawPanel />
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* ── 초기화 ── */}
-            <div className="flex flex-col rounded-md overflow-hidden" style={SHADOW}>
-                <Tip label="전체 초기화">
-                    <button onClick={clearAll}
-                        className="w-9 h-9 flex items-center justify-center bg-white text-gray-400 hover:bg-red-50 hover:text-red-400 transition-colors rounded-md cursor-pointer">
-                        <Trash2 size={15} />
-                    </button>
-                </Tip>
-            </div>
+            {show('map.tool.clear') && (
+                <div className="flex flex-col rounded-md overflow-hidden" style={SHADOW}>
+                    <Tip label="전체 초기화">
+                        <button onClick={clearAll}
+                            className="w-9 h-9 flex items-center justify-center bg-white text-gray-400 hover:bg-red-50 hover:text-red-400 transition-colors rounded-md cursor-pointer">
+                            <Trash2 size={15} />
+                        </button>
+                    </Tip>
+                </div>
+            )}
         </div>
     )
 }

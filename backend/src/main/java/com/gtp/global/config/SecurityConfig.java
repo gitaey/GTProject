@@ -47,6 +47,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/layer-groups/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/bot-log/**").permitAll()
                 .requestMatchers("/api/bot/**").authenticated()
+                .requestMatchers("/api/access-log/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/menu-visibility").authenticated()
+                .requestMatchers(HttpMethod.PUT, "/api/menu-visibility").hasRole("SUPER_ADMIN")
                 .anyRequest().permitAll()
             )
             .addFilterBefore(new JwtFilter(jwtUtil), UsernamePasswordAuthenticationFilter.class);

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuthStore } from '@/stores/authStore'
 import { useSidebarStore } from '@/stores/sidebarStore'
+import { useMenuStore } from '@/stores/menuStore'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 
 interface SubMenuItem {
@@ -23,33 +24,22 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
     { id: 'home', label: '대시보드', href: '/' },
     {
+        id: 'system',
+        label: '시스템',
+        children: [
+            { id: 'system-user', label: '사용자 관리', href: '/admin/user' },
+            { id: 'system-access-log', label: '접속 로그', href: '/admin/access-log' },
+            { id: 'system-menu', label: '메뉴 관리', href: '/admin/menu' },
+        ],
+    },
+    {
         id: 'map-admin',
         label: '지도',
         children: [
-            { id: 'map-view',       label: '지도 보기',            href: '/map' },
-            { id: 'map-layer',      label: '레이어 관리',          href: '/map-admin/layer' },
-            { id: 'map-layer-perm', label: '사용자별 레이어 권한', href: '/map-admin/layer-perm' },
-            { id: 'map-menu',       label: '메뉴 관리',            href: '/map-admin/menu' },
-            { id: 'map-permission', label: '권한 관리',            href: '/map-admin/permission' },
-        ],
-    },
-    {
-        id: 'blog',
-        label: '블로그',
-        children: [
-            { id: 'blog-view',     label: '블로그 보기',  href: '/blog' },
-            { id: 'blog-admin',    label: '포스트 관리',  href: '/admin/blog' },
-            { id: 'blog-category', label: '카테고리 관리', href: '/admin/blog/category' },
-        ],
-    },
-    {
-        id: 'bot',
-        label: '기빵봇',
-        children: [
-            { id: 'bot-log',      label: '봇 로그',       href: '/admin/bot-log' },
-            { id: 'bot-command',  label: '명령어 관리',   href: '/admin/bot/command' },
-            { id: 'bot-schedule', label: '자동 전송 관리', href: '/admin/bot/schedule' },
-            { id: 'bot-room',     label: '방 모니터링',   href: '/admin/bot/room' },
+            { id: 'map-view', label: '지도 보기', href: '/map' },
+            { id: 'map-layer', label: '레이어 관리', href: '/map-admin/layer' },
+            { id: 'map-menu', label: '메뉴 관리', href: '/map-admin/menu' },
+            { id: 'map-permission', label: '권한 관리', href: '/map-admin/permission' },
         ],
     },
     {
@@ -61,10 +51,22 @@ const menuItems: MenuItem[] = [
         ],
     },
     {
-        id: 'system',
-        label: '시스템',
+        id: 'blog',
+        label: '블로그',
         children: [
-            { id: 'system-user', label: '사용자 관리', href: '/admin/user' },
+            { id: 'blog-view', label: '블로그 보기', href: '/blog' },
+            { id: 'blog-admin', label: '포스트 관리', href: '/admin/blog' },
+            { id: 'blog-category', label: '카테고리 관리', href: '/admin/blog/category' },
+        ],
+    },
+    {
+        id: 'bot',
+        label: '기빵봇',
+        children: [
+            { id: 'bot-log', label: '봇 로그', href: '/admin/bot-log' },
+            { id: 'bot-command', label: '명령어 관리', href: '/admin/bot/command' },
+            { id: 'bot-schedule', label: '자동 전송 관리', href: '/admin/bot/schedule' },
+            { id: 'bot-room', label: '방 모니터링', href: '/admin/bot/room' },
         ],
     },
 ]
@@ -72,16 +74,35 @@ const menuItems: MenuItem[] = [
 const ADMIN_ONLY_IDS = new Set(['map-admin', 'bot', 'geoserver', 'system'])
 
 export default function Sidebar() {
-    const pathname        = usePathname()
-    const { user }        = useAuthStore()
+    const pathname = usePathname()
+    const { user } = useAuthStore()
     const { isOpen, close } = useSidebarStore()
+    const { isAllowed, loaded } = useMenuStore()
 
     const isSuperAdmin = user?.role === 'SUPER_ADMIN'
-    const visibleMenus = menuItems.filter(m => m.id === 'home' || isSuperAdmin || !ADMIN_ONLY_IDS.has(m.id))
+
+    const getVisibleMenus = (): MenuItem[] => {
+        if (isSuperAdmin) return menuItems
+        if (!loaded) {
+            return menuItems.filter((m) => m.id === 'home' || !ADMIN_ONLY_IDS.has(m.id))
+        }
+        return menuItems
+            .map((item) => {
+                if (!item.children) {
+                    return isAllowed('sidebar.' + item.id) ? item : null
+                }
+                const visibleChildren = item.children.filter((c) => isAllowed('sidebar.' + c.id))
+                if (visibleChildren.length === 0) return null
+                return { ...item, children: visibleChildren }
+            })
+            .filter((item): item is MenuItem => item !== null)
+    }
+
+    const visibleMenus = getVisibleMenus()
 
     const findActiveGroup = () => {
         for (const m of visibleMenus) {
-            if (m.children?.some(c => pathname.startsWith(c.href))) return m.id
+            if (m.children?.some((c) => pathname.startsWith(c.href))) return m.id
         }
         return null
     }
@@ -89,11 +110,13 @@ export default function Sidebar() {
     const [open, setOpen] = useState<string | null>(findActiveGroup)
 
     // 페이지 이동 시 모바일 사이드바 닫기
-    useEffect(() => { close() }, [pathname, close])
+    useEffect(() => {
+        close()
+    }, [pathname, close])
 
     const displayName = user?.nickname ?? user?.userId ?? '사용자'
-    const initial     = displayName.charAt(0).toUpperCase()
-    const roleLabel   = user?.roleLabel ?? ''
+    const initial = displayName.charAt(0).toUpperCase()
+    const roleLabel = user?.roleLabel ?? ''
 
     const isActive = (href: string) => pathname === href
 
@@ -108,7 +131,11 @@ export default function Sidebar() {
             style={{ background: 'var(--bg-sidebar)', borderRight: '1px solid var(--border)' }}
         >
             {/* 로고 */}
-            <Link href="/" className="px-4 py-4 flex items-center gap-2.5 cursor-pointer" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+            <Link
+                href="/"
+                className="px-4 py-4 flex items-center gap-2.5 cursor-pointer"
+                style={{ borderBottom: '1px solid var(--border-subtle)' }}
+            >
                 <div className="w-2 h-2 rounded-full shrink-0" style={{ background: 'var(--accent)' }} />
                 <span className="text-sm font-medium tracking-tight" style={{ color: 'var(--text-primary)' }}>
                     기빵 프로젝트
@@ -134,8 +161,8 @@ export default function Sidebar() {
                         )
                     }
 
-                    const isGroupActive = item.children.some(c => pathname.startsWith(c.href))
-                    const isGroupOpen   = open === item.id
+                    const isGroupActive = item.children.some((c) => pathname.startsWith(c.href))
+                    const isGroupOpen = open === item.id
 
                     return (
                         <div key={item.id} className="mt-1">
@@ -145,10 +172,11 @@ export default function Sidebar() {
                                 style={{ color: isGroupActive ? 'var(--accent)' : 'var(--text-primary)' }}
                             >
                                 <span>{item.label}</span>
-                                {isGroupOpen
-                                    ? <ChevronDown size={13} style={{ color: 'var(--text-faint)' }} />
-                                    : <ChevronRight size={13} style={{ color: 'var(--text-faint)' }} />
-                                }
+                                {isGroupOpen ? (
+                                    <ChevronDown size={13} style={{ color: 'var(--text-faint)' }} />
+                                ) : (
+                                    <ChevronRight size={13} style={{ color: 'var(--text-faint)' }} />
+                                )}
                             </button>
 
                             {isGroupOpen && (
@@ -178,7 +206,10 @@ export default function Sidebar() {
             </nav>
 
             {/* 푸터 */}
-            <div className="px-4 py-3 flex items-center gap-2.5" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+            <div
+                className="px-4 py-3 flex items-center gap-2.5"
+                style={{ borderTop: '1px solid var(--border-subtle)' }}
+            >
                 <div
                     className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-medium shrink-0"
                     style={{ background: 'var(--accent)' }}
@@ -186,8 +217,12 @@ export default function Sidebar() {
                     {initial}
                 </div>
                 <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate" style={{ color: 'var(--text-secondary)' }}>{displayName}</p>
-                    <p className="font-mono text-[10px] truncate" style={{ color: 'var(--text-faint)' }}>{roleLabel}</p>
+                    <p className="text-xs font-medium truncate" style={{ color: 'var(--text-secondary)' }}>
+                        {displayName}
+                    </p>
+                    <p className="font-mono text-[10px] truncate" style={{ color: 'var(--text-faint)' }}>
+                        {roleLabel}
+                    </p>
                 </div>
             </div>
         </aside>
@@ -196,12 +231,7 @@ export default function Sidebar() {
     return (
         <>
             {/* 모바일 백드롭 */}
-            {isOpen && (
-                <div
-                    className="fixed inset-0 z-30 bg-black/50 sm:hidden"
-                    onClick={close}
-                />
-            )}
+            {isOpen && <div className="fixed inset-0 z-30 bg-black/50 sm:hidden" onClick={close} />}
             {sidebarContent}
         </>
     )
