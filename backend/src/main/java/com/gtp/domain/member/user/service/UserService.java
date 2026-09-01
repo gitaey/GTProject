@@ -1,10 +1,9 @@
 package com.gtp.domain.member.user.service;
 
+import com.gtp.domain.member.role.service.RoleService;
 import com.gtp.domain.member.user.dto.UserCreateRequest;
 import com.gtp.domain.member.user.dto.UserResponse;
 import com.gtp.domain.member.user.dto.UserUpdateRequest;
-import com.gtp.domain.member.user.entity.Permission;
-import com.gtp.domain.member.user.entity.Role;
 import com.gtp.domain.member.user.entity.User;
 import com.gtp.domain.member.user.entity.UserStatus;
 import com.gtp.domain.member.user.repository.UserRepository;
@@ -27,14 +26,15 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RoleService roleService;
 
     /* 목록 조회 (검색 + 필터 + 페이징) */
     public Page<UserResponse> getUsers(String keyword, String role, String status, Pageable pageable) {
-        Role roleEnum     = parseRole(role);
+        String roleCode   = StringUtils.hasText(role) ? role : null;
         UserStatus statusEnum = parseStatus(status);
         String kw         = StringUtils.hasText(keyword) ? keyword : null;
 
-        return userRepository.search(kw, roleEnum, statusEnum, pageable)
+        return userRepository.search(kw, roleCode, statusEnum, pageable)
                 .map(UserResponse::new);
     }
 
@@ -56,7 +56,7 @@ public class UserService {
             throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
         }
 
-        validatePermission(req.getRole(), req.getPermission());
+        roleService.validateRolePermission(req.getRole(), req.getPermission());
 
         User user = User.builder()
                 .userId(req.getUserId())
@@ -64,8 +64,8 @@ public class UserService {
                 .nickname(StringUtils.hasText(req.getNickname()) ? req.getNickname() : null)
                 .email(StringUtils.hasText(req.getEmail()) ? req.getEmail() : null)
                 .password(passwordEncoder.encode(req.getPassword()))
-                .role(req.getRole())
-                .permission(req.getPermission())
+                .roleCode(req.getRole())
+                .permissionCode(req.getPermission())
                 .status(UserStatus.ACTIVE)
                 .build();
 
@@ -88,7 +88,7 @@ public class UserService {
             throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
         }
 
-        validatePermission(req.getRole(), req.getPermission());
+        roleService.validateRolePermission(req.getRole(), req.getPermission());
 
         user.update(
                 StringUtils.hasText(req.getUserName()) ? req.getUserName() : null,
@@ -135,18 +135,6 @@ public class UserService {
     private User findById(String userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-    }
-
-    private void validatePermission(Role role, Permission permission) {
-        if (role == Role.SUPER_ADMIN || role == Role.MAP_ADMIN) return;
-        if (permission == null) throw new CustomException(ErrorCode.PERMISSION_REQUIRED);
-        if (!permission.belongsTo(role)) throw new CustomException(ErrorCode.INVALID_PERMISSION);
-    }
-
-    private Role parseRole(String role) {
-        if (!StringUtils.hasText(role)) return null;
-        try { return Role.valueOf(role); }
-        catch (IllegalArgumentException e) { throw new CustomException(ErrorCode.INVALID_ROLE); }
     }
 
     private UserStatus parseStatus(String status) {

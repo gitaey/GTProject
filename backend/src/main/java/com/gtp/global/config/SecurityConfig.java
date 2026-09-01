@@ -50,6 +50,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/access-log/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/menu-visibility").authenticated()
                 .requestMatchers(HttpMethod.PUT, "/api/menu-visibility").hasRole("SUPER_ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/roles", "/api/roles/**").authenticated()
+                .requestMatchers("/api/roles/**").hasRole("SUPER_ADMIN")
                 .anyRequest().permitAll()
             )
             .addFilterBefore(new JwtFilter(jwtUtil), UsernamePasswordAuthenticationFilter.class);

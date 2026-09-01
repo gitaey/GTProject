@@ -3,8 +3,6 @@ package com.gtp.domain.menu.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gtp.domain.member.user.entity.Permission;
-import com.gtp.domain.member.user.entity.Role;
 import com.gtp.domain.menu.entity.MenuVisibility;
 import com.gtp.domain.menu.repository.MenuVisibilityRepository;
 import com.gtp.global.exception.CustomException;
@@ -33,7 +31,7 @@ public class MenuVisibilityService {
             "sidebar.blog-view", "sidebar.blog-admin", "sidebar.blog-category",
             "sidebar.bot-log", "sidebar.bot-command", "sidebar.bot-schedule", "sidebar.bot-room",
             "sidebar.geoserver-publish", "sidebar.geoserver-styles",
-            "sidebar.system-user", "sidebar.system-access-log", "sidebar.system-menu",
+            "sidebar.system-user", "sidebar.system-access-log", "sidebar.system-menu", "sidebar.system-permission",
             "map.panel.layer", "map.panel.image", "map.panel.etc",
             "map.tool.zoom", "map.tool.draw", "map.tool.measure-distance",
             "map.tool.measure-area", "map.tool.radius-search", "map.tool.clear"
@@ -68,15 +66,14 @@ public class MenuVisibilityService {
      * role + permission 조합으로 menuIds 조회.
      * DB에 없으면 DEFAULT_MENUS에서 기본값 반환.
      */
-    public List<String> getMenuIds(Role role, Permission permission) {
-        Optional<MenuVisibility> opt = menuVisibilityRepository.findByRoleAndPermission(role, permission);
+    public List<String> getMenuIds(String roleCode, String permissionCode) {
+        Optional<MenuVisibility> opt = menuVisibilityRepository.findByRoleCodeAndPermissionCode(roleCode, permissionCode);
 
         if (opt.isPresent()) {
             return parseMenuIds(opt.get().getMenuIds());
         }
 
-        // 기본값 키 생성: SUPER_ADMIN, MAP_ADMIN, MAP_USER_VIEWER, MAP_USER_DEPT_A, MAP_USER_DEPT_B
-        String defaultKey = buildDefaultKey(role, permission);
+        String defaultKey = buildDefaultKey(roleCode, permissionCode);
         List<String> defaults = DEFAULT_MENUS.get(defaultKey);
         if (defaults == null) {
             throw new CustomException(ErrorCode.NOT_FOUND);
@@ -88,16 +85,16 @@ public class MenuVisibilityService {
      * role + permission 조합으로 menuIds 저장(upsert).
      */
     @Transactional
-    public void updateMenuIds(Role role, Permission permission, List<String> menuIds) {
+    public void updateMenuIds(String roleCode, String permissionCode, List<String> menuIds) {
         String menuIdsJson = serializeMenuIds(menuIds);
 
-        menuVisibilityRepository.findByRoleAndPermission(role, permission)
+        menuVisibilityRepository.findByRoleCodeAndPermissionCode(roleCode, permissionCode)
             .ifPresentOrElse(
                 existing -> existing.updateMenuIds(menuIdsJson),
                 () -> menuVisibilityRepository.save(
                     MenuVisibility.builder()
-                        .role(role)
-                        .permission(permission)
+                        .roleCode(roleCode)
+                        .permissionCode(permissionCode)
                         .menuIds(menuIdsJson)
                         .build()
                 )
@@ -122,11 +119,11 @@ public class MenuVisibilityService {
         }
     }
 
-    private String buildDefaultKey(Role role, Permission permission) {
-        if (role == Role.SUPER_ADMIN) return "SUPER_ADMIN";
-        if (role == Role.MAP_ADMIN) return "MAP_ADMIN";
-        if (role == Role.MAP_USER && permission != null) {
-            return "MAP_USER_" + permission.name();
+    private String buildDefaultKey(String roleCode, String permissionCode) {
+        if ("SUPER_ADMIN".equals(roleCode)) return "SUPER_ADMIN";
+        if ("MAP_ADMIN".equals(roleCode)) return "MAP_ADMIN";
+        if ("MAP_USER".equals(roleCode) && permissionCode != null && !permissionCode.isBlank()) {
+            return "MAP_USER_" + permissionCode;
         }
         throw new CustomException(ErrorCode.INVALID_INPUT);
     }

@@ -1,7 +1,5 @@
 package com.gtp.domain.menu.controller;
 
-import com.gtp.domain.member.user.entity.Permission;
-import com.gtp.domain.member.user.entity.Role;
 import com.gtp.domain.menu.dto.MenuVisibilityRequest;
 import com.gtp.domain.menu.dto.MenuVisibilityResponse;
 import com.gtp.domain.menu.service.MenuVisibilityService;
@@ -30,10 +28,8 @@ public class MenuVisibilityController {
             @RequestParam String role,
             @RequestParam(required = false) String permission
     ) {
-        Role roleEnum = parseRole(role);
-        Permission permissionEnum = parsePermission(permission);
-
-        List<String> menuIds = menuVisibilityService.getMenuIds(roleEnum, permissionEnum);
+        if (!StringUtils.hasText(role)) throw new CustomException(ErrorCode.INVALID_INPUT);
+        List<String> menuIds = menuVisibilityService.getMenuIds(role, permission);
         return ApiResponse.ok(new MenuVisibilityResponse(role, permission, menuIds));
     }
 
@@ -45,24 +41,8 @@ public class MenuVisibilityController {
     public ApiResponse<MenuVisibilityResponse> updateMenuVisibility(
             @RequestBody MenuVisibilityRequest req
     ) {
-        Role roleEnum = parseRole(req.getRole());
-        Permission permissionEnum = parsePermission(req.getPermission());
-
-        menuVisibilityService.updateMenuIds(roleEnum, permissionEnum, req.getMenuIds());
+        if (!StringUtils.hasText(req.getRole())) throw new CustomException(ErrorCode.INVALID_INPUT);
+        menuVisibilityService.updateMenuIds(req.getRole(), req.getPermission(), req.getMenuIds());
         return ApiResponse.ok(new MenuVisibilityResponse(req.getRole(), req.getPermission(), req.getMenuIds()));
-    }
-
-    /* ────────── 내부 유틸 ────────── */
-
-    private Role parseRole(String role) {
-        if (!StringUtils.hasText(role)) throw new CustomException(ErrorCode.INVALID_INPUT);
-        try { return Role.valueOf(role); }
-        catch (IllegalArgumentException e) { throw new CustomException(ErrorCode.INVALID_ROLE); }
-    }
-
-    private Permission parsePermission(String permission) {
-        if (!StringUtils.hasText(permission)) return null;
-        try { return Permission.valueOf(permission); }
-        catch (IllegalArgumentException e) { throw new CustomException(ErrorCode.INVALID_PERMISSION); }
     }
 }

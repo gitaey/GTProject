@@ -43,7 +43,12 @@ public enum ErrorCode {
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다."),
     ACCOUNT_INACTIVE(HttpStatus.FORBIDDEN, "비활성화된 계정입니다."),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
-    INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다.");
+    INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다."),
+
+    // 역할/세부권한 관련
+    DUPLICATE_ROLE_CODE(HttpStatus.CONFLICT, "이미 존재하는 역할 코드입니다."),
+    DUPLICATE_PERMISSION_CODE(HttpStatus.CONFLICT, "이미 존재하는 세부 권한 코드입니다."),
+    ROLE_HAS_PERMISSIONS(HttpStatus.CONFLICT, "세부 권한이 있는 역할은 삭제할 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;

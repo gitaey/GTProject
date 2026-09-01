@@ -28,8 +28,24 @@ import type {
     UserStatus,
     UserUpdateRequest,
 } from '@/types/user'
-import { PERMISSION_MAP, ROLE_OPTIONS } from '@/types/user'
 import { getToken } from '@/stores/authStore'
+
+/* ── 역할 API 타입 ── */
+interface RolePermissionItem {
+    code: string
+    roleCode: string
+    label: string
+    sortOrder: number
+}
+
+interface RoleItem {
+    code: string
+    label: string
+    hasSubPermission: boolean
+    isSuper: boolean
+    sortOrder: number
+    permissions: RolePermissionItem[]
+}
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
@@ -51,6 +67,8 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
     if (!json.success) throw new Error(json.message)
     return json.data
 }
+
+const fetchRoles = () => apiFetch<RoleItem[]>('/api/roles')
 
 const fetchUsers = (params: Record<string, string>) =>
     apiFetch<UserPage>(`/api/users?${new URLSearchParams(params)}`)
@@ -75,24 +93,25 @@ const EMPTY_FORM: UserFormState = {
     role: 'MAP_USER', permission: 'VIEWER',
 }
 
-function RoleIcon({ role }: { role: Role }) {
-    if (role === 'SUPER_ADMIN') return <ShieldAlert size={11} />
+function RoleIcon({ role, isSuper }: { role: Role; isSuper?: boolean }) {
+    if (isSuper || role === 'SUPER_ADMIN') return <ShieldAlert size={11} />
     if (role === 'MAP_ADMIN')   return <Map size={11} />
     return <UserIcon size={11} />
 }
 
-const ROLE_STYLE: Record<Role, { bg: string; color: string }> = {
+const ROLE_STYLE: Record<string, { bg: string; color: string }> = {
     SUPER_ADMIN: { bg: 'rgba(239,68,68,0.12)',  color: '#ef4444' },
     MAP_ADMIN:   { bg: 'rgba(59,130,246,0.12)', color: '#3b82f6' },
     MAP_USER:    { bg: 'rgba(107,114,128,0.12)', color: 'var(--text-muted)' },
 }
+const DEFAULT_ROLE_STYLE = { bg: 'rgba(107,114,128,0.12)', color: 'var(--text-muted)' }
 
-function RoleBadge({ role, roleLabel }: { role: Role; roleLabel: string }) {
-    const s = ROLE_STYLE[role]
+function RoleBadge({ role, roleLabel, isSuper }: { role: Role; roleLabel: string; isSuper?: boolean }) {
+    const s = isSuper ? ROLE_STYLE.SUPER_ADMIN : (ROLE_STYLE[role] ?? DEFAULT_ROLE_STYLE)
     return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
             style={{ background: s.bg, color: s.color }}>
-            <RoleIcon role={role} />
+            <RoleIcon role={role} isSuper={isSuper} />
             {roleLabel}
         </span>
     )
@@ -126,6 +145,7 @@ const inputStyle: React.CSSProperties = {
 }
 
 export default function UserManagementPage() {
+    const [roles, setRoles]             = useState<RoleItem[]>([])
     const [page, setPage]               = useState<UserPage | null>(null)
     const [loading, setLoading]         = useState(false)
     const [error, setError]             = useState<string | null>(null)
@@ -144,9 +164,18 @@ export default function UserManagementPage() {
 
     const abortRef = useRef<AbortController | null>(null)
 
+    useEffect(() => {
+        fetchRoles()
+            .then(data => setRoles([...data].sort((a, b) => a.sortOrder - b.sortOrder)))
+            .catch(() => {/* 역할 로드 실패 시 조용히 무시 */})
+    }, [])
+
     const users       = page?.content ?? []
     const totalPages  = page?.totalPages ?? 0
-    const permissions = PERMISSION_MAP[form.role]
+    const currentRoleItem = roles.find(r => r.code === form.role)
+    const permissions = currentRoleItem?.hasSubPermission
+        ? currentRoleItem.permissions.slice().sort((a, b) => a.sortOrder - b.sortOrder)
+        : []
 
     const isAllChecked    = users.length > 0 && users.every((u) => selectedIds.has(u.userId))
     const isIndeterminate = users.some((u) => selectedIds.has(u.userId)) && !isAllChecked
@@ -182,8 +211,11 @@ export default function UserManagementPage() {
     useEffect(() => { load() }, [load])
 
     const handleRoleChange = (role: Role) => {
-        const perms = PERMISSION_MAP[role]
-        setForm((f) => ({ ...f, role, permission: perms ? perms[0].value : '' }))
+        const roleItem = roles.find(r => r.code === role)
+        const firstPerm = roleItem?.hasSubPermission && roleItem.permissions.length > 0
+            ? roleItem.permissions.slice().sort((a, b) => a.sortOrder - b.sortOrder)[0].code as Permission
+            : '' as Permission | ''
+        setForm((f) => ({ ...f, role, permission: firstPerm }))
     }
 
     const openCreate = () => { setForm(EMPTY_FORM); setFormError(null); setModalType('create') }
@@ -283,8 +315,8 @@ export default function UserManagementPage() {
                             style={inputStyle}
                         >
                             <option value="">전체 역할</option>
-                            {ROLE_OPTIONS.map((r) => (
-                                <option key={r.value} value={r.value}>{r.label}</option>
+                            {roles.map((r) => (
+                                <option key={r.code} value={r.code}>{r.label}</option>
                             ))}
                         </select>
 
@@ -410,7 +442,7 @@ export default function UserManagementPage() {
                                                 <td className="px-4 py-4" style={{ color: 'var(--text-secondary)' }}>{user.nickname ?? '-'}</td>
                                                 <td className="px-4 py-4" style={{ color: 'var(--text-muted)' }}>{user.email ?? '-'}</td>
                                                 <td className="px-4 py-4">
-                                                    <RoleBadge role={user.role} roleLabel={user.roleLabel} />
+                                                    <RoleBadge role={user.role} roleLabel={user.roleLabel} isSuper={roles.find(r => r.code === user.role)?.isSuper} />
                                                 </td>
                                                 <td className="px-4 py-4 text-xs" style={{ color: 'var(--text-muted)' }}>
                                                     {user.permissionLabel ?? '-'}
@@ -528,13 +560,13 @@ export default function UserManagementPage() {
                                     className="w-full px-3 py-2.5 text-sm focus:outline-none"
                                     style={inputStyle}
                                 >
-                                    {ROLE_OPTIONS.map((r) => (
-                                        <option key={r.value} value={r.value}>{r.label}</option>
+                                    {roles.map((r) => (
+                                        <option key={r.code} value={r.code}>{r.label}</option>
                                     ))}
                                 </select>
                             </div>
 
-                            {permissions && permissions.length > 0 && (
+                            {permissions.length > 0 && (
                                 <div>
                                     <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
                                         세부 권한 <span style={{ color: '#ef4444' }}>*</span>
@@ -546,24 +578,24 @@ export default function UserManagementPage() {
                                         style={inputStyle}
                                     >
                                         {permissions.map((p) => (
-                                            <option key={p.value} value={p.value}>{p.label}</option>
+                                            <option key={p.code} value={p.code}>{p.label}</option>
                                         ))}
                                     </select>
                                 </div>
                             )}
 
-                            {form.role === 'SUPER_ADMIN' && (
+                            {currentRoleItem?.isSuper && (
                                 <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs"
                                     style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444' }}>
                                     <ShieldAlert size={14} />
                                     슈퍼관리자는 모든 기능에 접근 가능하며 세부 권한이 없습니다.
                                 </div>
                             )}
-                            {form.role === 'MAP_ADMIN' && (
+                            {!currentRoleItem?.isSuper && !currentRoleItem?.hasSubPermission && form.role && (
                                 <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs"
                                     style={{ background: 'rgba(242,103,34,0.08)', border: '1px solid rgba(242,103,34,0.2)', color: '#F26722' }}>
                                     <ShieldAlert size={14} />
-                                    지도관리자는 세부 권한 없이 지도 관리 기능에 접근합니다.
+                                    이 역할은 세부 권한 없이 해당 기능에 접근합니다.
                                 </div>
                             )}
                         </div>

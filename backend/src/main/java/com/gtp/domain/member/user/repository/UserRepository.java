@@ -1,6 +1,5 @@
 package com.gtp.domain.member.user.repository;
 
-import com.gtp.domain.member.user.entity.Role;
 import com.gtp.domain.member.user.entity.User;
 import com.gtp.domain.member.user.entity.UserStatus;
 import org.springframework.data.domain.Page;
@@ -17,7 +16,7 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     boolean existsByEmail(String email);
 
-    /* 키워드(user_id/이름/닉네임/이메일) + 역할 + 상태 필터 검색 */
+    /* 키워드(user_id/이름/닉네임/이메일) + 역할코드 + 상태 필터 검색 */
     @Query("""
         SELECT u FROM User u
         WHERE (:keyword IS NULL
@@ -25,13 +24,13 @@ public interface UserRepository extends JpaRepository<User, String> {
                OR u.userName LIKE %:keyword%
                OR u.nickname LIKE %:keyword%
                OR u.email    LIKE %:keyword%)
-          AND (:role   IS NULL OR u.role   = :role)
+          AND (:roleCode IS NULL OR u.roleCode = :roleCode)
           AND (:status IS NULL OR u.status = :status)
         ORDER BY u.createdAt DESC
     """)
     Page<User> search(
             @Param("keyword") String keyword,
-            @Param("role") Role role,
+            @Param("roleCode") String roleCode,
             @Param("status") UserStatus status,
             Pageable pageable
     );

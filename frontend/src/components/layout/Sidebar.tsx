@@ -28,6 +28,7 @@ const menuItems: MenuItem[] = [
         label: '시스템',
         children: [
             { id: 'system-user', label: '사용자 관리', href: '/admin/user' },
+            { id: 'system-permission', label: '권한 관리', href: '/admin/permission' },
             { id: 'system-access-log', label: '접속 로그', href: '/admin/access-log' },
             { id: 'system-menu', label: '메뉴 관리', href: '/admin/menu' },
         ],

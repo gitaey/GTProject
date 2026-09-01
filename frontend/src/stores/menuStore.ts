@@ -18,14 +18,21 @@ export const useMenuStore = create<MenuStoreState>((set, get) => ({
     fetchMenus: async (role, permission) => {
         const token = getToken()
         if (!token) return
-        const params = new URLSearchParams({ role })
-        if (permission) params.set('permission', permission)
-        const res = await fetch(`${API}/api/menu-visibility?${params}`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-        const json = await res.json()
-        if (json.success) {
-            set({ allowedMenus: new Set(json.data.menuIds), loaded: true })
+        try {
+            const params = new URLSearchParams({ role })
+            if (permission) params.set('permission', permission)
+            const res = await fetch(`${API}/api/menu-visibility?${params}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            })
+            if (!res.ok) { set({ loaded: true }); return }
+            const json = await res.json()
+            if (json.success) {
+                set({ allowedMenus: new Set(json.data.menuIds), loaded: true })
+            } else {
+                set({ loaded: true })
+            }
+        } catch {
+            set({ loaded: true })
         }
     },
 

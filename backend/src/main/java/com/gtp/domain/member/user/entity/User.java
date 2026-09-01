@@ -38,15 +38,13 @@ public class User {
     @Comment("BCrypt 암호화된 비밀번호")
     private String password;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false, length = 20)
-    @Comment("사용자 역할 (SUPER_ADMIN: 슈퍼관리자, USER: 일반 사용자, LOSTARK: 로스트아크)")
-    private Role role;
+    @Column(name = "role", nullable = false, length = 30)
+    @Comment("사용자 역할 코드 (tbl_role.code 참조)")
+    private String roleCode;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "permission", length = 30)
-    @Comment("역할별 세부 권한 (SUPER_ADMIN은 NULL, USER/LOSTARK는 필수)")
-    private Permission permission;
+    @Comment("역할별 세부 권한 코드 (tbl_permission.code 참조, nullable)")
+    private String permissionCode;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
@@ -68,12 +66,12 @@ public class User {
     private LocalDateTime updatedAt;
 
     /* 정보 수정 */
-    public void update(String userName, String nickname, String email, Role role, Permission permission) {
-        this.userName   = userName;
-        this.nickname   = nickname;
-        this.email      = email;
-        this.role       = role;
-        this.permission = permission;
+    public void update(String userName, String nickname, String email, String roleCode, String permissionCode) {
+        this.userName       = userName;
+        this.nickname       = nickname;
+        this.email          = email;
+        this.roleCode       = roleCode;
+        this.permissionCode = permissionCode;
     }
 
     /* 비밀번호 변경 */

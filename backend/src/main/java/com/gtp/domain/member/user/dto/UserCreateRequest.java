@@ -1,7 +1,5 @@
 package com.gtp.domain.member.user.dto;
 
-import com.gtp.domain.member.user.entity.Permission;
-import com.gtp.domain.member.user.entity.Role;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
 
@@ -25,9 +23,9 @@ public class UserCreateRequest {
     @Size(min = 8, message = "비밀번호는 최소 8자 이상이어야 합니다.")
     private String password;
 
-    @NotNull(message = "역할은 필수입니다.")
-    private Role role;
+    @NotBlank(message = "역할은 필수입니다.")
+    private String role; // 역할 코드 (tbl_role.code)
 
-    /* SUPER_ADMIN은 null, USER/LOSTARK는 필수 (서비스 레이어에서 검증) */
-    private Permission permission;
+    /* hasSubPermission=true인 역할은 필수 (서비스 레이어에서 검증) */
+    private String permission; // 세부 권한 코드 (tbl_permission.code, nullable)
 }
