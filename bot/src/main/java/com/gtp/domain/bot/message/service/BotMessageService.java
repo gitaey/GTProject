@@ -197,14 +197,26 @@ public class BotMessageService {
         // 로펙 점수
         String lopecScore = fetchLopecScore(name);
 
-        // 어빌리티 스톤 각인 파싱
+        // 어빌리티 스톤 각인 파싱 + 무기/완갑 강화 단계
         Map<String, Integer> stoneEngravings = new HashMap<>();
+        String weaponRefine = null;
+        String armorRefine = null;
+        java.util.regex.Pattern refinePattern = java.util.regex.Pattern.compile("\\+(\\d+)");
         try {
             List<EquipmentItem> equipment = lostarkService.getEquipment(name);
             for (EquipmentItem item : equipment) {
-                if ("어빌리티 스톤".equals(item.getType()) && item.getTooltip() != null) {
+                String type = item.getType();
+                if (type == null) continue;
+                if ("어빌리티 스톤".equals(type) && item.getTooltip() != null) {
                     stoneEngravings = parseStoneEngravings(item.getTooltip());
-                    break;
+                }
+                if ("무기".equals(type) && weaponRefine == null && item.getName() != null) {
+                    java.util.regex.Matcher m = refinePattern.matcher(item.getName());
+                    if (m.find()) weaponRefine = "+" + m.group(1);
+                }
+                if (armorRefine == null && "완갑".equals(type) && item.getName() != null) {
+                    java.util.regex.Matcher m = refinePattern.matcher(item.getName());
+                    if (m.find()) armorRefine = "+" + m.group(1);
                 }
             }
         } catch (Exception ignored) {}
@@ -221,6 +233,12 @@ public class BotMessageService {
         if (!arkTitle.isEmpty()) sb.append("/").append(arkTitle);
         sb.append("\n");
         if (ancientCount > 0) sb.append("고대코어 ").append(ancientCount).append("개\n");
+        if (weaponRefine != null || armorRefine != null) {
+            if (weaponRefine != null) sb.append("무기 ").append(weaponRefine);
+            if (weaponRefine != null && armorRefine != null) sb.append(" / ");
+            if (armorRefine != null) sb.append("완갑 ").append(armorRefine);
+            sb.append("\n");
+        }
         sb.append("───────────────\n");
         sb.append("◆ 레벨  템").append(d.getItemAvgLevel()).append("/원").append(d.getExpeditionLevel()).append("\n");
         sb.append("◆ 투력  ").append(d.getCombatPower()).append("\n");
