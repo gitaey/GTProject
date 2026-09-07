@@ -216,7 +216,10 @@ public class BotMessageService {
                 }
                 if (armorRefine == null && "완갑".equals(type) && item.getName() != null) {
                     java.util.regex.Matcher m = refinePattern.matcher(item.getName());
-                    if (m.find()) armorRefine = "+" + m.group(1);
+                    if (m.find()) {
+                        String grade = item.getGrade() != null ? "(" + item.getGrade() + ")" : "";
+                        armorRefine = grade + "+" + m.group(1);
+                    }
                 }
             }
         } catch (Exception ignored) {}
@@ -234,7 +237,7 @@ public class BotMessageService {
         sb.append("\n");
         if (ancientCount > 0) sb.append("고대코어 ").append(ancientCount).append("개\n");
         if (weaponRefine != null || armorRefine != null) {
-            if (weaponRefine != null) sb.append("무기 ").append(weaponRefine);
+            if (weaponRefine != null) sb.append("무기").append(weaponRefine);
             if (weaponRefine != null && armorRefine != null) sb.append(" / ");
             if (armorRefine != null) sb.append("완갑 ").append(armorRefine);
             sb.append("\n");
