@@ -239,7 +239,7 @@ public class BotMessageService {
         if (weaponRefine != null || armorRefine != null) {
             if (weaponRefine != null) sb.append("무기").append(weaponRefine);
             if (weaponRefine != null && armorRefine != null) sb.append(" / ");
-            if (armorRefine != null) sb.append("완갑 ").append(armorRefine);
+            if (armorRefine != null) sb.append("완갑").append(armorRefine);
             sb.append("\n");
         }
         sb.append("───────────────\n");
