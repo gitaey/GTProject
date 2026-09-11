@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gtp.domain.menu.entity.MenuVisibility;
 import com.gtp.domain.menu.repository.MenuVisibilityRepository;
+import com.gtp.domain.member.role.service.RoleService;
 import com.gtp.global.exception.CustomException;
 import com.gtp.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class MenuVisibilityService {
 
     private final MenuVisibilityRepository menuVisibilityRepository;
     private final ObjectMapper objectMapper;
+    private final RoleService roleService;
 
     // DB에 없을 때 반환할 기본 메뉴 목록
     private static final Map<String, List<String>> DEFAULT_MENUS = Map.of(
@@ -34,31 +36,31 @@ public class MenuVisibilityService {
             "sidebar.system-user", "sidebar.system-access-log", "sidebar.system-menu", "sidebar.system-permission",
             "map.panel.layer", "map.panel.image", "map.panel.etc",
             "map.tool.zoom", "map.tool.draw", "map.tool.measure-distance",
-            "map.tool.measure-area", "map.tool.radius-search", "map.tool.clear"
+            "map.tool.measure-area", "map.tool.radius-search", "map.tool.wind", "map.tool.clear"
         ),
         "MAP_ADMIN", List.of(
             "sidebar.home", "sidebar.map-view", "sidebar.map-layer",
             "sidebar.geoserver-publish", "sidebar.geoserver-styles",
             "map.panel.layer", "map.panel.image", "map.panel.etc",
             "map.tool.zoom", "map.tool.draw", "map.tool.measure-distance",
-            "map.tool.measure-area", "map.tool.radius-search", "map.tool.clear"
+            "map.tool.measure-area", "map.tool.radius-search", "map.tool.wind", "map.tool.clear"
         ),
         "MAP_USER_VIEWER", List.of(
             "sidebar.home", "sidebar.map-view",
             "map.panel.layer", "map.panel.etc",
-            "map.tool.zoom", "map.tool.measure-distance", "map.tool.measure-area"
+            "map.tool.zoom", "map.tool.measure-distance", "map.tool.measure-area", "map.tool.wind"
         ),
         "MAP_USER_DEPT_A", List.of(
             "sidebar.home", "sidebar.map-view",
             "map.panel.layer", "map.panel.image", "map.panel.etc",
             "map.tool.zoom", "map.tool.draw", "map.tool.measure-distance",
-            "map.tool.measure-area", "map.tool.radius-search", "map.tool.clear"
+            "map.tool.measure-area", "map.tool.radius-search", "map.tool.wind", "map.tool.clear"
         ),
         "MAP_USER_DEPT_B", List.of(
             "sidebar.home", "sidebar.map-view",
             "map.panel.layer", "map.panel.image", "map.panel.etc",
             "map.tool.zoom", "map.tool.draw", "map.tool.measure-distance",
-            "map.tool.measure-area", "map.tool.radius-search", "map.tool.clear"
+            "map.tool.measure-area", "map.tool.radius-search", "map.tool.wind", "map.tool.clear"
         )
     );
 
@@ -86,6 +88,7 @@ public class MenuVisibilityService {
      */
     @Transactional
     public void updateMenuIds(String roleCode, String permissionCode, List<String> menuIds) {
+        roleService.assertSuperActionAllowed(roleCode);
         String menuIdsJson = serializeMenuIds(menuIds);
 
         menuVisibilityRepository.findByRoleCodeAndPermissionCode(roleCode, permissionCode)

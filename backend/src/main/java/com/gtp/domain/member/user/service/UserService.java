@@ -56,6 +56,7 @@ public class UserService {
             throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
         }
 
+        roleService.assertSuperActionAllowed(req.getRole());
         roleService.validateRolePermission(req.getRole(), req.getPermission());
 
         User user = User.builder()
@@ -76,6 +77,8 @@ public class UserService {
     @Transactional
     public UserResponse updateUser(String userId, UserUpdateRequest req) {
         User user = findById(userId);
+        roleService.assertSuperActionAllowed(user.getRoleCode());
+        roleService.assertSuperActionAllowed(req.getRole());
 
         if (StringUtils.hasText(req.getNickname())
                 && !req.getNickname().equals(user.getNickname())
@@ -109,6 +112,7 @@ public class UserService {
     @Transactional
     public UserResponse toggleStatus(String userId) {
         User user = findById(userId);
+        roleService.assertSuperActionAllowed(user.getRoleCode());
         user.toggleStatus();
         return new UserResponse(user);
     }
@@ -116,7 +120,9 @@ public class UserService {
     /* 사용자 단건 삭제 */
     @Transactional
     public void deleteUser(String userId) {
-        userRepository.delete(findById(userId));
+        User user = findById(userId);
+        roleService.assertSuperActionAllowed(user.getRoleCode());
+        userRepository.delete(user);
     }
 
     /* 사용자 일괄 삭제 */
@@ -126,6 +132,7 @@ public class UserService {
         if (users.isEmpty()) {
             throw new CustomException(ErrorCode.USER_NOT_FOUND);
         }
+        users.forEach(u -> roleService.assertSuperActionAllowed(u.getRoleCode()));
         userRepository.deleteAll(users);
         return users.size();
     }

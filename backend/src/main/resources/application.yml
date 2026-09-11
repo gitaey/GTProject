@@ -66,3 +66,13 @@ geoserver:
     user: ${GEOSERVER_ADMIN_USER:admin}
     password: ${GEOSERVER_ADMIN_PASSWORD:sis3047!@}
   legend-layer: ${GEOSERVER_LEGEND_LAYER:gtp:tl_scco_ctprvn}
+
+# 바람길 레이어 (GFS 0.25도 바람 데이터, 6시간마다 갱신)
+wind:
+  nomads-base-url: ${WIND_NOMADS_BASE_URL:https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl}
+  bbox:
+    left-lon: 122
+    right-lon: 132
+    top-lat: 40
+    bottom-lat: 32
+  forecast-hours: 6   # f000 ~ f005 (한 사이클당 시간별 프레임 개수)

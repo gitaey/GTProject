@@ -8,6 +8,8 @@ import com.gtp.domain.member.role.repository.RoleRepository;
 import com.gtp.global.exception.CustomException;
 import com.gtp.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -98,6 +100,28 @@ public class RoleService {
     public void deletePermission(String code) {
         permissionRepository.delete(permissionRepository.findById(code)
                 .orElseThrow(() -> new CustomException(ErrorCode.INVALID_PERMISSION)));
+    }
+
+    /** 해당 역할 코드가 슈퍼 역할인지 여부 */
+    public boolean isSuperRole(String roleCode) {
+        if (roleCode == null) return false;
+        return roleRepository.findById(roleCode).map(RoleEntity::isSuper).orElse(false);
+    }
+
+    /** 현재 로그인한 사용자가 슈퍼 역할인지 여부 */
+    public boolean isCurrentUserSuper() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return false;
+        return auth.getAuthorities().stream()
+                .map(a -> a.getAuthority().replaceFirst("^ROLE_", ""))
+                .anyMatch(this::isSuperRole);
+    }
+
+    /** targetRoleCode가 슈퍼 역할인데 현재 사용자가 슈퍼가 아니면 차단 */
+    public void assertSuperActionAllowed(String targetRoleCode) {
+        if (isSuperRole(targetRoleCode) && !isCurrentUserSuper()) {
+            throw new CustomException(ErrorCode.SUPER_ADMIN_PROTECTED);
+        }
     }
 
     public void validateRolePermission(String roleCode, String permissionCode) {

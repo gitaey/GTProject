@@ -17,7 +17,26 @@ import MeasureTooltip from '@/components/map/overlay/MeasureTooltip'
 import { useMapStore } from '@/stores/map/mapStore'
 
 
+const RADIUS_STYLE = new Style({
+    stroke: new Stroke({ color: '#7c3aed', width: 2.5 }),
+    fill: new Fill({ color: 'rgba(124, 58, 237, 0.15)' }),
+})
+const CENTER_DOT_STYLE = new Style({
+    image: new CircleStyle({
+        radius: 5,
+        fill: new Fill({ color: '#7c3aed' }),
+        stroke: new Stroke({ color: '#fff', width: 2 }),
+    }),
+})
+
+function formatRadius(radius: number) {
+    return radius >= 1000
+        ? `반경: ${(radius / 1000).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} km`
+        : `반경: ${Math.round(radius).toLocaleString('ko-KR')} m`
+}
+
 export function useRadiusSearch(map: Map | null, activeTool: MapTool) {
+    const radiusSearchMeters = useMapStore((s) => s.radiusSearchMeters)
     const sourceRef = useRef(new VectorSource())
     const layerRef = useRef(new VectorLayer({
         source: sourceRef.current,
@@ -94,6 +113,78 @@ export function useRadiusSearch(map: Map | null, activeTool: MapTool) {
         map.addOverlay(overlay)
         tooltipOverlayRef.current = overlay
 
+        // 원 확정 후 공통 처리: 중심점 표시 + 반경 라벨(닫기 버튼 포함) 오버레이
+        const finalizeCircle = (
+            center: [number, number],
+            radius: number,
+            feature: Feature,
+            edgePoint: [number, number] | null,
+        ) => {
+            const centerFeature = new Feature(new Point(center))
+            centerFeature.setStyle(CENTER_DOT_STYLE)
+            sourceRef.current.addFeature(centerFeature)
+
+            const extraFeatures: Feature[] = [centerFeature]
+
+            if (edgePoint) {
+                const lineFeature = new Feature(new LineString([center, edgePoint]))
+                lineFeature.setStyle(new Style({
+                    stroke: new Stroke({ color: '#7c3aed', width: 1.5, lineDash: [4, 4] }),
+                }))
+                sourceRef.current.addFeature(lineFeature)
+                extraFeatures.push(lineFeature)
+            }
+
+            const fixedEl = document.createElement('div')
+            const fixedRoot = createRoot(fixedEl)
+
+            const fixedOverlay = new Overlay({
+                element: fixedEl,
+                offset: [0, -10],
+                positioning: 'bottom-center',
+                position: center,
+            })
+            map.addOverlay(fixedOverlay)
+
+            fixedOverlaysRef.current.push({ overlay: fixedOverlay, root: fixedRoot, el: fixedEl, extraFeatures })
+
+            const handleClose = () => {
+                sourceRef.current.removeFeature(feature)
+                extraFeatures.forEach((f) => sourceRef.current.removeFeature(f))
+                map.removeOverlay(fixedOverlay)
+                setTimeout(() => fixedRoot.unmount(), 0)
+                fixedEl.remove()
+                fixedOverlaysRef.current = fixedOverlaysRef.current.filter((item) => item.overlay !== fixedOverlay)
+            }
+
+            fixedRoot.render(<MeasureTooltip value={formatRadius(radius)} onClose={handleClose} />)
+        }
+
+        // ── 반경 직접 입력 모드: 클릭 한 번으로 고정 반경 원 생성 ──
+        if (radiusSearchMeters && radiusSearchMeters > 0) {
+            const handleMapClick = (evt: { coordinate: number[] }) => {
+                const center = evt.coordinate as [number, number]
+                const radius = radiusSearchMeters
+
+                const circleFeature = new Feature(new Circle(center, radius))
+                circleFeature.setStyle(RADIUS_STYLE)
+                sourceRef.current.addFeature(circleFeature)
+
+                finalizeCircle(center, radius, circleFeature, null)
+            }
+            map.on('click', handleMapClick)
+
+            return () => {
+                map.un('click', handleMapClick)
+                map.removeOverlay(overlay)
+                setTimeout(() => root.unmount(), 0)
+                el.remove()
+                tooltipOverlayRef.current = null
+                rootRef.current = null
+                tooltipElRef.current = null
+            }
+        }
+
         const draw = new Draw({
             source: sourceRef.current,
             type: 'Circle',
@@ -159,58 +250,10 @@ export function useRadiusSearch(map: Map | null, activeTool: MapTool) {
 
         draw.on('drawend', (e) => {
             const geom = e.feature.getGeometry() as Circle
-            const center = geom.getCenter()
+            const center = geom.getCenter() as [number, number]
             const radius = geom.getRadius()
-            const feature = e.feature
 
-            // 중심점 feature
-            const centerDotStyle = new Style({
-                image: new CircleStyle({
-                    radius: 5,
-                    fill: new Fill({ color: '#7c3aed' }),
-                    stroke: new Stroke({ color: '#fff', width: 2 }),
-                }),
-            })
-            const centerFeature = new Feature(new Point(center))
-            centerFeature.setStyle(centerDotStyle)
-            sourceRef.current.addFeature(centerFeature)
-
-            // 반경선 feature (중심 → 마우스 놓은 위치)
-            const edgePoint: [number, number] = lastPointerCoord
-            const lineStyle = new Style({
-                stroke: new Stroke({ color: '#7c3aed', width: 1.5, lineDash: [4, 4] }),
-            })
-            const lineFeature = new Feature(new LineString([center, edgePoint]))
-            lineFeature.setStyle(lineStyle)
-            sourceRef.current.addFeature(lineFeature)
-
-            const extraFeatures = [centerFeature, lineFeature]
-
-            const fixedEl = document.createElement('div')
-            const fixedRoot = createRoot(fixedEl)
-
-            const fixedOverlay = new Overlay({
-                element: fixedEl,
-                offset: [0, -10],
-                positioning: 'bottom-center',
-                position: center,
-            })
-            map.addOverlay(fixedOverlay)
-
-            fixedOverlaysRef.current.push({ overlay: fixedOverlay, root: fixedRoot, el: fixedEl, extraFeatures })
-
-            const handleClose = () => {
-                sourceRef.current.removeFeature(feature)
-                extraFeatures.forEach((f) => sourceRef.current.removeFeature(f))
-                map.removeOverlay(fixedOverlay)
-                setTimeout(() => fixedRoot.unmount(), 0)
-                fixedEl.remove()
-                fixedOverlaysRef.current = fixedOverlaysRef.current.filter((item) => item.overlay !== fixedOverlay)
-            }
-
-            fixedRoot.render(<MeasureTooltip value={radius >= 1000
-    ? `반경: ${(radius / 1000).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} km`
-    : `반경: ${Math.round(radius).toLocaleString('ko-KR')} m`} onClose={handleClose} />)
+            finalizeCircle(center, radius, e.feature, lastPointerCoord)
 
             overlay.setPosition(undefined)
             root.render(<MeasureTooltip value="" />)
@@ -233,5 +276,5 @@ export function useRadiusSearch(map: Map | null, activeTool: MapTool) {
             rootRef.current = null
             tooltipElRef.current = null
         }
-    }, [activeTool, map])
+    }, [activeTool, map, radiusSearchMeters])
 }

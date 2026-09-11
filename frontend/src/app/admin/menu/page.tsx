@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
 import { Save, X } from 'lucide-react'
-import { getToken } from '@/stores/authStore'
+import { getToken, useAuthStore } from '@/stores/authStore'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
@@ -76,8 +76,8 @@ const MENU_CATALOG: CatalogArea[] = [
                 items: [
                     { id: 'sidebar.system-user', label: '사용자 관리' },
                     { id: 'sidebar.system-permission', label: '권한 관리' },
-                    { id: 'sidebar.system-access-log', label: '접속 로그' },
                     { id: 'sidebar.system-menu', label: '메뉴 관리' },
+                    { id: 'sidebar.system-access-log', label: '접속 로그' },
                 ],
             },
         ],
@@ -108,6 +108,7 @@ const MENU_CATALOG: CatalogArea[] = [
                     { id: 'map.tool.measure-distance', label: '거리 측정' },
                     { id: 'map.tool.measure-area', label: '면적 측정' },
                     { id: 'map.tool.radius-search', label: '반경 검색' },
+                    { id: 'map.tool.wind', label: '바람길' },
                     { id: 'map.tool.clear', label: '전체 초기화' },
                 ],
             },
@@ -192,6 +193,7 @@ const inputStyle: React.CSSProperties = {
 }
 
 export default function MenuManagementPage() {
+    const currentUser = useAuthStore((s) => s.user)
     const [roles, setRoles] = useState<RoleItem[]>([])
     const [selectedRole, setSelectedRole] = useState('')
     const [selectedPermission, setSelectedPermission] = useState<string | null>(null)
@@ -205,7 +207,10 @@ export default function MenuManagementPage() {
             .then((data) => {
                 const sorted = [...data].sort((a, b) => a.sortOrder - b.sortOrder)
                 setRoles(sorted)
-                if (sorted.length > 0) setSelectedRole(sorted[0].code)
+                const isSuper = sorted.find((r) => r.code === currentUser?.role)?.isSuper ?? false
+                const selectable = isSuper ? sorted : sorted.filter((r) => !r.isSuper)
+                if (selectable.length > 0) setSelectedRole(selectable[0].code)
+                else if (sorted.length > 0) setSelectedRole(sorted[0].code)
             })
             .catch(() => showToast('역할 목록을 불러오는데 실패했습니다.', false))
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -217,6 +222,10 @@ export default function MenuManagementPage() {
         ? (selectedPermission ?? permOptions[0]?.code ?? null)
         : null
     const visibleCatalog = getVisibleCatalog(roleOption?.isSuper ?? false)
+    const isCurrentUserSuper = roles.find((r) => r.code === currentUser?.role)?.isSuper ?? false
+    // 슈퍼관리자가 아니면 역할 목록에서 슈퍼 역할을 선택 자체를 못하게 제외
+    const assignableRoles = isCurrentUserSuper ? roles : roles.filter((r) => !r.isSuper)
+    const isTargetLocked = (roleOption?.isSuper ?? false) && !isCurrentUserSuper
 
     const showToast = (msg: string, ok: boolean) => {
         setToast({ msg, ok })
@@ -241,6 +250,7 @@ export default function MenuManagementPage() {
     }, [load])
 
     const toggleItem = (id: string) => {
+        if (isTargetLocked) return
         setChecked((prev) => {
             const n = new Set(prev)
             n.has(id) ? n.delete(id) : n.add(id)
@@ -249,6 +259,7 @@ export default function MenuManagementPage() {
     }
 
     const toggleArea = (area: CatalogArea, allChecked: boolean) => {
+        if (isTargetLocked) return
         setChecked((prev) => {
             const n = new Set(prev)
             areaAllItems(area).forEach((item) => (allChecked ? n.delete(item.id) : n.add(item.id)))
@@ -257,6 +268,7 @@ export default function MenuManagementPage() {
     }
 
     const toggleGroup = (group: CatalogGroup, allChecked: boolean) => {
+        if (isTargetLocked) return
         setChecked((prev) => {
             const n = new Set(prev)
             group.items.forEach((item) => (allChecked ? n.delete(item.id) : n.add(item.id)))
@@ -323,7 +335,7 @@ export default function MenuManagementPage() {
                                     minWidth: '140px',
                                 }}
                             >
-                                {roles.map((r) => (
+                                {assignableRoles.map((r) => (
                                     <option key={r.code} value={r.code}>
                                         {r.label}
                                     </option>
@@ -366,25 +378,26 @@ export default function MenuManagementPage() {
 
                         <button
                             onClick={handleSave}
-                            disabled={saving || loading}
+                            disabled={saving || loading || isTargetLocked}
+                            title={isTargetLocked ? '슈퍼관리자 역할은 변경할 수 없습니다' : undefined}
                             style={{
                                 marginLeft: 'auto',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '7px',
                                 padding: '8px 20px',
-                                background: saving || loading ? '#f1f5f9' : '#F26722',
-                                color: saving || loading ? '#94a3b8' : '#fff',
+                                background: saving || loading || isTargetLocked ? '#f1f5f9' : '#F26722',
+                                color: saving || loading || isTargetLocked ? '#94a3b8' : '#fff',
                                 border: 'none',
                                 borderRadius: '8px',
                                 fontSize: '13.5px',
                                 fontWeight: 600,
-                                cursor: saving || loading ? 'not-allowed' : 'pointer',
+                                cursor: saving || loading || isTargetLocked ? 'not-allowed' : 'pointer',
                                 transition: 'all 0.15s',
                             }}
                         >
                             <Save size={14} />
-                            {saving ? '저장 중...' : '변경사항 저장'}
+                            {saving ? '저장 중...' : isTargetLocked ? '수정 불가' : '변경사항 저장'}
                         </button>
                     </div>
 

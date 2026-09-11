@@ -126,12 +126,3 @@ export interface TreeNode {
     groupData?: DbLayerGroup
     layerData?: DbLayer
 }
-
-// Permission 옵션
-export const PERMISSION_OPTIONS = [
-    { value: 'SUPER_ADMIN', label: '슈퍼관리자' },
-    { value: 'MAP_ADMIN',   label: '지도관리자' },
-    { value: 'VIEWER',      label: 'VIEWER (뷰어)' },
-    { value: 'DEPT_A',      label: 'DEPT_A (부서A)' },
-    { value: 'DEPT_B',      label: 'DEPT_B (부서B)' },
-]

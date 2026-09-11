@@ -12,6 +12,7 @@ import { useAreaMeasure } from '@/hooks/map/useAreaMeasure'
 import { useLayerManager } from '@/hooks/map/useLayerManager'
 import { useRadiusSearch } from '@/hooks/map/useRadiusSearch'
 import { useParcelHighlight } from '@/hooks/map/useParcelHighlight'
+import { useWindLayer } from '@/hooks/map/useWindLayer'
 import MapHeader from '@/components/map/header/MapHeader'
 import MapStatusBar from '@/components/map/statusbar/MapStatusBar'
 import NavLeft from '@/components/map/nav/NavLeft'
@@ -34,13 +35,14 @@ const TOOL_HINT: Partial<Record<MapTool, string>> = {
     'draw-circle':  '우클릭으로 그리기 종료',
     'draw-box':     '우클릭으로 그리기 종료',
     'draw-text':    '우클릭으로 그리기 종료',
-    'select':       '클릭해서 선택 · 꼭지점 드래그로 수정',
+    'select':       '클릭해서 선택 · Shift+클릭으로 여러 개 선택',
+    'edit':         '클릭해서 선택 · 꼭지점 드래그로 수정',
 }
 
 export default function MapView({ center, zoom, className }: MapViewProps) {
     const containerRef = useRef<HTMLDivElement>(null)
     const mapRef = useMap(containerRef, { center, zoom })
-    const { activeTool, flyToRequest, clearFlyTo } = useMapStore()
+    const { activeTool, flyToRequest, clearFlyTo, windLayerVisible } = useMapStore()
     const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null)
 
     useEffect(() => {
@@ -59,6 +61,7 @@ export default function MapView({ center, zoom, className }: MapViewProps) {
     useLayerManager(mapRef)
     useRadiusSearch(mapRef, activeTool)
     useParcelHighlight(mapRef)
+    useWindLayer(mapRef, windLayerVisible)
 
     const hint = TOOL_HINT[activeTool]
 

@@ -18,7 +18,6 @@ import { CSS } from '@dnd-kit/utilities'
 import {
     DbLayer, DbLayerFormState, DbLayerGroup, DbLayerType, DbLayerSourceType,
     LayerTreeResponse, EMPTY_LAYER_FORM, LAYER_TYPE_OPTIONS, LAYER_SOURCE_OPTIONS,
-    PERMISSION_OPTIONS,
 } from '@/types/layer'
 import { getToken } from '@/stores/authStore'
 import { useLayerStore } from '@/stores/map/layerStore'
@@ -38,6 +37,36 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
     const json = await res.json()
     if (!json.success) throw new Error(json.message)
     return json.data
+}
+
+/* ── 역할/권한 (시스템 - 권한관리에서 동적으로 관리) ── */
+interface RolePermissionItem {
+    code: string
+    roleCode: string
+    label: string
+    sortOrder: number
+}
+interface RoleItem {
+    code: string
+    label: string
+    hasSubPermission: boolean
+    isSuper: boolean
+    sortOrder: number
+    permissions: RolePermissionItem[]
+}
+const fetchRoles = () => apiFetch<RoleItem[]>('/api/roles')
+
+function sortRoles(roles: RoleItem[]): RoleItem[] {
+    return [...roles].sort((a, b) => a.sortOrder - b.sortOrder)
+}
+function sortPermissions(perms: RolePermissionItem[]): RolePermissionItem[] {
+    return [...perms].sort((a, b) => a.sortOrder - b.sortOrder)
+}
+// 레이어 권한 저장 키: 세부 권한이 있는 역할은 세부 권한 코드, 없는 역할은 역할 코드 자체
+function layerPermissionKey(role: RoleItem | undefined, subPermission: string | null): string | null {
+    if (!role) return null
+    if (role.hasSubPermission) return subPermission
+    return role.code
 }
 
 const inputStyle: React.CSSProperties = {
@@ -654,10 +683,20 @@ export default function LayerPage() {
     const [deleteModal, setDeleteModal] = useState<DeleteModal_ | null>(null)
 
     // Permission tab state
-    const [permission, setPermission]   = useState('VIEWER')
+    const [roles, setRoles]             = useState<RoleItem[]>([])
+    const [permRole, setPermRole]       = useState('')
+    const [permSubPermission, setPermSubPermission] = useState<string | null>(null)
     const [permIds, setPermIds]         = useState<Set<number>>(new Set())
     const [permSaving, setPermSaving]   = useState(false)
     const [permDirty, setPermDirty]     = useState(false)
+
+    const sortedRoles = useMemo(() => sortRoles(roles), [roles])
+    const permRoleItem = sortedRoles.find((r) => r.code === permRole)
+    const permSubOptions = permRoleItem?.hasSubPermission ? sortPermissions(permRoleItem.permissions) : []
+    const effectiveSubPermission = permRoleItem?.hasSubPermission
+        ? (permSubPermission ?? permSubOptions[0]?.code ?? null)
+        : null
+    const permission = layerPermissionKey(permRoleItem, effectiveSubPermission)
 
     // DnD active item
     const [activeId, setActiveId] = useState<string | null>(null)
@@ -680,7 +719,16 @@ export default function LayerPage() {
     }, [])
 
     useEffect(() => { loadTree() }, [loadTree])
-    useEffect(() => { if (tab === 'permission') loadPermission(permission) }, [tab, permission, loadPermission])
+    useEffect(() => {
+        fetchRoles()
+            .then((data) => {
+                const sorted = sortRoles(data)
+                setRoles(sorted)
+                if (sorted.length > 0) setPermRole(sorted[0].code)
+            })
+            .catch(() => {/* 역할 로드 실패 시 조용히 무시 */})
+    }, [])
+    useEffect(() => { if (tab === 'permission' && permission) loadPermission(permission) }, [tab, permission, loadPermission])
 
     // 모든 레이어 flat list (permission 탭용)
     const allLayers: DbLayer[] = []
@@ -719,6 +767,7 @@ export default function LayerPage() {
     }
 
     const savePermission = async () => {
+        if (!permission) return
         setPermSaving(true)
         try {
             await apiFetch(`/api/layers/permissions/${permission}`, {
@@ -1024,11 +1073,19 @@ export default function LayerPage() {
 
                         {tab === 'permission' && (
                             <div className="flex items-center gap-2">
-                                <select value={permission} onChange={e => setPermission(e.target.value)}
+                                <select value={permRole}
+                                    onChange={e => { setPermRole(e.target.value); setPermSubPermission(null) }}
                                     className="px-3 py-2 text-sm rounded-lg focus:outline-none cursor-pointer" style={inputStyle}>
-                                    {PERMISSION_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                    {sortedRoles.map(r => <option key={r.code} value={r.code}>{r.label}</option>)}
                                 </select>
-                                <button onClick={savePermission} disabled={!permDirty || permSaving}
+                                {permRoleItem?.hasSubPermission && permSubOptions.length > 0 && (
+                                    <select value={effectiveSubPermission ?? ''}
+                                        onChange={e => setPermSubPermission(e.target.value)}
+                                        className="px-3 py-2 text-sm rounded-lg focus:outline-none cursor-pointer" style={inputStyle}>
+                                        {permSubOptions.map(p => <option key={p.code} value={p.code}>{p.label}</option>)}
+                                    </select>
+                                )}
+                                <button onClick={savePermission} disabled={!permDirty || permSaving || !permission}
                                     className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg cursor-pointer disabled:opacity-40"
                                     style={{ background: 'var(--accent)', color: '#fff' }}>
                                     <Save size={15} /> {permSaving ? '저장 중...' : '저장'}

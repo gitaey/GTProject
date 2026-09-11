@@ -180,9 +180,14 @@ export function useDrawing(map: Map | null, activeTool: MapTool) {
 
         const drawing = isDrawTool(activeTool)
 
-        // Select/Modify 는 그리기 중에는 비활성
-        selectRef.current?.setActive(!drawing)
-        modifyRef.current?.setActive(!drawing)
+        // 선택 모드: 클릭으로 선택만 가능. 편집 모드: 선택 + 꼭지점 드래그 수정
+        const selecting = activeTool === 'select' || activeTool === 'edit'
+        const editing = activeTool === 'edit'
+        selectRef.current?.setActive(selecting)
+        modifyRef.current?.setActive(editing)
+        if (!selecting) {
+            selectRef.current?.getFeatures().clear()
+        }
 
         // 기존 Draw 인터랙션 제거
         if (drawRef.current) {

@@ -6,6 +6,7 @@ import { create } from 'zustand'
 export type MapTool =
     | 'none'
     | 'select'
+    | 'edit'
     | 'draw-point'
     | 'draw-line'
     | 'draw-polygon'
@@ -56,6 +57,12 @@ interface MapStore {
     flyToRequest: FlyToRequest | null
     flyTo: (req: FlyToRequest) => void
     clearFlyTo: () => void
+    // 반경검색: 직접 입력한 반경(m). null이면 기존처럼 드래그로 반경 지정
+    radiusSearchMeters: number | null
+    setRadiusSearchMeters: (m: number | null) => void
+    // 바람길 레이어 표시 여부
+    windLayerVisible: boolean
+    toggleWindLayer: () => void
 }
 
 // create<MapStore>(): Zustand Store 생성
@@ -74,4 +81,8 @@ export const useMapStore = create<MapStore>((set) => ({
     flyToRequest: null,
     flyTo: (req) => set({ flyToRequest: req }),
     clearFlyTo: () => set({ flyToRequest: null }),
+    radiusSearchMeters: null,
+    setRadiusSearchMeters: (m) => set({ radiusSearchMeters: m }),
+    windLayerVisible: false,
+    toggleWindLayer: () => set((state) => ({ windLayerVisible: !state.windLayerVisible })),
 }))

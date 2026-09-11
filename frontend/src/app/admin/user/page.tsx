@@ -28,7 +28,7 @@ import type {
     UserStatus,
     UserUpdateRequest,
 } from '@/types/user'
-import { getToken } from '@/stores/authStore'
+import { getToken, useAuthStore } from '@/stores/authStore'
 
 /* ── 역할 API 타입 ── */
 interface RolePermissionItem {
@@ -145,6 +145,7 @@ const inputStyle: React.CSSProperties = {
 }
 
 export default function UserManagementPage() {
+    const currentUser = useAuthStore(s => s.user)
     const [roles, setRoles]             = useState<RoleItem[]>([])
     const [page, setPage]               = useState<UserPage | null>(null)
     const [loading, setLoading]         = useState(false)
@@ -177,14 +178,20 @@ export default function UserManagementPage() {
         ? currentRoleItem.permissions.slice().sort((a, b) => a.sortOrder - b.sortOrder)
         : []
 
-    const isAllChecked    = users.length > 0 && users.every((u) => selectedIds.has(u.userId))
-    const isIndeterminate = users.some((u) => selectedIds.has(u.userId)) && !isAllChecked
+    const isCurrentUserSuper = roles.find(r => r.code === currentUser?.role)?.isSuper ?? false
+    const isRoleSuper = (roleCode: string) => roles.find(r => r.code === roleCode)?.isSuper ?? false
+    // 슈퍼관리자가 아니면 역할 선택지에서 슈퍼 역할을 제외
+    const assignableRoles = isCurrentUserSuper ? roles : roles.filter(r => !r.isSuper)
+
+    const selectableUsers = users.filter((u) => !(isRoleSuper(u.role) && !isCurrentUserSuper))
+    const isAllChecked    = selectableUsers.length > 0 && selectableUsers.every((u) => selectedIds.has(u.userId))
+    const isIndeterminate = selectableUsers.some((u) => selectedIds.has(u.userId)) && !isAllChecked
 
     const toggleAll = () => {
         if (isAllChecked) {
-            setSelectedIds((prev) => { const n = new Set(prev); users.forEach((u) => n.delete(u.userId)); return n })
+            setSelectedIds((prev) => { const n = new Set(prev); selectableUsers.forEach((u) => n.delete(u.userId)); return n })
         } else {
-            setSelectedIds((prev) => { const n = new Set(prev); users.forEach((u) => n.add(u.userId)); return n })
+            setSelectedIds((prev) => { const n = new Set(prev); selectableUsers.forEach((u) => n.add(u.userId)); return n })
         }
     }
 
@@ -220,12 +227,16 @@ export default function UserManagementPage() {
 
     const openCreate = () => { setForm(EMPTY_FORM); setFormError(null); setModalType('create') }
     const openEdit   = (user: User) => {
+        if (isRoleSuper(user.role) && !isCurrentUserSuper) return
         setSelectedUser(user)
         setForm({ userId: user.userId, userName: user.userName ?? '', nickname: user.nickname ?? '',
             email: user.email ?? '', password: '', role: user.role, permission: user.permission ?? '' })
         setFormError(null); setModalType('edit')
     }
-    const openDelete = (user: User) => { setSelectedUser(user); setModalType('delete') }
+    const openDelete = (user: User) => {
+        if (isRoleSuper(user.role) && !isCurrentUserSuper) return
+        setSelectedUser(user); setModalType('delete')
+    }
     const closeModal = () => { setModalType(null); setSelectedUser(null); setFormError(null) }
 
     const handleCreate = async () => {
@@ -281,6 +292,7 @@ export default function UserManagementPage() {
     }
 
     const handleToggle = async (user: User) => {
+        if (isRoleSuper(user.role) && !isCurrentUserSuper) return
         try { await toggleStatus(user.userId); load() }
         catch (e) { setError(e instanceof Error ? e.message : '상태 변경에 실패했습니다.') }
     }
@@ -419,7 +431,9 @@ export default function UserManagementPage() {
                                             </td>
                                         </tr>
                                     ) : (
-                                        users.map((user, idx) => (
+                                        users.map((user, idx) => {
+                                            const locked = isRoleSuper(user.role) && !isCurrentUserSuper
+                                            return (
                                             <tr key={user.userId}
                                                 style={{
                                                     borderBottom: '1px solid var(--border-subtle)',
@@ -432,7 +446,8 @@ export default function UserManagementPage() {
                                                         type="checkbox"
                                                         checked={selectedIds.has(user.userId)}
                                                         onChange={() => toggleOne(user.userId)}
-                                                        className="w-4 h-4 rounded cursor-pointer block"
+                                                        disabled={locked}
+                                                        className="w-4 h-4 rounded cursor-pointer block disabled:opacity-40 disabled:cursor-not-allowed"
                                                     />
                                                 </td>
                                                 <td className="px-4 py-4 text-xs" style={{ color: 'var(--text-faint)' }}>
@@ -453,28 +468,34 @@ export default function UserManagementPage() {
                                                 <td className="px-4 py-4">
                                                     <div className="flex items-center justify-center gap-1">
                                                         <button onClick={() => handleToggle(user)}
-                                                            title={user.status === 'ACTIVE' ? '비활성화' : '활성화'}
-                                                            className="p-1.5 rounded-lg transition-colors"
+                                                            disabled={locked}
+                                                            title={locked ? '슈퍼관리자는 변경할 수 없습니다' : (user.status === 'ACTIVE' ? '비활성화' : '활성화')}
+                                                            className="p-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                                             style={{ color: 'var(--text-faint)' }}>
                                                             {user.status === 'ACTIVE'
                                                                 ? <ToggleRight size={18} style={{ color: '#10b981' }} />
                                                                 : <ToggleLeft size={18} style={{ color: 'var(--text-faint)' }} />
                                                             }
                                                         </button>
-                                                        <button onClick={() => openEdit(user)} title="수정"
-                                                            className="p-1.5 rounded-lg transition-colors"
+                                                        <button onClick={() => openEdit(user)}
+                                                            disabled={locked}
+                                                            title={locked ? '슈퍼관리자는 수정할 수 없습니다' : '수정'}
+                                                            className="p-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                                             style={{ color: 'var(--text-faint)' }}>
                                                             <Pencil size={15} />
                                                         </button>
-                                                        <button onClick={() => openDelete(user)} title="삭제"
-                                                            className="p-1.5 rounded-lg transition-colors"
+                                                        <button onClick={() => openDelete(user)}
+                                                            disabled={locked}
+                                                            title={locked ? '슈퍼관리자는 삭제할 수 없습니다' : '삭제'}
+                                                            className="p-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                                             style={{ color: 'var(--text-faint)' }}>
                                                             <Trash2 size={15} />
                                                         </button>
                                                     </div>
                                                 </td>
                                             </tr>
-                                        ))
+                                            )
+                                        })
                                     )}
                                 </tbody>
                             </table>
@@ -560,7 +581,7 @@ export default function UserManagementPage() {
                                     className="w-full px-3 py-2.5 text-sm focus:outline-none"
                                     style={inputStyle}
                                 >
-                                    {roles.map((r) => (
+                                    {assignableRoles.map((r) => (
                                         <option key={r.code} value={r.code}>{r.label}</option>
                                     ))}
                                 </select>

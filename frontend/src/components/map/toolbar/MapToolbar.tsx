@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import {
     PenLine, Ruler, Trash2, Plus, Minus, SquareDashed, CircleDot,
     MapPin, Minus as LineIco, Pentagon, Circle, Square, Type,
-    MousePointer2, Trash,
+    MousePointer2, Trash, PenSquare, Wind,
 } from 'lucide-react'
 import { useMapStore, MapTool } from '@/stores/map/mapStore'
 import { useDrawStore, PRESET_COLORS } from '@/stores/map/drawStore'
@@ -31,7 +31,7 @@ const SHADOW = { boxShadow: '0 2px 8px rgba(0,0,0,0.15), 0 0 0 0.5px rgba(0,0,0,
 // ── 유틸 ──────────────────────────────────────────────────────────────────────
 
 function isDrawMode(tool: MapTool) { return tool.startsWith('draw-') }
-function isSelectMode(tool: MapTool) { return tool === 'select' }
+function isSelectMode(tool: MapTool) { return tool === 'select' || tool === 'edit' }
 
 // ── 툴팁 ──────────────────────────────────────────────────────────────────────
 
@@ -76,6 +76,7 @@ function DrawPanel() {
     const activeDef = DRAW_TOOLS.find(t => t.id === activeTool)
 
     function enterSelect() { setActiveTool('select') }
+    function enterEdit() { setActiveTool('edit') }
 
     return (
         <div className="bg-white rounded-xl overflow-hidden" style={{ ...SHADOW, width: 208 }}>
@@ -105,30 +106,45 @@ function DrawPanel() {
             {/* ── 구분선 ── */}
             <div className="mx-2.5 my-2.5 h-px bg-gray-100" />
 
-            {/* ── 선택·편집 모드 ── */}
+            {/* ── 선택 / 편집 모드 ── */}
             <div className="px-2.5 pb-2.5">
-                <button
-                    onClick={enterSelect}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                        inSelect
-                            ? 'bg-[#F26722] text-white'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}>
-                    <MousePointer2 size={13} />
-                    <span>선택 · 편집</span>
-                    {inSelect && selectedCount > 0 && (
-                        <span className="ml-auto bg-white/30 text-white text-[10px] px-1.5 py-0.5 rounded-full font-semibold">
-                            {selectedCount}
-                        </span>
-                    )}
-                </button>
+                <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                        onClick={enterSelect}
+                        className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs font-medium transition-all ${
+                            activeTool === 'select'
+                                ? 'bg-[#F26722] text-white'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}>
+                        <MousePointer2 size={13} />
+                        <span>선택</span>
+                    </button>
+                    <button
+                        onClick={enterEdit}
+                        className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs font-medium transition-all ${
+                            activeTool === 'edit'
+                                ? 'bg-[#F26722] text-white'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}>
+                        <PenSquare size={13} />
+                        <span>편집</span>
+                    </button>
+                </div>
 
-                {/* 선택 모드 안내 */}
+                {inSelect && selectedCount > 0 && (
+                    <span className="mt-1.5 inline-block bg-gray-100 text-gray-500 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">
+                        {selectedCount}개 선택됨
+                    </span>
+                )}
+
+                {/* 선택/편집 모드 안내 */}
                 {inSelect && (
                     <div className="mt-2 space-y-1.5">
                         {selectedCount === 0 ? (
                             <p className="text-[10px] text-gray-400 text-center py-1">
-                                도형을 클릭해 선택 · 꼭지점 드래그로 수정
+                                {activeTool === 'edit'
+                                    ? '도형을 클릭해 선택 · 꼭지점 드래그로 수정'
+                                    : '클릭해서 선택 · Shift+클릭으로 여러 개 선택'}
                             </p>
                         ) : (
                             <button
@@ -235,10 +251,57 @@ function DrawPanel() {
     )
 }
 
+// ── 반경검색 패널 ─────────────────────────────────────────────────────────────
+
+function RadiusPanel() {
+    const { radiusSearchMeters, setRadiusSearchMeters } = useMapStore()
+    const [input, setInput] = useState(radiusSearchMeters != null ? String(radiusSearchMeters) : '')
+
+    const apply = () => {
+        const n = Number(input)
+        setRadiusSearchMeters(Number.isFinite(n) && n > 0 ? n : null)
+    }
+    const reset = () => {
+        setInput('')
+        setRadiusSearchMeters(null)
+    }
+
+    return (
+        <div className="bg-white rounded-xl overflow-hidden p-2.5" style={{ ...SHADOW, width: 192 }}>
+            <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest mb-2 px-0.5">반경 직접 입력</p>
+            <div className="flex items-center gap-1.5">
+                <input type="number" min={1} value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && apply()}
+                    placeholder="예: 500"
+                    className="w-full h-8 px-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#F26722]" />
+                <span className="text-[11px] text-gray-400 shrink-0">m</span>
+            </div>
+            <div className="flex items-center gap-1.5 mt-2">
+                <button onClick={apply}
+                    className="flex-1 h-7 rounded-lg bg-[#F26722] text-white text-[11px] font-medium hover:bg-[#e05d19] transition-colors">
+                    적용
+                </button>
+                {radiusSearchMeters != null && (
+                    <button onClick={reset}
+                        className="flex-1 h-7 rounded-lg bg-gray-100 text-gray-500 text-[11px] font-medium hover:bg-gray-200 transition-colors">
+                        해제
+                    </button>
+                )}
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1.5 px-0.5">
+                {radiusSearchMeters != null
+                    ? '지도를 클릭하면 입력한 반경으로 원이 생성됩니다.'
+                    : '미입력 시 드래그로 반경을 지정합니다.'}
+            </p>
+        </div>
+    )
+}
+
 // ── 메인 컴포넌트 ─────────────────────────────────────────────────────────────
 
 export default function MapToolbar({ map }: { map: Map | null }) {
-    const { activeTool, setActiveTool, clearAll } = useMapStore()
+    const { activeTool, setActiveTool, clearAll, windLayerVisible, toggleWindLayer } = useMapStore()
     const { isAllowed, loaded } = useMenuStore()
     const [drawOpen, setDrawOpen] = useState(false)
     const panelRef = useRef<HTMLDivElement>(null)
@@ -252,7 +315,8 @@ export default function MapToolbar({ map }: { map: Map | null }) {
     const showMeasD   = show('map.tool.measure-distance')
     const showMeasA   = show('map.tool.measure-area')
     const showRadius  = show('map.tool.radius-search')
-    const showToolGrp = showDraw || showMeasD || showMeasA || showRadius
+    const showWind    = show('map.tool.wind')
+    const showToolGrp = showDraw || showMeasD || showMeasA || showRadius || showWind
 
     function zoom(delta: number) {
         if (!map) return
@@ -301,14 +365,27 @@ export default function MapToolbar({ map }: { map: Map | null }) {
                     {showRadius && (
                         <Tip label="반경검색">
                             <TBtn active={activeTool === 'radius-search'} onClick={() => setActiveTool('radius-search')}
-                                cls={`${!showDraw && !showMeasD && !showMeasA ? 'rounded-t-md' : ''} rounded-b-md`}>
+                                cls={`${!showDraw && !showMeasD && !showMeasA ? 'rounded-t-md' : ''} ${showWind ? 'border-b border-gray-100' : 'rounded-b-md'}`}>
                                 <CircleDot size={15} />
+                            </TBtn>
+                        </Tip>
+                    )}
+                    {showWind && (
+                        <Tip label="바람길">
+                            <TBtn active={windLayerVisible} onClick={toggleWindLayer}
+                                cls={`${!showDraw && !showMeasD && !showMeasA && !showRadius ? 'rounded-t-md' : ''} rounded-b-md`}>
+                                <Wind size={15} />
                             </TBtn>
                         </Tip>
                     )}
                     {drawOpen && showDraw && (
                         <div className="absolute right-11 top-0 z-50">
                             <DrawPanel />
+                        </div>
+                    )}
+                    {showRadius && activeTool === 'radius-search' && (
+                        <div className="absolute right-11 bottom-0 z-50">
+                            <RadiusPanel />
                         </div>
                     )}
                 </div>

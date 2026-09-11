@@ -28,9 +28,7 @@ const menuItems: MenuItem[] = [
         label: '시스템',
         children: [
             { id: 'system-user', label: '사용자 관리', href: '/admin/user' },
-            { id: 'system-permission', label: '권한 관리', href: '/admin/permission' },
             { id: 'system-access-log', label: '접속 로그', href: '/admin/access-log' },
-            { id: 'system-menu', label: '메뉴 관리', href: '/admin/menu' },
         ],
     },
     {
@@ -39,8 +37,6 @@ const menuItems: MenuItem[] = [
         children: [
             { id: 'map-view', label: '지도 보기', href: '/map' },
             { id: 'map-layer', label: '레이어 관리', href: '/map-admin/layer' },
-            { id: 'map-menu', label: '메뉴 관리', href: '/map-admin/menu' },
-            { id: 'map-permission', label: '권한 관리', href: '/map-admin/permission' },
         ],
     },
     {
