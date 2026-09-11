@@ -67,12 +67,14 @@ geoserver:
     password: ${GEOSERVER_ADMIN_PASSWORD:sis3047!@}
   legend-layer: ${GEOSERVER_LEGEND_LAYER:gtp:tl_scco_ctprvn}
 
-# 바람길 레이어 (GFS 0.25도 바람 데이터, 6시간마다 갱신)
+# 바람길 레이어 (기상청 LDAPS 1km 바람 데이터, 6시간마다 갱신)
 wind:
-  nomads-base-url: ${WIND_NOMADS_BASE_URL:https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl}
-  bbox:
-    left-lon: 122
-    right-lon: 132
-    top-lat: 40
-    bottom-lat: 32
-  forecast-hours: 6   # f000 ~ f005 (한 사이클당 시간별 프레임 개수)
+  forecast-hours: 6            # leadHour 0~5 (한 사이클당 시간별 프레임 개수)
+  source-stride: 2             # 원본 637x793 격자를 이 간격으로 샘플링
+  output:
+    resolution-deg: 0.02        # 리샘플링 결과 격자 간격(도), 0.02도 ≈ 2.2km
+
+# 기상청 API허브 (LDAPS 국지예보모델)
+kma:
+  api-key: ${KMA_API_KEY}
+  base-url: https://apihub.kma.go.kr/api/typ02/openApi/KIMModelInfoService/getKIMLdapsUnisAll

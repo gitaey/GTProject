@@ -31,12 +31,3 @@ bot/target/
 
 # GeoTIFF 업로드 디렉토리
 geotiff-uploads/
-
-# .NET / C# (lostark-party-scanner)
-lostark-party-scanner/**/bin/
-lostark-party-scanner/**/obj/
-lostark-party-scanner/.vs/
-lostark-party-scanner/publish/
-lostark-party-scanner/test-images/
-*.user
-*.suo

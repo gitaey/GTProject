@@ -21,6 +21,7 @@ import MapToolbar from '@/components/map/toolbar/MapToolbar'
 import MobileLayerButton from '@/components/map/mobile/MobileLayerButton'
 import RegionOverlay from '@/components/map/overlay/RegionOverlay'
 import TextInputOverlay from '@/components/map/overlay/TextInputOverlay'
+import WindLegend from '@/components/map/overlay/WindLegend'
 
 interface MapViewProps {
     center?: [number, number]
@@ -99,6 +100,7 @@ export default function MapView({ center, zoom, className }: MapViewProps) {
 
                     <MapToolbar map={mapRef} />
                     <MobileLayerButton />
+                    <WindLegend />
                 </div>
             </div>
 

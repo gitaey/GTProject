@@ -316,7 +316,7 @@ export default function MapToolbar({ map }: { map: Map | null }) {
     const showMeasA   = show('map.tool.measure-area')
     const showRadius  = show('map.tool.radius-search')
     const showWind    = show('map.tool.wind')
-    const showToolGrp = showDraw || showMeasD || showMeasA || showRadius || showWind
+    const showToolGrp = showDraw || showMeasD || showMeasA || showRadius
 
     function zoom(delta: number) {
         if (!map) return
@@ -332,6 +332,17 @@ export default function MapToolbar({ map }: { map: Map | null }) {
                 <div className="flex flex-col rounded-md overflow-hidden" style={SHADOW}>
                     <Tip label="확대"><TBtn onClick={() => zoom(1)} cls="rounded-t-md border-b border-gray-100"><Plus size={16} /></TBtn></Tip>
                     <Tip label="축소"><TBtn onClick={() => zoom(-1)} cls="rounded-b-md"><Minus size={16} /></TBtn></Tip>
+                </div>
+            )}
+
+            {/* ── 바람길 ── */}
+            {showWind && (
+                <div className="flex flex-col rounded-md overflow-hidden" style={SHADOW}>
+                    <Tip label="바람길">
+                        <TBtn active={windLayerVisible} onClick={toggleWindLayer} cls="rounded-md">
+                            <Wind size={15} />
+                        </TBtn>
+                    </Tip>
                 </div>
             )}
 
@@ -365,16 +376,8 @@ export default function MapToolbar({ map }: { map: Map | null }) {
                     {showRadius && (
                         <Tip label="반경검색">
                             <TBtn active={activeTool === 'radius-search'} onClick={() => setActiveTool('radius-search')}
-                                cls={`${!showDraw && !showMeasD && !showMeasA ? 'rounded-t-md' : ''} ${showWind ? 'border-b border-gray-100' : 'rounded-b-md'}`}>
+                                cls={`${!showDraw && !showMeasD && !showMeasA ? 'rounded-t-md' : ''} rounded-b-md`}>
                                 <CircleDot size={15} />
-                            </TBtn>
-                        </Tip>
-                    )}
-                    {showWind && (
-                        <Tip label="바람길">
-                            <TBtn active={windLayerVisible} onClick={toggleWindLayer}
-                                cls={`${!showDraw && !showMeasD && !showMeasA && !showRadius ? 'rounded-t-md' : ''} rounded-b-md`}>
-                                <Wind size={15} />
                             </TBtn>
                         </Tip>
                     )}
