@@ -22,7 +22,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<?>> handleException(Exception e,
             HttpServletRequest request) {
-        log.error("Exception: {}", e.getMessage());
+        log.error("Unhandled Exception at {} {}", request.getMethod(), request.getRequestURI(), e);
         return ResponseEntity.status(500)
                 .body(ApiResponse.fail("서버 오류가 발생했습니다."));
     }
