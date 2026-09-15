@@ -31,3 +31,6 @@ bot/target/
 
 # GeoTIFF 업로드 디렉토리
 geotiff-uploads/
+
+# 나만의지도 업로드 디렉토리
+mymap-uploads/

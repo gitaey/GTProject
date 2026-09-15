@@ -78,6 +78,7 @@ const MENU_CATALOG: CatalogArea[] = [
                     { id: 'sidebar.system-permission', label: '권한 관리' },
                     { id: 'sidebar.system-menu', label: '메뉴 관리' },
                     { id: 'sidebar.system-access-log', label: '접속 로그' },
+                    { id: 'sidebar.system-mymap', label: '나만의지도 관리' },
                 ],
             },
         ],
@@ -91,6 +92,7 @@ const MENU_CATALOG: CatalogArea[] = [
                 items: [
                     { id: 'map.panel.layer', label: '레이어 패널' },
                     { id: 'map.panel.image', label: '항공영상 패널' },
+                    { id: 'map.panel.mymap', label: '나만의지도 패널' },
                     { id: 'map.panel.etc', label: '기타 패널' },
                 ],
             },

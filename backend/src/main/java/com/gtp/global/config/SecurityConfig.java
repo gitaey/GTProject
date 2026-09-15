@@ -50,6 +50,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/bot-log/**").permitAll()
                 .requestMatchers("/api/bot/**").authenticated()
                 .requestMatchers("/api/access-log/**").authenticated()
+                .requestMatchers("/api/admin/mymap/**").hasRole("SUPER_ADMIN")
+                .requestMatchers("/api/mymap/**").authenticated()
                 .requestMatchers("/api/menu-visibility").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/roles", "/api/roles/**").authenticated()
                 .requestMatchers("/api/roles/**").hasRole("SUPER_ADMIN")

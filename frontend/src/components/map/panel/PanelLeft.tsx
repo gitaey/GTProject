@@ -10,6 +10,7 @@ import { usePanelStore } from '@/stores/map/panelStore'
 import LayerPanel from './LayerPanel'
 import EtcPanel from './EtcPanel'
 import ImagePanel from './ImagePanel'
+import MyMapPanel from './MyMapPanel'
 
 interface PanelLeftProps {
     map?: OlMap | null
@@ -29,6 +30,7 @@ export default function PanelLeft({ map }: PanelLeftProps) {
         `}>
             {activePanel === 'layer'   && <LayerPanel />}
             {activePanel === 'image'   && <ImagePanel map={map ?? null} />}
+            {activePanel === 'mymap'   && <MyMapPanel map={map ?? null} />}
             {activePanel === 'etc'     && <EtcPanel />}
         </div>
     )

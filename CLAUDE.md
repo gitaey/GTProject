@@ -1,11 +1,13 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+상세 아키텍처/기능별 내용은 `.claude/rules/`에 주제별로 나눠뒀습니다 (백엔드/프론트/지도 기능/배포).
 
 ## 프로젝트 개요
 
-Next.js 프론트엔드 + Spring Boot 백엔드 모노레포.  
-지도(OpenLayers + VWorld API), 대시보드, 카카오봇(Discord 연동), 블로그, GeoServer 레이어 관리 기능 제공.
+Next.js 프론트엔드 + Spring Boot 백엔드 모노레포.
+지도(OpenLayers + VWorld API), 대시보드, 카카오봇(Discord 연동), 블로그, GeoServer 레이어 관리,
+나만의지도(shp/엑셀 업로드), 바람길(기상청 LDAPS) 기능 제공.
 
 ---
 
@@ -46,6 +48,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8080   # 생략 시 기본값 동일
 | `LOSTARK_API_KEY` | 로스트아크 캐릭터 조회 |
 | `GEOSERVER_URL` | GeoServer 주소 (기본: `https://geo.gitaey-dev.com/geoserver`) |
 | `GEOSERVER_ADMIN_USER` / `GEOSERVER_ADMIN_PASSWORD` | GeoServer 관리자 |
+| `KMA_API_KEY` | 기상청 API허브 (바람길 LDAPS 데이터) |
 
 ---
 
@@ -53,126 +56,12 @@ NEXT_PUBLIC_API_URL=http://localhost:8080   # 생략 시 기본값 동일
 
 | 영역 | 스택 |
 |---|---|
-| Frontend | Next.js 15.5 (App Router), React 19, TypeScript 5, Tailwind CSS v4 (PostCSS 방식 — `tailwind.config.*` 파일 없음) |
-| 지도 | OpenLayers 9.x, VWorld WMTS/WMS/WFS/Data API, proj4 (EPSG:5186) |
+| Frontend | Next.js 15.5, React 19, TypeScript 5, Tailwind CSS v4 (PostCSS 방식) |
+| 지도 | OpenLayers 9.x, ol-wind, VWorld WMTS/WMS/WFS/Data API, proj4 (EPSG:5186) |
 | 상태관리 | Zustand 4.4.7 |
 | Backend | Spring Boot 3.4.5, Java 17, JPA, Spring Security (Stateless JWT) |
-| DB | PostgreSQL |
-| 외부 연동 | Google Sheets API v4, Discord JDA 5.x, 로스트아크 API |
-
----
-
-## 아키텍처
-
-### Frontend 핵심 데이터 흐름
-
-```
-Zustand Stores
-  ├── mapStore     → activeTool, flyTo, clearAll(Pub/Sub), parcel 콜백
-  ├── layerStore   → 레이어 트리(LayerGroup > LayerItem), 가시성/투명도, basemap 모드
-  ├── drawStore    → 그리기 스타일, textInput 오버레이, 선택 피처 수/삭제
-  └── panelStore   → 열린 패널 타입 ('layer' | 'image' | 'etc' | null)
-          ↓
-hooks/map/          → Zustand 상태를 OL 인터랙션으로 변환
-          ↓
-OpenLayers Map 인스턴스 (MapView에서 생성, 각 훅에 전달)
-          ↓
-components/map/     → MapView → MapToolbar, PanelLeft, MapHeader 등
-```
-
-### hooks/map/ 역할
-
-| 훅 | 역할 |
-|---|---|
-| `useMap` | OL Map 인스턴스 초기화 (EPSG:5186 프로젝션, WMTS 베이스맵) |
-| `useLayerManager` | `layerStore` 트리 ↔ OL WMS/WMTS 레이어 동기화 |
-| `useDrawing` | Draw / Select / Modify 인터랙션 관리. 우클릭 → 그리기 완료 + `activeTool: 'none'` |
-| `useDistanceMeasure` | 거리 측정 (동적 툴팁 렌더링) |
-| `useAreaMeasure` | 면적 측정 (동적 툴팁 렌더링) |
-| `useRadiusSearch` | 반경 검색 원 그리기 |
-| `useParcelHighlight` | VWorld Data API로 필지 폴리곤 조회 + 핀/라벨 오버레이. `registerParcelHighlighter`로 직접 콜백 등록 (Zustand 경유 없이 즉시 실행) |
-| `useRegionName` | 지도 이동 시 행정구역명 조회 |
-
-### mapStore 핵심 패턴
-
-**Pub/Sub 초기화:** `clearAll()` 호출 시 `clearListeners` Set에 등록된 모든 훅의 초기화 함수를 호출.  
-각 훅은 `onClear(fn)` 으로 구독 → 구독 해제 함수 반환.
-
-**직접 콜백 패턴 (parcel):**
-```ts
-// 레이어 훅이 등록
-registerParcelHighlighter((lon, lat, title?) => { ... })
-// 검색 컴포넌트가 직접 호출 (React re-render 없이 즉시 실행)
-highlightParcel(lon, lat, title)
-```
-
-**MapTool 토글:** `setActiveTool(tool)` 은 같은 도구를 다시 누르면 `'none'`으로 해제.
-
-### 레이어 트리 구조
-
-```
-LayerGroup
-  └─ LayerGroup (중첩 가능)
-       └─ LayerItem (type: 'wmts-base' | 'wms')
-```
-
-`layerStore.flattenGroupLayers()` 로 트리에서 모든 LeafItem 추출.  
-확장 상태는 `localStorage['layer-group-expanded']`에 유지.  
-레이어 가시성/투명도는 `layerStore` 에서 per-user 서버 저장 (백엔드 `LayerService`).
-
-### Backend 구조
-
-```
-com.gtp/
-├── global/
-│   ├── config/     CorsConfig (localhost:3000 허용), SecurityConfig, BotDataInitializer
-│   ├── jwt/        JwtUtil, JwtFilter
-│   ├── exception/  CustomException, ErrorCode(enum), GlobalExceptionHandler
-│   └── response/   ApiResponse<T>  ← 모든 API 응답 래퍼
-└── domain/
-    ├── blog/       게시글, 카테고리, slug 기반 조회
-    ├── bot/        command / room / schedule / log / message / discord
-    ├── geoserver/  GeoServer REST API 연동 (SLD 스타일, 레이어 publish)
-    ├── lostark/    캐릭터 조회 API, 레이드 일정
-    ├── map/        레이어 트리 CRUD (LayerGroup, LayerItem 엔티티)
-    └── member/     auth (JWT 로그인), user
-```
-
-모든 비즈니스 예외는 `throw new CustomException(ErrorCode.XXX)` 형식.
-
-### Security 규칙 (SecurityConfig)
-
-- `GET /api/posts`, `/api/categories`, `/api/layers/**`, `/api/layer-groups`, `/api/geoserver/sld/**` → 인증 불필요
-- `POST /api/auth/login` → 인증 불필요
-- 나머지 `/api/categories/**`, `/api/users/**`, `/api/auth/me`, `/api/posts/**`, `/api/geoserver/**`, `/api/layers/**`, `/api/layer-groups/**` → 인증 필요
-- `anyRequest` → `permitAll()` (폴백)
-
----
-
-## Proxy 구조
-
-### Next.js Rewrite (next.config.ts)
-`/api/*` → `http://localhost:8080/api/*` (개발 환경 CORS 우회)
-
-### App Router API 핸들러 (`frontend/src/app/proxy/`)
-서버 사이드에서 API 키를 숨기기 위한 프록시 라우트:
-
-| 경로 | 용도 |
-|---|---|
-| `/proxy/vworld/search` | VWorld 통합검색 (주소/POI) |
-| `/proxy/vworld/wfs` | VWorld WFS 피처 조회 |
-| `/proxy/vworld/data` | VWorld Data API (필지 폴리곤 등) |
-| `/proxy/vworld/legend-style` | VWorld 범례 스타일 |
-| `/proxy/geoserver/legend/[name]` | GeoServer 범례 이미지 |
-| `/proxy/geoserver/styles/[name]` | GeoServer SLD 스타일 |
-| `/proxy/region` | 행정구역명 조회 |
-| `/proxy/wfs` | 범용 WFS 프록시 |
-
-**VWorld domain 파라미터:** VWorld API는 등록된 도메인 일치 필수.  
-proxy route에서 `NODE_ENV`에 따라 자동 주입:
-```ts
-const DOMAIN = NODE_ENV === 'production' ? 'https://gitaey-dev.com' : 'http://localhost:3000'
-```
+| DB | PostgreSQL + PostGIS |
+| 외부 연동 | Google Sheets API v4, Discord JDA 5.x, 로스트아크 API, 기상청 API허브, GeoTools 32.1, Apache POI |
 
 ---
 
@@ -188,6 +77,11 @@ const DOMAIN = NODE_ENV === 'production' ? 'https://gitaey-dev.com' : 'http://lo
 - 모든 파라미터에 타입 명시 (implicit any 금지)
 - `interface` 우선 (`type`보다)
 - **프론트엔드 파일 수정 후 반드시 `npx tsc --noEmit`으로 타입 에러 확인 후 완료 선언**
+
+### Backend
+- 모든 비즈니스 예외는 `throw new CustomException(ErrorCode.XXX)` 형식
+- 새 도메인은 다른 도메인 클래스를 참조하지 않는 독립 모듈로 설계하는 걸 기본으로 함
+  (예: `domain/mymap`은 `userId`/`roleCode`를 문자열로만 다루고 `User`/`Role` 엔티티를 참조하지 않음)
 
 ### 커밋 메시지
 한글로 작성. `추가/수정/삭제/리팩토링 + 설명` 형식.
@@ -217,64 +111,15 @@ const DOMAIN = NODE_ENV === 'production' ? 'https://gitaey-dev.com' : 'http://lo
 | `/admin/geoserver/publish` | GeoServer 레이어 배포 |
 | `/admin/geoserver/styles` | GeoServer SLD 스타일 관리 |
 | `/admin/user` | 회원 관리 |
+| `/admin/permission` | 역할/권한 관리 |
+| `/admin/menu` | 메뉴 가시성 관리 |
+| `/admin/access-log` | 접속 로그 |
+| `/admin/mymap` | 나만의지도 관리 (전체 오버사이트) |
 
 ---
 
-## 서버 구조
+## 도메인 목록 (backend)
 
-### 기본 정보
-- **OS**: CentOS Linux 7
-- **SSH 포트**: 19922
-- **프로젝트 경로**: `/gtp/GTProject/`
-
-### 도메인 → 포트 매핑 (Nginx)
-| 도메인 | 포트 | 서비스 |
-|---|---|---|
-| `gitaey-dev.com` | 49092 | 프론트엔드 (Next.js) |
-| `api.gitaey-dev.com` | 49090 | 백엔드 (Spring Boot) |
-| `geo.gitaey-dev.com` | 49094 | GeoServer |
-| `sisnet.kr` | 8081 | SISNET_HOMPAGE Tomcat (별개 서비스) |
-| bot (내부용) | 49093 | 기빵봇 (Spring Boot) |
-
-### Docker 컨테이너 (`/gtp/docker/docker-compose.yml`)
-| 컨테이너 | 이미지 | 포트 |
-|---|---|---|
-| gtp-nginx | nginx:alpine | host network |
-| gtp-frontend | node:18 | 49092:3000 |
-| gtp-backend | gtp-backend:latest | 49090:8080 |
-| gtp-postgres | postgis/postgis:16-3.4 | 49091:5432 |
-| gtp-bot | gtp-bot:latest | 49093:8081 |
-| gtp-geoserver | kartoza/geoserver:2.24.0 | 49094:8080 |
-
-- 환경변수: `/gtp/docker/.env`
-- Nginx 설정: `/gtp/nginx/conf.d/gtp.conf`
-- Google 인증: `/gtp/google-credentials.json`
-
-### CI/CD
-- GitHub Actions (`appleboy/ssh-action`) → SSH로 서버 접속 → git pull → docker build/run
-- 워크플로우: `.github/workflows/deploy-backend.yml`, `deploy-frontend.yml`, `deploy-bot.yml`
-- GitHub Secrets: `SERVER_HOST`, `SERVER_USER`, `SSH_PRIVATE_KEY`
-
-### 봇 서비스 배포 시 주의사항
-- **포트 8081은 SISNET_HOMPAGE Tomcat이 점유 중** → 봇은 **49093** 포트 사용 (`49093:8081`)
-- GeoServer는 **49094** 포트 사용 (`49094:8080`)
-- `bot/src/main/resources/application.yml`의 서버 포트는 8081 유지 (컨테이너 내부 포트)
-
----
-
-## 구현 현황
-
-- [x] 지도 (VWorld WMTS/WMS, EPSG:5186)
-- [x] 레이어 패널 (트리 구조, 토글/투명도, per-user 서버 저장)
-- [x] 그리기 도구 (포인트/선/폴리곤/원/직사각형/텍스트, 선택·편집·삭제)
-- [x] 거리/면적 측정
-- [x] 반경 검색
-- [x] 통합검색 (VWorld) + 필지 폴리곤 하이라이트
-- [x] 블로그 (CRUD, 카테고리, slug)
-- [x] 카카오봇 (명령어, 방, 스케줄, 로그, Discord 연동)
-- [x] Google Sheets 레이드 일정 연동
-- [x] 로스트아크 캐릭터 조회
-- [x] GeoServer 레이어/스타일 관리
-- [ ] 인증/로그인 (JWT 구조 완성, UI 미완)
-- [ ] 지도 팝업
-- [ ] 데이터 내보내기
+`blog`, `bot`, `geoserver`, `geotiff`, `log`(접속 로그), `map`(레이어 트리),
+`member/{auth,role,user}`(로그인·동적 역할/권한·회원), `menu`(메뉴 가시성),
+`mymap`(나만의지도), `wind`(바람길). 상세는 `.claude/rules/backend.md` 참고.

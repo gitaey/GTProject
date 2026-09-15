@@ -3,14 +3,15 @@
 // 좌측 아이콘 네비게이션 컴포넌트
 // 각 아이콘 클릭 시 오른쪽 패널 내용이 전환됨
 // hidden md:flex → 모바일에서는 숨김, 태블릿부터 표시
-import { LucideIcon, Layers, Aperture, MoreHorizontal, Settings } from 'lucide-react'
+import { LucideIcon, Layers, Aperture, Map, MoreHorizontal, Settings } from 'lucide-react'
 import { usePanelStore, PanelType } from '@/stores/map/panelStore'
 import { useMenuStore } from '@/stores/menuStore'
 
 const NAV_ITEMS: { type: PanelType; label: string; icon: LucideIcon; menuId: string }[] = [
-    { type: 'layer', label: '레이어', icon: Layers,         menuId: 'map.panel.layer' },
-    { type: 'image', label: 'TIFF',   icon: Aperture,       menuId: 'map.panel.image' },
-    { type: 'etc',   label: '기타',   icon: MoreHorizontal, menuId: 'map.panel.etc'   },
+    { type: 'layer', label: '레이어',     icon: Layers,         menuId: 'map.panel.layer' },
+    { type: 'image', label: 'TIFF',       icon: Aperture,       menuId: 'map.panel.image' },
+    { type: 'mymap', label: '나만의지도', icon: Map,            menuId: 'map.panel.mymap' },
+    { type: 'etc',   label: '기타',       icon: MoreHorizontal, menuId: 'map.panel.etc'   },
 ]
 
 export default function NavLeft() {

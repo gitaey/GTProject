@@ -17,6 +17,10 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: false
+        jdbc:
+          batch_size: 500
+        order_inserts: true
+        order_updates: true
 
   servlet:
     multipart:
@@ -55,6 +59,9 @@ lostark:
 
 geotiff:
   upload-dir: ${GEOTIFF_UPLOAD_DIR:./geotiff-uploads}
+
+mymap:
+  upload-dir: ${MYMAP_UPLOAD_DIR:./mymap-uploads}
 
 titiler:
   url: ${TITILER_URL:http://localhost:8000}

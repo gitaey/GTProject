@@ -17,6 +17,13 @@
       "cwd": "backend"
     },
     {
+      "name": "Backend (Spring Boot, JDK25)",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-NoProfile", "-Command", "$env:JAVA_HOME='C:\\Program Files\\Eclipse Adoptium\\jdk-25.0.2.10-hotspot'; $env:SPRING_PROFILES_ACTIVE='local'; .\\mvnw.cmd spring-boot:run"],
+      "port": 8080,
+      "cwd": "backend"
+    },
+    {
       "name": "Kakaobot (Node.js)",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],

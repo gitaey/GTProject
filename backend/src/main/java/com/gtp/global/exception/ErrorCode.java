@@ -39,6 +39,15 @@ public enum ErrorCode {
     INVALID_FILE_TYPE(HttpStatus.BAD_REQUEST, "GeoTIFF(.tif, .tiff) 파일만 업로드 가능합니다."),
     FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "파일 업로드에 실패했습니다."),
 
+    // 나만의지도 관련
+    USER_MAP_NOT_FOUND(HttpStatus.NOT_FOUND, "나만의지도를 찾을 수 없습니다."),
+    USER_MAP_FORBIDDEN(HttpStatus.FORBIDDEN, "이 나만의지도에 대한 권한이 없습니다."),
+    USER_MAP_NOT_READY(HttpStatus.CONFLICT, "아직 처리 중인 나만의지도입니다."),
+    INVALID_SHP_FILE(HttpStatus.BAD_REQUEST, "shp 파일 세트(.shp/.shx/.dbf)가 올바르지 않습니다."),
+    INVALID_EXCEL_FILE(HttpStatus.BAD_REQUEST, "엑셀(.xlsx) 파일만 업로드 가능합니다."),
+    EXCEL_UPLOAD_NOT_FOUND(HttpStatus.NOT_FOUND, "엑셀 업로드 세션을 찾을 수 없습니다(만료되었을 수 있습니다)."),
+    INVALID_COORDINATE_COLUMN(HttpStatus.BAD_REQUEST, "선택한 위도/경도 컬럼에서 좌표를 읽을 수 없습니다."),
+
     // 인증 관련
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다."),
     ACCOUNT_INACTIVE(HttpStatus.FORBIDDEN, "비활성화된 계정입니다."),
