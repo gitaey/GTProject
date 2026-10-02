@@ -1,0 +1,2 @@
+# gis-map 패키지 UMD 빌드 산출물 (npm run build:gis-umd)
+packages/*/dist/

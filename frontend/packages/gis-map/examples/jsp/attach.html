@@ -1,0 +1,207 @@
+<!doctype html>
+<!--
+  gis-map attach 번들(b) 예제 — "업무 페이지가 전역 ol(공식 full build ol.js)로 이미 만든 지도"에 엔진을 붙인다. JSP 판은 attach.jsp.
+  빌드: frontend/에서 npm run build:gis-umd ((a)·(b)를 차례로 빌드)
+        → packages/gis-map/dist/gis-map.attach.umd.js, gis-map.attach.css
+  여는 법: 이 파일을 브라우저로 바로 열거나(file://), 패키지 폴더와 frontend/node_modules/ol을 내주는 정적 서버로 연다(README 6절).
+  ol은 이 저장소의 frontend/node_modules/ol(9.2.4)을 쓴다 — 업무 프로젝트에서는 원래 쓰던 ol.js·ol.css 자리로 바꾼다(7.1 이상).
+  백엔드 없이 뜬다. 배경지도는 호스트(업무 코드)가 만든 OpenStreetMap이고, 저작자 표시는 호스트의 Attribution 컨트롤이 그린다.
+  React·Tailwind·jQuery 없음. ES5 문법만 쓴다.
+-->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>gis-map attach 예제 (기존 OL 지도에 붙이기)</title>
+<!-- 1) 업무 페이지가 원래 쓰던 ol (전역 ol + ol.css) -->
+<link rel="stylesheet" href="../../../../node_modules/ol/ol.css">
+<!-- 2) 엔진 CSS: ol.css가 들어 있지 않다. 엔진이 그리는 DOM(측정 툴팁·텍스트 입력·커서 안내)에만 걸린다 → 호스트 지도 모양은 그대로 -->
+<link rel="stylesheet" href="../../dist/gis-map.attach.css">
+<style>
+    /* 업무 화면 자체의 모양(지도 모듈 CSS 아님) */
+    html, body { margin: 0; height: 100%; }
+    body { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; font-size: 14px; color: #222; }
+    .demo { display: flex; height: 100%; }
+    .demo-side { width: 300px; flex: none; overflow: auto; padding: 12px; border-right: 1px solid #ddd; box-sizing: border-box; background: #fafafa; }
+    .demo-side h1 { font-size: 16px; margin: 0 0 4px; }
+    .demo-side h2 { font-size: 13px; margin: 14px 0 6px; color: #555; }
+    .demo-side button { margin: 0 4px 4px 0; padding: 4px 8px; border: 1px solid #bbb; background: #fff; border-radius: 3px; cursor: pointer; font-size: 12px; }
+    .demo-side button.is-on { background: #f26722; border-color: #f26722; color: #fff; }
+    .demo-side button:disabled { opacity: .45; cursor: default; }
+    .demo-side ul { list-style: none; margin: 0; padding-left: 0; }
+    .demo-note { color: #777; font-size: 12px; }
+    .demo-log { font: 11px/1.4 Consolas, monospace; background: #fff; border: 1px solid #ddd; height: 170px; overflow: auto; padding: 4px; white-space: pre-wrap; }
+    /* 호스트 지도 요소: 높이는 페이지가 준다. attach 번들은 class "gm-root"가 필요 없다 */
+    .demo-map { flex: 1; position: relative; }
+    .host-pin { background: #1e40af; color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="demo">
+    <aside class="demo-side">
+        <h1>기존 OL 지도에 붙이기</h1>
+        <div class="demo-note">gis-map <span id="ver"></span> · 호스트 ol <span id="olver"></span> · 백엔드 없음</div>
+        <div class="demo-note" id="check"></div>
+
+        <h2>엔진</h2>
+        <button type="button" id="btnAttach">붙이기</button><button type="button" id="btnDetach">떼기(destroy)</button>
+
+        <h2>도구</h2>
+        <section id="tools">
+            <button type="button" data-tool="draw-point">점</button><button type="button" data-tool="draw-line">선</button><button type="button" data-tool="draw-polygon">면</button><button type="button" data-tool="draw-circle">원</button><button type="button" data-tool="draw-box">사각형</button><button type="button" data-tool="draw-text">텍스트</button><button type="button" data-tool="select">선택</button><br>
+            <button type="button" data-tool="measure-distance">거리측정</button><button type="button" data-tool="measure-area">면적측정</button><button type="button" data-tool="radius-search">반경</button><br>
+            <button type="button" id="btnClear">전체 지우기</button>
+            <div class="demo-note">그리기·측정은 더블클릭 또는 우클릭으로 끝낸다. 같은 단추를 다시 누르면 꺼진다.</div>
+        </section>
+
+        <h2>엔진 레이어 트리</h2>
+        <section id="tree"><div class="demo-note">붙이면 보인다</div></section>
+
+        <h2>기록(호스트 지도 상태)</h2>
+        <div id="log" class="demo-log"></div>
+    </aside>
+    <div id="map" class="demo-map"></div>
+</div>
+
+<!-- 1) 업무 페이지가 원래 쓰던 ol.js -->
+<script src="../../../../node_modules/ol/dist/ol.js"></script>
+<script>
+// ───── 여기까지가 "업무 페이지가 원래 가진 지도"다(엔진과 무관한 업무 코드) ─────
+(function () {
+    'use strict';
+    var pin = document.createElement('div');
+    pin.className = 'host-pin';
+    pin.textContent = '업무 지도의 오버레이';
+    var hostVector = new ol.layer.Vector({
+        source: new ol.source.Vector({ features: [new ol.Feature(new ol.geom.Point(ol.proj.fromLonLat([127.0276, 37.4979])))] }),
+        zIndex: 50
+    });
+    var controls = typeof ol.control.defaults === 'function' ? ol.control.defaults() : ol.control.defaults.defaults();
+    controls.push(new ol.control.ScaleLine());
+    window.hostMap = new ol.Map({
+        target: 'map',
+        // OSM 타일 이용 조건: 화면에 "© OpenStreetMap contributors"를 보인다 — ol.source.OSM의 기본 저작자 표시 + Attribution 컨트롤(기본 컨트롤에 있음)
+        layers: [new ol.layer.Tile({ source: new ol.source.OSM() }), hostVector],
+        controls: controls,
+        view: new ol.View({ center: ol.proj.fromLonLat([127.0276, 37.4979]), zoom: 15 })
+    });
+    hostMap.addOverlay(new ol.Overlay({ element: pin, position: ol.proj.fromLonLat([127.0300, 37.4995]), positioning: 'bottom-center' }));
+})();
+</script>
+
+<!-- 3) attach 번들: ol.js 뒤에 불러온다(번들은 불러오는 순간의 전역 ol을 쓴다) -->
+<script src="../../dist/gis-map.attach.umd.js"></script>
+<script>
+(function () {
+    'use strict';
+    // 자리표시자: 실제 키를 이 파일에 적어 커밋하지 않는다. 비우면 엔진 트리의 VWorld 레이어를 빼고 OSM 예시만 둔다
+    var VWORLD_KEY = '';
+
+    function log(msg) { var el = document.getElementById('log'); el.textContent += msg + '\n'; el.scrollTop = el.scrollHeight; }
+    function hostCounts() {
+        return '레이어 ' + hostMap.getLayers().getLength() + ' · interaction ' + hostMap.getInteractions().getLength() +
+            ' · control ' + hostMap.getControls().getLength() + ' · overlay ' + hostMap.getOverlays().getLength();
+    }
+
+    // 도입 전 점검: 이 페이지의 ol이 엔진이 쓰는 API를 다 가졌는지
+    var report = GisMap.checkOl();
+    document.getElementById('ver').textContent = GisMap.version;
+    document.getElementById('olver').textContent = report.version || '버전 모름';
+    document.getElementById('check').textContent = report.ok
+        ? 'checkOl: 통과' + (report.testedRange ? '(시험한 버전대)' : '(시험 버전대 밖 — COMPATIBILITY.md)')
+        : 'checkOl: 실패 — ' + (report.belowMinimum ? 'ol ' + report.minVersion + ' 이상 필요' : '없는 API ' + report.missing.join(', '));
+    log('붙이기 전 호스트: ' + hostCounts());
+
+    function layerDef(id, groupId, name, type, url, layerName, visible, extra) {
+        var d = { id: id, name: name, type: type, sourceType: 'OPENAPI', url: url, layerName: layerName, styleName: null, styleConfig: null,
+            format: 'image/png', projection: null, minZoom: null, maxZoom: null, opacity: 1, visible: visible, sortOrder: id,
+            groupId: groupId, groupName: null, description: null, createdAt: '', updatedAt: '' };
+        if (extra) for (var k in extra) if (Object.prototype.hasOwnProperty.call(extra, k)) d[k] = extra[k];
+        return d;
+    }
+    function demoTree() {
+        var layers = VWORLD_KEY
+            ? [layerDef(21, 2, '연속지적도(VWorld WMS)', 'WMS', 'https://api.vworld.kr/req/wms', 'lp_pa_cbnd_bubun', false, { minZoom: 15 })]
+            : [layerDef(22, 2, 'OSM 위에 덮는 예시(반투명 OSM)', 'XYZ', 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', 'osm-overlay', false, { opacity: 0.5, maxZoom: 19 })];
+        return { groups: [{ id: 2, name: '엔진이 관리하는 레이어', parentId: null, sortOrder: 0, children: [], layers: layers }], ungroupedLayers: [] };
+    }
+
+    var gis = null, offs = [];
+    function attach() {
+        if (gis) return;
+        try {
+            gis = GisMap.attach(hostMap, {
+                host: { keys: { vworld: VWORLD_KEY } },
+                sources: { layerTree: { loadTree: function () { return Promise.resolve(demoTree()); } } },
+                // 호스트 레이어 zIndex 체계(이 예제: 호스트 벡터 50)와 겹치지 않게 엔진 도구·강조 레이어를 위로
+                zIndex: { tools: 900, parcel: 950 }
+            });
+        } catch (e) {
+            log('붙이기 실패: ' + e.message);
+            return;
+        }
+        log('붙임 ' + gis.id + ' → 호스트: ' + hostCounts());
+        offs.push(gis.tools.store.subscribe(function (s) {
+            var btns = document.querySelectorAll('#tools [data-tool]');
+            for (var i = 0; i < btns.length; i++) btns[i].className = btns[i].getAttribute('data-tool') === s.activeTool ? 'is-on' : '';
+        }));
+        offs.push(gis.layers.store.subscribe(renderTree));
+        renderTree();
+        syncButtons();
+    }
+    function detach() {
+        if (!gis) return;
+        for (var i = 0; i < offs.length; i++) offs[i]();
+        offs = [];
+        gis.destroy();
+        gis = null;
+        log('떼기(destroy) → 호스트: ' + hostCounts() + ' (붙이기 전과 같아야 한다)');
+        document.getElementById('tree').innerHTML = '<div class="demo-note">붙이면 보인다</div>';
+        var btns = document.querySelectorAll('#tools [data-tool]');
+        for (var j = 0; j < btns.length; j++) btns[j].className = '';
+        syncButtons();
+    }
+    function syncButtons() {
+        document.getElementById('btnAttach').disabled = !!gis || !report.ok;
+        document.getElementById('btnDetach').disabled = !gis;
+        var all = document.querySelectorAll('#tools button');
+        for (var i = 0; i < all.length; i++) all[i].disabled = !gis;
+    }
+    function renderTree() {
+        var box = document.getElementById('tree');
+        var s = gis.layers.store.getState();
+        box.innerHTML = '';
+        if (!s.tree) { box.innerHTML = '<div class="demo-note">' + (s.error ? '불러오기 실패' : '불러오는 중') + '</div>'; return; }
+        var ul = document.createElement('ul');
+        var layers = gis.layers.allLayers();
+        for (var i = 0; i < layers.length; i++) {
+            (function (layer) {
+                var li = document.createElement('li');
+                var label = document.createElement('label');
+                var cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.checked = gis.layers.isVisible(layer);
+                cb.onchange = function () { gis.layers.toggleLayer(layer.id); };
+                label.appendChild(cb);
+                label.appendChild(document.createTextNode(' ' + layer.name));
+                li.appendChild(label);
+                ul.appendChild(li);
+            })(layers[i]);
+        }
+        box.appendChild(ul);
+    }
+
+    document.getElementById('btnAttach').onclick = attach;
+    document.getElementById('btnDetach').onclick = detach;
+    document.getElementById('tools').onclick = function (e) {
+        var t = e.target && e.target.getAttribute && e.target.getAttribute('data-tool');
+        if (t && gis) gis.tools.activate(t);
+    };
+    document.getElementById('btnClear').onclick = function () { if (gis) gis.clearAll(); };
+
+    attach();
+})();
+</script>
+</body>
+</html>

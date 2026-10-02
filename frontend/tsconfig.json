@@ -19,9 +19,15 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@gtp/gis-map/core": ["./packages/gis-map/src/core/index.ts"],
+      "@gtp/gis-map/core/wind": ["./packages/gis-map/src/core/wind/index.ts"],
+      "@gtp/gis-map/react": ["./packages/gis-map/src/react/index.ts"],
+      "@gtp/gis-map/ui": ["./packages/gis-map/src/ui/index.ts"],
+      "@gtp/gis-map/adapters/rest": ["./packages/gis-map/src/adapters/rest/index.ts"],
+      "@gtp/gis-map/adapters/proxy": ["./packages/gis-map/src/adapters/proxy/index.ts"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "packages/*/dist"]
 }

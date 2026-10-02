@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import 'ol/ol.css';
+@import '../../packages/gis-map/src/styles/gis-map.css';
+@import '../../packages/gis-map/src/styles/gis-map-ui.css';
 @plugin "@tailwindcss/typography";
 
 :root {
@@ -42,17 +44,16 @@
     --accent-border: rgba(249, 115, 22, 0.35);
 }
 
-@keyframes shimmer {
-    0%   { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
-}
-
 @theme inline {
-    --animate-shimmer: shimmer 1.2s infinite;
     --color-background: var(--bg-page);
     --color-foreground: var(--text-primary);
     --font-sans: var(--font-geist-sans);
     --font-mono: var(--font-geist-mono);
+}
+
+/* 지도 패키지(--gm-*) 호스트 설정: 등폭 글꼴을 GTProject 글꼴(Geist Mono)로 — 패키지 기본은 시스템 등폭 글꼴 */
+.gm-root {
+    --gm-font-mono: var(--font-geist-mono);
 }
 
 body {
@@ -61,23 +62,3 @@ body {
     font-family: var(--font-geist-sans), Arial, sans-serif;
 }
 
-/* OL ScaleLine 스타일 */
-.ol-scale-line {
-    background: rgba(255, 255, 255, 0.85);
-    border-radius: 4px;
-    bottom: 10px;
-    padding: 3px 6px;
-    border: 1px solid #d1d5db;
-    position: absolute;
-    right : 10px;
-    left: unset;
-}
-.ol-scale-line-inner {
-    border: 1.5px solid #374151;
-    border-top: none;
-    color: #374151;
-    font-size: 11px;
-    font-family: 'Consolas', 'Courier New', monospace;
-    text-align: center;
-    margin-top: 2px;
-}

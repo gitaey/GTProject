@@ -1,0 +1,472 @@
+/* gis-map 코어 스타일: .gm-root 최소 리셋 + --gm-* 변수 + 코어 DOM(측정 툴팁·텍스트 입력·커서 안내) + OL 축척 막대(.gm-root 안). gm- 접두사만(OL 컨트롤 꾸밈은 .gm-root 아래로 한정), @layer 밖에 작성. */
+/* 불러오는 순서: gis-map.css → gis-map-ui.css (리셋이 코어·위젯 규칙보다 앞에 와야 한다 — 명시도가 같아서 뒤에 오는 규칙이 이긴다) */
+
+/* ── .gm-root 상속 기본값 (FE-5b-2, QA FE-5b-1 M1) ──
+   Tailwind v4 preflight가 html에 주는 상속값과 같다 → GTProject(html에 같은 값)에서는 계산값이 바뀌지 않고,
+   Tailwind가 없는 호스트에서도 줄 높이 등이 같아진다. 글꼴(font-family)은 호스트 글꼴을 따른다(설계 결정 대기 — FE-5b-1 Q3). */
+.gm-root {
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    -moz-tab-size: 4;
+    tab-size: 4;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* ── .gm-root 최소 리셋 (FE-5b-1, 5b-2에서 select·img·숫자 입력 단추 추가) ──
+   값은 Tailwind v4 preflight와 같다 → Tailwind가 있는 호스트(GTProject)에서는 아무것도 바뀌지 않고,
+   Tailwind가 없는 호스트에서도 같은 모습이 된다. 호스트의 전역 button/input 규칙(명시도 0,0,1)보다 강하고(0,1,0),
+   뒤에 오는 gm- 규칙(0,1,0 이상)에는 진다.
+   대상은 gm- 클래스가 붙은 요소만 — 호스트가 .gm-root 안에 넣는 내용(GTProject '기타' 패널처럼 Tailwind를 쓰는 커스텀 패널)은
+   건드리지 않는다(@layer 밖 규칙은 Tailwind utilities 층보다 항상 이겨서, 전체에 걸면 그 내용의 여백·배경이 지워진다).
+   그래서 패키지 위젯은 꾸밈이 있는 요소마다 gm- 클래스를 단다(인라인 style만 있던 요소 포함 — FE-5b-2). */
+.gm-root :where([class*="gm-"]),
+.gm-root :where([class*="gm-"])::before,
+.gm-root :where([class*="gm-"])::after {
+    box-sizing: border-box;
+    border: 0 solid;
+    margin: 0;
+    padding: 0;
+}
+
+.gm-root :where(button[class*="gm-"], input[class*="gm-"], select[class*="gm-"]) {
+    font: inherit;
+    font-feature-settings: inherit;
+    font-variation-settings: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    opacity: 1;
+    background-color: rgba(0, 0, 0, 0);
+    border-radius: 0;
+}
+
+.gm-root :where(button[class*="gm-"]) {
+    -webkit-appearance: button;
+    -moz-appearance: button;
+    appearance: button;
+}
+
+.gm-root :where(input[class*="gm-"])::placeholder {
+    opacity: 1;
+}
+
+.gm-root :where(input[class*="gm-"])::-webkit-inner-spin-button,
+.gm-root :where(input[class*="gm-"])::-webkit-outer-spin-button {
+    height: auto;
+}
+
+@supports (not ((-webkit-appearance: -apple-pay-button))) or (contain-intrinsic-size: 1px) {
+    .gm-root :where(input[class*="gm-"])::placeholder {
+        color: currentColor;
+    }
+
+    @supports (color: color-mix(in lab, red, red)) {
+        .gm-root :where(input[class*="gm-"])::placeholder {
+            color: color-mix(in oklab, currentcolor 50%, transparent);
+        }
+    }
+}
+
+/* lucide 아이콘: gm- 요소의 바로 아래 svg, gm- 클래스가 붙은 svg / gm- 클래스가 붙은 img(범례 이미지) */
+.gm-root :where([class*="gm-"] > svg, svg[class*="gm-"], img[class*="gm-"]) {
+    vertical-align: middle;
+    display: block;
+}
+
+.gm-root :where(img[class*="gm-"]) {
+    max-width: 100%;
+    height: auto;
+}
+
+/* ── --gm-* 변수 (FE-5b-1) ──
+   값은 옛 Tailwind 테마(개발 서버가 준 CSS)의 값을 그대로 옮겼다. 색은 hex → display-p3 → lab 3단(@supports)도 같다.
+   호스트가 바꾸고 싶으면 .gm-root { --gm-…: … } 를 이 파일 뒤에 둔다(GTProject: app/globals.css의 --gm-font-mono). */
+.gm-root {
+    --gm-spacing: .25rem;
+    --gm-text-xs: .75rem;
+    --gm-text-xs--line-height: calc(1 / .75);
+    --gm-text-sm: .875rem;
+    --gm-text-sm--line-height: calc(1.25 / .875);
+    --gm-text-base: 1rem;
+    --gm-text-base--line-height: calc(1.5 / 1);
+    --gm-text-xl: 1.25rem;
+    --gm-text-xl--line-height: calc(1.75 / 1.25);
+    --gm-font-weight-normal: 400;
+    --gm-font-weight-medium: 500;
+    --gm-font-weight-semibold: 600;
+    --gm-font-weight-bold: 700;
+    --gm-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    --gm-tracking-wider: .05em;
+    --gm-tracking-widest: .1em;
+    --gm-radius-md: .375rem;
+    --gm-radius-lg: .5rem;
+    --gm-radius-xl: .75rem;
+    --gm-radius-full: 3.40282e38px;
+    --gm-container-xs: 20rem;
+    --gm-blur-sm: 8px;
+    /* 그림자·애니메이션은 변수로 거쳐 쓴다 — 개발 서버(lightningcss)가 리터럴 값만 줄여 써서(퍼짐 0 생략 등) 옛 Tailwind 계산값과 글자가 달라지는 것을 막는다 */
+    --gm-shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, .1), 0 1px 2px -1px rgba(0, 0, 0, .1);
+    --gm-animate-spin: gm-spin 1s linear infinite;
+    --gm-transition-duration: .15s;
+    --gm-transition-ease: cubic-bezier(.4, 0, .2, 1);
+    /* 브랜드 색(FE-5c) — 패키지 안에서 브랜드 색 값을 정의하는 곳은 여기와 core/config.ts DEFAULT_THEME.primary 둘뿐이다.
+       위젯 CSS·인라인 style·마우스 핸들러는 전부 아래 변수를 쓴다. 바꾸는 방법:
+         · CSS: 호스트가 .gm-root { --gm-primary: … } 한 줄 → 주 색을 쓰는 모든 곳. 옅은 배경·hover·로고 그라데이션까지 바꾸려면 파생 3개도 함께
+         · JS: config.theme.primary(#rrggbb) → MapRoot(MapShell 루트)가 넷을 한꺼번에 계산해 넣는다(기본값과 같으면 아무것도 넣지 않는다)
+       파생 값을 color-mix()로 계산하지 않는 이유: Chrome 111·Edge 111·Firefox 113·Safari 16.2(2023년)부터라 공공기관의 구형 브라우저에서
+       색이 통째로 빠지고, 최신 브라우저에서도 계산값 표기가 color(srgb …)로 바뀌며 옛 hover 색 #e05d19는 어떤 혼합 비율과도 같지 않다.
+       rgba(var(--gm-primary-rgb), a)는 CSS 변수를 지원하는 모든 브라우저(Chrome 49+)에서 동작한다. */
+    --gm-primary: #f26722;
+    /* 주 색의 r, g, b(쉼표로 구분) — rgba(var(--gm-primary-rgb), .04) 같은 옅은 배경·그림자용. --gm-primary와 같은 색이어야 한다 */
+    --gm-primary-rgb: 242, 103, 34;
+    /* 주 색 단추 hover(옛 hover:bg-[#e05d19]), 로고 그라데이션 끝색(옛 인라인 #E04E0A) */
+    --gm-primary-hover: #e05d19;
+    --gm-primary-deep: #e04e0a;
+    --gm-color-white: #fff;
+    --gm-color-gray-50: #f9fafb;
+    --gm-color-gray-100: #f3f4f6;
+    --gm-color-gray-200: #e5e7eb;
+    --gm-color-gray-300: #d1d5dc;
+    --gm-color-gray-400: #99a1af;
+    --gm-color-gray-500: #6a7282;
+    --gm-color-gray-600: #4a5565;
+    --gm-color-gray-700: #364153;
+    --gm-color-gray-800: #1e2939;
+    --gm-color-orange-50: #fff7ed;
+    --gm-color-orange-400: #ff8b1a;
+    --gm-color-orange-500: #fe6e00;
+    --gm-color-amber-700: #b75000;
+    --gm-color-red-50: #fef2f2;
+    --gm-color-red-400: #ff6568;
+    --gm-color-red-500: #fb2c36;
+    --gm-color-red-600: #e40014;
+}
+
+@supports (color: color(display-p3 0 0 0)) {
+    .gm-root {
+        --gm-color-gray-50: color(display-p3 .977213 .98084 .985102);
+        --gm-color-gray-100: color(display-p3 .953567 .956796 .964321);
+        --gm-color-gray-200: color(display-p3 .899787 .906171 .92106);
+        --gm-color-gray-300: color(display-p3 .822033 .835264 .858521);
+        --gm-color-gray-400: color(display-p3 .605734 .630385 .680158);
+        --gm-color-gray-500: color(display-p3 .421287 .446085 .504784);
+        --gm-color-gray-600: color(display-p3 .297358 .332176 .39043);
+        --gm-color-gray-700: color(display-p3 .219968 .253721 .318679);
+        --gm-color-gray-800: color(display-p3 .125854 .159497 .216835);
+        --gm-color-orange-50: color(display-p3 .99533 .970132 .933499);
+        --gm-color-orange-400: color(display-p3 .950192 .561807 .211017);
+        --gm-color-orange-500: color(display-p3 .946589 .449788 .0757345);
+        --gm-color-amber-700: color(display-p3 .67989 .32771 .0520514);
+        --gm-color-red-50: color(display-p3 .988669 .951204 .950419);
+        --gm-color-red-400: color(display-p3 .933534 .431676 .423491);
+        --gm-color-red-500: color(display-p3 .903738 .262579 .253307);
+        --gm-color-red-600: color(display-p3 .830323 .140383 .133196);
+    }
+}
+
+@supports (color: lab(0% 0 0)) {
+    .gm-root {
+        --gm-color-gray-50: lab(98.2596% -.247031 -.706708);
+        --gm-color-gray-100: lab(96.1596% -.082314 -1.13575);
+        --gm-color-gray-200: lab(91.6229% -.159085 -2.26791);
+        --gm-color-gray-300: lab(85.1236% -.612259 -3.7138);
+        --gm-color-gray-400: lab(65.9269% -.832707 -8.17474);
+        --gm-color-gray-500: lab(47.7841% -.393212 -10.0268);
+        --gm-color-gray-600: lab(35.6337% -1.58697 -10.8425);
+        --gm-color-gray-700: lab(27.1134% -.956401 -12.3224);
+        --gm-color-gray-800: lab(16.1051% -1.18239 -11.7533);
+        --gm-color-orange-50: lab(97.7008% 1.53738 5.90646);
+        --gm-color-orange-400: lab(70.0429% 42.5156 75.8207);
+        --gm-color-orange-500: lab(64.272% 57.1788 90.3583);
+        --gm-color-amber-700: lab(47.2709% 42.9082 69.2966);
+        --gm-color-red-50: lab(96.5005% 4.18511 1.52329);
+        --gm-color-red-400: lab(63.7053% 60.7449 31.3109);
+        --gm-color-red-500: lab(55.4814% 75.0732 48.8528);
+        --gm-color-red-600: lab(48.4493% 77.4328 61.5452);
+    }
+}
+
+
+/* ── 코어 DOM 공통 (FE-5b-2) — attach 모드에서는 .gm-root 밖(업무 페이지의 지도)에 그려진다.
+   Tailwind preflight가 html에 주는 상속값을 바깥 상자에 직접 둔다(.gm-root의 상속 기본값과 같다) → 호스트 html에 값이 없어도 줄 높이 등이 같다.
+   GTProject에서는 .gm-root(같은 값) 안이라 계산값이 바뀌지 않는다. 측정 툴팁은 아래 자기 규칙의 line-height가 덮는다 */
+.gm-tool-hint,
+.gm-text-input,
+.gm-measure-tooltip {
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    -moz-tab-size: 4;
+    tab-size: 4;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* ── 커서 안내 (core/tools/toolHint.ts) — 옛: absolute z-40 pointer-events-none / bg-gray-800/90 text-white text-[11px] px-2.5 py-1.5 rounded-md whitespace-nowrap backdrop-blur-sm ── */
+.gm-tool-hint {
+    position: absolute;
+    z-index: 40;
+    pointer-events: none;
+}
+
+.gm-tool-hint__label {
+    box-sizing: border-box;
+    margin: 0;
+    border: 0 solid;
+    padding: .375rem .625rem;
+    border-radius: .375rem;
+    background-color: rgba(30, 41, 57, .9);
+    color: #fff;
+    font-size: 11px;
+    white-space: nowrap;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .25);
+}
+
+@supports (color: color-mix(in lab, red, red)) {
+    .gm-tool-hint__label {
+        background-color: color-mix(in oklab, lab(16.1051% -1.18239 -11.7533) 90%, transparent);
+    }
+}
+
+/* ── 텍스트 도형 입력창 (core/tools/textInputOverlay.ts) ── */
+/* 옛: absolute z-50 pointer-events-none */
+.gm-text-input {
+    position: absolute;
+    z-index: 50;
+    pointer-events: none;
+}
+
+/* 옛: pointer-events-auto transform -translate-x-1/2 -translate-y-full mb-2 (클릭 지점 = 말풍선 꼬리 끝) */
+.gm-text-input__body {
+    box-sizing: border-box;
+    margin: 0 0 .5rem;
+    pointer-events: auto;
+    transform: translate(-50%, -100%);
+}
+
+/* 옛: bg-white rounded-md shadow-lg border border-gray-200 overflow-hidden flex items-center */
+.gm-text-input__box {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    margin: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: .375rem;
+    background-color: #fff;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -4px rgba(0, 0, 0, .1);
+}
+
+/* 옛: px-3 py-2 text-sm text-gray-800 outline-none w-48 */
+.gm-text-input__field {
+    box-sizing: border-box;
+    width: 12rem;
+    margin: 0;
+    border: 0 solid;
+    border-radius: 0;
+    padding: .5rem .75rem;
+    background-color: transparent;
+    font: inherit;
+    font-feature-settings: inherit;
+    font-variation-settings: inherit;
+    letter-spacing: inherit;
+    font-size: .875rem;
+    line-height: calc(1.25 / .875);
+    color: #1e2939;
+    opacity: 1;
+    outline-style: none;
+}
+
+/* 옛: px-2 py-2 text-gray-400 hover:text-gray-600 transition-colors */
+.gm-text-input__close {
+    box-sizing: border-box;
+    margin: 0;
+    border: 0 solid;
+    border-radius: 0;
+    padding: .5rem;
+    background-color: transparent;
+    font: inherit;
+    font-feature-settings: inherit;
+    font-variation-settings: inherit;
+    letter-spacing: inherit;
+    color: #99a1af;
+    opacity: 1;
+    -webkit-appearance: button;
+    -moz-appearance: button;
+    appearance: button;
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke;
+    transition-timing-function: cubic-bezier(.4, 0, .2, 1);
+    transition-duration: .15s;
+}
+
+@media (hover: hover) {
+    .gm-text-input__close:hover {
+        color: #4a5565;
+    }
+}
+
+.gm-text-input__close svg {
+    display: block;
+    vertical-align: middle;
+}
+
+/* 옛: flex justify-center + 인라인 삼각형(border 6px, 위쪽 #e5e7eb) */
+.gm-text-input__tail-wrap {
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    margin: 0;
+}
+
+.gm-text-input__tail {
+    box-sizing: border-box;
+    width: 0;
+    height: 0;
+    margin: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid #e5e7eb;
+}
+
+@supports (color: lab(0% 0 0)) {
+    .gm-text-input__box {
+        border-color: lab(91.6229% -.159085 -2.26791);
+    }
+    .gm-text-input__field {
+        color: lab(16.1051% -1.18239 -11.7533);
+    }
+    .gm-text-input__close {
+        color: lab(65.9269% -.832707 -8.17474);
+    }
+}
+
+@media (hover: hover) {
+    @supports (color: lab(0% 0 0)) {
+        .gm-text-input__close:hover {
+            color: lab(35.6337% -1.58697 -10.8425);
+        }
+    }
+}
+
+/* ── 측정 툴팁 (core/tools/measureTooltip.ts) — 거리·면적·반경. ol.Overlay 요소 안에 그린다 ── */
+/* 옛: bg-black/60 text-white text-xs px-2.5 py-1 rounded pointer-events-auto whitespace-nowrap */
+.gm-measure-tooltip {
+    box-sizing: border-box;
+    margin: 0;
+    border: 0 solid;
+    padding: .25rem .625rem;
+    border-radius: .25rem;
+    background-color: rgba(0, 0, 0, .6);
+    color: #fff;
+    font-size: .75rem;
+    line-height: calc(1 / .75);
+    white-space: nowrap;
+    pointer-events: auto;
+}
+
+@supports (color: color-mix(in lab, red, red)) {
+    .gm-measure-tooltip {
+        background-color: color-mix(in oklab, #000 60%, transparent);
+    }
+}
+
+/* 옛: flex items-center gap-1 */
+.gm-measure-tooltip__row {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+}
+
+.gm-measure-tooltip__row > span {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+}
+
+/* 옛: <button> ml-1 hover:text-red-400 transition-colors (+ Tailwind preflight의 button 리셋) */
+.gm-measure-tooltip__close {
+    box-sizing: border-box;
+    margin: 0 0 0 .25rem;
+    border: 0 solid;
+    border-radius: 0;
+    padding: 0;
+    background-color: transparent;
+    font: inherit;
+    font-feature-settings: inherit;
+    font-variation-settings: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    opacity: 1;
+    -webkit-appearance: button;
+    -moz-appearance: button;
+    appearance: button;
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke;
+    transition-timing-function: cubic-bezier(.4, 0, .2, 1);
+    transition-duration: .15s;
+}
+
+@media (hover: hover) {
+    .gm-measure-tooltip__close:hover {
+        color: #ff6568;
+    }
+}
+
+@media (hover: hover) {
+    @supports (color: lab(0% 0 0)) {
+        .gm-measure-tooltip__close:hover {
+            color: lab(63.7053% 60.7449 31.3109);
+        }
+    }
+}
+
+.gm-measure-tooltip__close svg {
+    display: block;
+    vertical-align: middle;
+}
+
+/* 옛: text-[10px] text-white/60 mt-0.5 */
+.gm-measure-tooltip__hint {
+    box-sizing: border-box;
+    margin: .125rem 0 0;
+    padding: 0;
+    border: 0 solid;
+    font-size: 10px;
+    color: rgba(255, 255, 255, .6);
+}
+
+@supports (color: color-mix(in lab, red, red)) {
+    .gm-measure-tooltip__hint {
+        color: color-mix(in oklab, #fff 60%, transparent);
+    }
+}
+
+/* ── OL 축척 막대(ol.control.ScaleLine) 모양 (FE-6b, QA FE-6a F1) ──
+   옛 위치: 앱 src/app/globals.css(전역 .ol-scale-line). 값은 한 글자도 바꾸지 않고 옮겼다.
+   코어 CSS에 두는 이유: 이 규칙은 React 위젯 마크업이 아니라 OL 컨트롤의 DOM을 꾸미고, JSP용 dist/gis-map.css(= ol.css + 이 파일)에도
+   들어가야 한다(축척 막대를 붙이는 쪽 = 위젯 MapStatusBar 또는 UMD GisMap.controls.scaleLine — 어느 쪽이든 같은 모양).
+   .gm-root 안에만 건다 — 업무 페이지가 따로 가진 OL 지도(.gm-root 밖, attach 포함)의 축척 막대 모양은 건드리지 않는다.
+   명시도 0,2,0이라 ol.css(0,1,0)·불러오는 순서와 무관하게 이긴다. */
+.gm-root .ol-scale-line {
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 4px;
+    bottom: 10px;
+    padding: 3px 6px;
+    border: 1px solid #d1d5db;
+    position: absolute;
+    right: 10px;
+    left: unset;
+}
+
+.gm-root .ol-scale-line-inner {
+    border: 1.5px solid #374151;
+    border-top: none;
+    color: #374151;
+    font-size: 11px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    text-align: center;
+    margin-top: 2px;
+}

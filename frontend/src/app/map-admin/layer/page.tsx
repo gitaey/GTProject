@@ -18,9 +18,12 @@ import { CSS } from '@dnd-kit/utilities'
 import {
     DbLayer, DbLayerFormState, DbLayerGroup, DbLayerType, DbLayerSourceType,
     LayerTreeResponse, EMPTY_LAYER_FORM, LAYER_TYPE_OPTIONS, LAYER_SOURCE_OPTIONS,
-} from '@/types/layer'
+} from './types'
 import { getToken } from '@/stores/authStore'
-import { useLayerStore } from '@/stores/map/layerStore'
+import { usePersistentExpanded } from '@gtp/gis-map/react'
+
+// 그룹 펼침 상태 저장 키 — /map 레이어 패널과 같은 키라 펼침 상태를 공유한다
+const LAYER_GROUP_EXPANDED_KEY = 'layer-group-expanded'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
@@ -243,7 +246,7 @@ function GroupNode({
     onToggleVisible, onUpdateLayer,
     onEditLayer, onDeleteLayer, onEditGroup, onDeleteGroup, onAddLayerToGroup, onAddGroupToGroup,
 }: GroupNodeProps) {
-    const { toggleExpanded, isExpanded } = useLayerStore()
+    const { toggle: toggleExpanded, isExpanded } = usePersistentExpanded(LAYER_GROUP_EXPANDED_KEY)
     const expanded = isExpanded(group.id)
     const layerIds = group.layers.map(l => `layer-${l.id}`)
 

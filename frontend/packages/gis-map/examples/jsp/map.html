@@ -1,0 +1,221 @@
+<!doctype html>
+<!--
+  gis-map UMD (a) 예제 — 정적 HTML 판(map.jsp와 같은 화면). 빌드: frontend/에서 npm run build:gis-umd → packages/gis-map/dist/
+  여는 법: 이 파일을 브라우저로 바로 열거나(file://), 정적 서버로 packages/gis-map/ 를 열어 /examples/jsp/map.html (http://)
+  백엔드 없이 뜬다: 레이어 트리는 아래 DEMO 소스(메모리)에서 오고, 지도 타일만 바깥(OSM 또는 VWorld)에서 받는다.
+  React·Tailwind·jQuery 없음. 엔진 API(GisMap.create / map.tools / map.layers / map.draw)만 쓴다.
+-->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>gis-map UMD 예제 (정적 HTML)</title>
+<!-- CSS는 JS가 넣어 주지 않는다 — 번들과 같은 폴더의 gis-map.css(= ol.css + 코어 CSS)를 직접 불러온다 -->
+<link rel="stylesheet" href="../../dist/gis-map.css">
+<style>
+    /* 아래는 예제 페이지(업무 화면) 자체의 모양이다. 지도 모듈 CSS가 아니다 */
+    /* 글자 크기는 body에만 준다 — html(뿌리) 글자 크기를 바꾸면 rem으로 쓴 지도 모듈 CSS(측정 툴팁 등)의 크기도 같이 바뀐다 */
+    html, body { margin: 0; height: 100%; }
+    body { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; font-size: 14px; color: #222; }
+    .demo { display: flex; height: 100%; }
+    .demo-side { width: 280px; flex: none; overflow: auto; padding: 12px; border-right: 1px solid #ddd; box-sizing: border-box; background: #fafafa; }
+    .demo-side h1 { font-size: 16px; margin: 0 0 4px; }
+    .demo-side h2 { font-size: 13px; margin: 14px 0 6px; color: #555; }
+    .demo-side button { margin: 0 4px 4px 0; padding: 4px 8px; border: 1px solid #bbb; background: #fff; border-radius: 3px; cursor: pointer; font-size: 12px; }
+    .demo-side button.is-on { background: #f26722; border-color: #f26722; color: #fff; }
+    .demo-side ul { list-style: none; margin: 0; padding-left: 14px; }
+    .demo-side > section > ul { padding-left: 0; }
+    .demo-side label { cursor: pointer; }
+    .demo-note { color: #777; font-size: 12px; }
+    .demo-log { font: 11px/1.4 Consolas, monospace; background: #fff; border: 1px solid #ddd; height: 120px; overflow: auto; padding: 4px; white-space: pre-wrap; }
+    /* 지도 요소: 높이는 페이지가 준다. class "gm-root"는 필수 — gis-map.css의 ol.css 전체(.gm-root 안으로 한정)·축척 막대 모양·--gm-* 변수의 기준이다 */
+    .demo-map { flex: 1; position: relative; }
+    /* OpenStreetMap 타일 이용 조건: 지도 화면에 저작자 표시. (a) 번들은 OL 저작자 표시 컨트롤을 넣지 않으므로(번들 ol 사본) 페이지가 직접 보인다 */
+    .demo-attrib { position: absolute; left: 6px; bottom: 6px; z-index: 1; font: 11px/1.4 Arial, sans-serif; color: #333; background: rgba(255, 255, 255, .8); padding: 1px 5px; border-radius: 3px; }
+    .demo-attrib a { color: #0b57d0; }
+</style>
+</head>
+<body>
+<div class="demo">
+    <aside class="demo-side">
+        <h1>gis-map UMD 예제</h1>
+        <div class="demo-note">버전 <span id="ver"></span> · 정적 HTML · 백엔드 없음</div>
+
+        <h2>도구</h2>
+        <section id="tools">
+            <button type="button" data-tool="draw-point">점</button><button type="button" data-tool="draw-line">선</button><button type="button" data-tool="draw-polygon">면</button><button type="button" data-tool="draw-circle">원</button><button type="button" data-tool="draw-box">사각형</button><button type="button" data-tool="draw-text">텍스트</button><button type="button" data-tool="select">선택</button><br>
+            <button type="button" data-tool="measure-distance">거리측정</button><button type="button" data-tool="measure-area">면적측정</button><button type="button" data-tool="radius-search">반경</button><br>
+            반경 직접 입력 <input id="radius" type="number" min="0" step="100" placeholder="m (비우면 드래그)" style="width:110px">
+            <div style="margin-top:6px"><button type="button" id="btnClear">전체 지우기</button><button type="button" id="btnGeoJson">그린 도형 GeoJSON</button><button type="button" id="btnRecreate">지도 다시 만들기</button></div>
+            <div class="demo-note">그리기·측정은 더블클릭 또는 우클릭으로 끝낸다. 같은 단추를 다시 누르면 꺼진다.</div>
+        </section>
+
+        <h2>레이어</h2>
+        <section id="tree"><div class="demo-note">불러오는 중</div></section>
+
+        <h2>기록</h2>
+        <div id="log" class="demo-log"></div>
+    </aside>
+    <div id="map" class="gm-root demo-map"><div id="attrib" class="demo-attrib" hidden>© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</div></div>
+</div>
+
+<script src="../../dist/gis-map.umd.js"></script>
+<script>
+(function () {
+    'use strict';
+    // ES5 문법만 쓴다(구형 업무 페이지와 같은 조건). 지도 모듈 번들 자체는 ES2019 문법이다(README 참고)
+
+    // 자리표시자: 실제 키를 이 파일에 적어 커밋하지 않는다. 비워 두면 VWorld 대신 OpenStreetMap 타일을 쓴다
+    var VWORLD_KEY = '';
+
+    function log(msg) {
+        var el = document.getElementById('log');
+        el.textContent += msg + '\n';
+        el.scrollTop = el.scrollHeight;
+    }
+
+    // 레이어 트리 소스(메모리). 실제 페이지는 GisMap.adapters.rest()가 /api/layers/tree에서 같은 모양을 받아 온다
+    function layerDef(id, groupId, name, type, url, layerName, visible, extra) {
+        var d = {
+            id: id, name: name, type: type, sourceType: 'OPENAPI', url: url, layerName: layerName, styleName: null, styleConfig: null,
+            format: 'image/png', projection: 'EPSG:3857', minZoom: null, maxZoom: null, opacity: 1, visible: visible, sortOrder: id,
+            groupId: groupId, groupName: null, description: null, createdAt: '', updatedAt: ''
+        };
+        if (extra) for (var k in extra) if (Object.prototype.hasOwnProperty.call(extra, k)) d[k] = extra[k];
+        return d;
+    }
+    function demoTree(hasKey) {
+        var base = hasKey
+            ? [
+                layerDef(11, 1, 'VWorld 일반', 'XYZ', 'https://api.vworld.kr/req/wmts/1.0.0/{VWORLD_KEY}/Base/{z}/{y}/{x}.png', 'Base', true),
+                layerDef(12, 1, 'VWorld 위성', 'XYZ', 'https://api.vworld.kr/req/wmts/1.0.0/{VWORLD_KEY}/Satellite/{z}/{y}/{x}.jpeg', 'Satellite', false),
+                layerDef(13, 1, 'VWorld 하이브리드', 'XYZ', 'https://api.vworld.kr/req/wmts/1.0.0/{VWORLD_KEY}/Hybrid/{z}/{y}/{x}.png', 'Hybrid', false)
+              ]
+            : [layerDef(14, 1, 'OpenStreetMap', 'XYZ', 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', 'osm', true, { maxZoom: 19 })];
+        var theme = hasKey
+            ? [layerDef(21, 2, '연속지적도(VWorld WMS)', 'WMS', 'https://api.vworld.kr/req/wms', 'lp_pa_cbnd_bubun', false, { minZoom: 15 })]
+            : [];
+        return {
+            groups: [
+                { id: 1, name: '배경지도', parentId: null, sortOrder: 0, children: [], layers: base },
+                { id: 2, name: '주제도', parentId: null, sortOrder: 1, children: [], layers: theme }
+            ],
+            ungroupedLayers: []
+        };
+    }
+    var DEMO_SOURCES = {
+        layerTree: { loadTree: function () { return Promise.resolve(demoTree(!!VWORLD_KEY)); } }
+    };
+
+    var map = null;
+    var offs = [];
+
+    function createMap() {
+        map = GisMap.create({
+            target: 'map',
+            host: {
+                // 이 예제는 서버를 부르지 않는다. 세션·CSRF 헤더를 넣는 법은 map.jsp를 본다
+                http: { credentials: 'same-origin', getHeaders: function () { return {}; } },
+                keys: { vworld: VWORLD_KEY }
+            },
+            sources: DEMO_SOURCES,
+            view: { center: [127.0276, 37.4979], zoom: 15 }
+        });
+        GisMap.controls.scaleLine(map);
+        log('지도 생성 ' + map.id);
+
+        offs.push(map.tools.store.subscribe(function (s) {
+            var btns = document.querySelectorAll('#tools [data-tool]');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].className = btns[i].getAttribute('data-tool') === s.activeTool ? 'is-on' : '';
+            }
+        }));
+        offs.push(map.layers.store.subscribe(renderTree));
+        offs.push(map.layers.store.subscribe(syncAttribution));
+        offs.push(map.on('clear', function () { log('전체 지우기'); }));
+        renderTree();
+        syncAttribution();
+    }
+
+    // OSM 레이어가 보일 때만 저작자 표시를 켠다
+    function syncAttribution() {
+        var on = false;
+        if (map.layers.store.getState().tree) {
+            var all = map.layers.allLayers();
+            for (var i = 0; i < all.length; i++) if (all[i].url.indexOf('openstreetmap.org') >= 0 && map.layers.isVisible(all[i])) on = true;
+        }
+        document.getElementById('attrib').hidden = !on;
+    }
+
+    // 레이어 트리(체크 = 지도 표시). 상태가 바뀔 때마다 다시 그린다
+    function renderTree() {
+        var box = document.getElementById('tree');
+        var s = map.layers.store.getState();
+        box.innerHTML = '';
+        if (s.error || !s.tree) {
+            var note = document.createElement('div');
+            note.className = 'demo-note';
+            note.textContent = s.error ? '불러오기 실패: ' + s.error : (s.loading ? '불러오는 중' : '트리 없음');
+            box.appendChild(note);
+            return;
+        }
+        box.appendChild(groupList(s.tree.groups, s.tree.ungroupedLayers));
+    }
+    function groupList(groups, layers) {
+        var ul = document.createElement('ul');
+        for (var i = 0; i < groups.length; i++) {
+            var g = groups[i];
+            var li = document.createElement('li');
+            var title = document.createElement('div');
+            title.textContent = g.name;
+            title.style.fontWeight = 'bold';
+            li.appendChild(title);
+            li.appendChild(groupList(g.children, g.layers));
+            ul.appendChild(li);
+        }
+        for (var j = 0; j < layers.length; j++) ul.appendChild(layerItem(layers[j]));
+        return ul;
+    }
+    function layerItem(layer) {
+        var li = document.createElement('li');
+        var label = document.createElement('label');
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = map.layers.isVisible(layer);
+        cb.setAttribute('data-layer-id', String(layer.id));
+        cb.onchange = function () { map.layers.toggleLayer(layer.id); };
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(' ' + layer.name));
+        li.appendChild(label);
+        return li;
+    }
+
+    // 도구 단추
+    document.getElementById('tools').onclick = function (e) {
+        var t = e.target && e.target.getAttribute && e.target.getAttribute('data-tool');
+        if (t) map.tools.activate(t);
+    };
+    document.getElementById('radius').onchange = function () {
+        map.tools.setRadiusMeters(this.value === '' ? null : Number(this.value));
+    };
+    document.getElementById('btnClear').onclick = function () { map.clearAll(); };
+    document.getElementById('btnGeoJson').onclick = function () {
+        var fc = map.draw.toGeoJSON();
+        log('도형 ' + fc.features.length + '개: ' + JSON.stringify(fc).slice(0, 300));
+    };
+    document.getElementById('btnRecreate').onclick = function () {
+        for (var i = 0; i < offs.length; i++) offs[i]();
+        offs = [];
+        map.destroy();
+        log('destroy 후 OL 레이어 ' + map.olMap.getLayers().getLength() + ' · interaction ' + map.olMap.getInteractions().getLength() +
+            ' · overlay ' + map.olMap.getOverlays().getLength() + ' · control ' + map.olMap.getControls().getLength());
+        createMap();
+    };
+
+    document.getElementById('ver').textContent = GisMap.version;
+    createMap();
+})();
+</script>
+</body>
+</html>

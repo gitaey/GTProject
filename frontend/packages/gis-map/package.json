@@ -1,0 +1,30 @@
+{
+    "name": "@gtp/gis-map",
+    "version": "0.1.0",
+    "private": true,
+    "description": "OpenLayers 지도 엔진(core) + React 바인딩/위젯 + 데이터 소스 어댑터. 폴더째 복사해서 쓰는 이식 단위.",
+    "exports": {
+        "./core": "./src/core/index.ts",
+        "./core/wind": "./src/core/wind/index.ts",
+        "./react": "./src/react/index.ts",
+        "./ui": "./src/ui/index.ts",
+        "./adapters/rest": "./src/adapters/rest/index.ts",
+        "./adapters/proxy": "./src/adapters/proxy/index.ts",
+        "./styles/gis-map.css": "./src/styles/gis-map.css",
+        "./styles/gis-map-ui.css": "./src/styles/gis-map-ui.css"
+    },
+    "peerDependencies": {
+        "ol": "^9.2",
+        "proj4": "^2.20",
+        "ol-wind": "^1.1",
+        "react": ">=18",
+        "react-dom": ">=18",
+        "lucide-react": "*"
+    },
+    "peerDependenciesMeta": {
+        "ol-wind": { "optional": true },
+        "react": { "optional": true },
+        "react-dom": { "optional": true },
+        "lucide-react": { "optional": true }
+    }
+}

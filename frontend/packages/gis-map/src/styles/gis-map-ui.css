@@ -1,0 +1,2056 @@
+/* gis-map UI 위젯 스타일. gm- 접두사만, @layer 밖에 작성. gis-map.css(리셋·--gm-* 변수) 다음에 불러온다.
+   FE-5b-1: 틀(지도 화면·머리줄·검색·배경지도·네비·사이드패널·상태바·지역명 배지·바람 범례·모바일 레이어 버튼).
+   FE-5b-2: 도구·패널(도구 모음·그리기/반경 패널·레이어 패널/트리/범례/설정·TIFF/나만의지도 패널·업로드/공유 대화상자) — 아래 "FE-5b-2" 절.
+   값은 옛 Tailwind 유틸이 개발 서버 CSS에서 내던 선언을 그대로 옮겼다(속성 이름·식 동일, 테마 변수만 --gm-*).
+   그림자 = Tailwind 합성과 같은 5칸: inset-shadow, inset-ring, ring-offset, ring, shadow (쓰지 않는 칸은 0 0 rgba(0, 0, 0, 0)).
+   lightningcss(개발 서버)가 리터럴을 줄여 쓰는 값(그림자 퍼짐 0, animation 순서, translate의 세로 0)은 var()를 거쳐 옛 계산값과 글자까지 같게 둔다.
+   브레이크포인트: md = 48rem(768px), lg = 64rem(1024px) — Tailwind 기본과 같다. hover는 @media (hover: hover) 안에서만. */
+
+/* ── 애니메이션 ── */
+@keyframes gm-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes gm-shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+/* ── 지도 화면 틀 (ui/MapView) ── */
+/* 옛: flex flex-col w-full h-full */
+.gm-map-view {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+}
+
+/* 옛: relative flex flex-1 overflow-hidden */
+.gm-map-view__body {
+    position: relative;
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* 옛: relative flex-1 h-full */
+.gm-map-view__stage {
+    position: relative;
+    flex: 1;
+    height: 100%;
+}
+
+/* 옛: w-full h-full (GisMapView) */
+.gm-map-view__map {
+    width: 100%;
+    height: 100%;
+}
+
+/* ── 머리줄 (ui/shell/MapHeader) ── */
+/* 옛: flex items-center gap-3 h-12 px-4 bg-white border-b border-gray-200 shadow-sm flex-shrink-0 */
+.gm-header {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--gm-spacing) * 3);
+    height: calc(var(--gm-spacing) * 12);
+    padding-inline: calc(var(--gm-spacing) * 4);
+    background-color: var(--gm-color-white);
+    border-bottom-style: solid;
+    border-bottom-width: 1px;
+    border-color: var(--gm-color-gray-200);
+    box-shadow: 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), var(--gm-shadow-sm);
+    flex-shrink: 0;
+}
+
+/* 옛: flex items-center gap-2 font-bold text-sm text-gray-800 whitespace-nowrap w-[282px] flex-shrink-0 */
+.gm-header__brand {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--gm-spacing) * 2);
+    font-weight: var(--gm-font-weight-bold);
+    font-size: var(--gm-text-sm);
+    line-height: var(--gm-text-sm--line-height);
+    color: var(--gm-color-gray-800);
+    white-space: nowrap;
+    width: 282px;
+    flex-shrink: 0;
+}
+
+/* 옛: w-7 h-7 rounded-lg flex items-center justify-center text-sm text-white
+   + 옛 인라인 background linear-gradient(135deg, 브랜드색 0%, #E04E0A 100%), boxShadow 0 2px 6px rgba(브랜드색, 0.35) (FE-5c: 변수로 옮김) */
+.gm-header__logo {
+    width: calc(var(--gm-spacing) * 7);
+    height: calc(var(--gm-spacing) * 7);
+    border-radius: var(--gm-radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--gm-text-sm);
+    line-height: var(--gm-text-sm--line-height);
+    color: var(--gm-color-white);
+    background: linear-gradient(135deg, var(--gm-primary) 0%, var(--gm-primary-deep) 100%);
+    box-shadow: 0 2px 6px rgba(var(--gm-primary-rgb), .35);
+}
+
+/* 옛: text-xs font-normal text-gray-400 */
+.gm-header__brand-sub {
+    font-size: var(--gm-text-xs);
+    line-height: var(--gm-text-xs--line-height);
+    font-weight: var(--gm-font-weight-normal);
+    color: var(--gm-color-gray-400);
+}
+
+/* 옛: hidden md:flex items-center gap-3 ml-auto */
+.gm-header__actions {
+    display: none;
+    align-items: center;
+    gap: calc(var(--gm-spacing) * 3);
+    margin-left: auto;
+}
+
+/* 옛: w-px h-5 bg-gray-200 */
+.gm-header__divider {
+    width: 1px;
+    height: calc(var(--gm-spacing) * 5);
+    background-color: var(--gm-color-gray-200);
+}
+
+/* 옛: flex items-center gap-2 */
+.gm-header__user {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--gm-spacing) * 2);
+}
+
+/* 옛: w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-medium flex-shrink-0 + 옛 인라인 background 브랜드색(FE-5c) */
+.gm-header__avatar {
+    width: calc(var(--gm-spacing) * 7);
+    height: calc(var(--gm-spacing) * 7);
+    border-radius: var(--gm-radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gm-color-white);
+    font-size: var(--gm-text-xs);
+    line-height: var(--gm-text-xs--line-height);
+    font-weight: var(--gm-font-weight-medium);
+    flex-shrink: 0;
+    background: var(--gm-primary);
+}
+
+/* 옛: text-left */
+.gm-header__user-text {
+    text-align: left;
+}
+
+/* 옛: text-xs font-medium leading-none text-gray-800 (leading-none이 text-xs의 줄 높이를 1로 덮는다) */
+.gm-header__user-name {
+    font-size: var(--gm-text-xs);
+    line-height: 1;
+    font-weight: var(--gm-font-weight-medium);
+    color: var(--gm-color-gray-800);
+}
+
+/* 옛: font-mono text-[10px] mt-0.5 text-gray-400 */
+.gm-header__user-role {
+    font-family: var(--gm-font-mono);
+    font-size: 10px;
+    margin-top: calc(var(--gm-spacing) * .5);
+    color: var(--gm-color-gray-400);
+}
+
+/* ── 배경지도 전환 (ui/search/BasemapSwitcher) — 색·굵기는 인라인 ── */
+/* 옛: flex items-center p-0.5 rounded-lg */
+.gm-basemap {
+    display: flex;
+    align-items: center;
+    padding: calc(var(--gm-spacing) * .5);
+    border-radius: var(--gm-radius-lg);
+}
+
+/* 옛: px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer */
+.gm-basemap__btn {
+    padding-inline: calc(var(--gm-spacing) * 3);
+    padding-block: calc(var(--gm-spacing) * 1);
+    border-radius: var(--gm-radius-md);
+    font-size: var(--gm-text-xs);
+    line-height: var(--gm-text-xs--line-height);
+    font-weight: var(--gm-font-weight-medium);
+    transition-property: all;
+    transition-timing-function: var(--gm-transition-ease);
+    transition-duration: var(--gm-transition-duration);
+    cursor: pointer;
+}
+
+/* ── 통합 검색 (ui/search/SearchBar) ── */
+/* 옛: relative flex-1 max-w-xs ml-5 */
+.gm-search {
+    position: relative;
+    flex: 1;
+    max-width: var(--gm-container-xs);
+    margin-left: calc(var(--gm-spacing) * 5);
+}
+
+/* 옛: relative flex items-center */
+.gm-search__field {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+/* 옛: absolute left-3 text-gray-400 pointer-events-none */
+.gm-search__icon {
+    position: absolute;
+    left: calc(var(--gm-spacing) * 3);
+    color: var(--gm-color-gray-400);
+    pointer-events: none;
+}
+
+/* 옛: w-full pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none
+       focus:border-orange-400 focus:ring-2 focus:ring-orange-50 transition-all */
+.gm-search__input {
+    width: 100%;
+    padding-left: calc(var(--gm-spacing) * 8);
+    padding-right: calc(var(--gm-spacing) * 7);
+    padding-block: calc(var(--gm-spacing) * 1.5);
+    font-size: var(--gm-text-xs);
+    line-height: var(--gm-text-xs--line-height);
+    background-color: var(--gm-color-gray-50);
+    border-style: solid;
+    border-width: 1px;
+    border-color: var(--gm-color-gray-200);
+    border-radius: var(--gm-radius-lg);
+    outline-style: none;
+    transition-property: all;
+    transition-timing-function: var(--gm-transition-ease);
+    transition-duration: var(--gm-transition-duration);
+}
+
+.gm-search__input:focus {
+    border-color: var(--gm-color-orange-400);
+    box-shadow: 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 0 calc(2px + 0px) var(--gm-color-orange-50), 0 0 rgba(0, 0, 0, 0);
+}
+
+/* 옛: absolute right-2 text-gray-300 hover:text-gray-500 cursor-pointer */
+.gm-search__clear {
+    position: absolute;
+    right: calc(var(--gm-spacing) * 2);
+    color: var(--gm-color-gray-300);
+    cursor: pointer;
+}
+
+@media (hover: hover) {
+    .gm-search__clear:hover {
+        color: var(--gm-color-gray-500);
+    }
+}
+
+/* 옛: absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden z-50
+       (최대 높이·세로 스크롤은 인라인) */
+.gm-search__dropdown {
+    position: absolute;
+    top: 100%;
+    left: calc(var(--gm-spacing) * 0);
+    right: calc(var(--gm-spacing) * 0);
+    margin-top: calc(var(--gm-spacing) * 1);
+    background-color: var(--gm-color-white);
+    border-radius: var(--gm-radius-xl);
+    box-shadow: 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -4px rgba(0, 0, 0, .1);
+    border-style: solid;
+    border-width: 1px;
+    border-color: var(--gm-color-gray-100);
+    overflow: hidden;
+    z-index: 50;
+}
+
+/* 옛: flex items-center justify-center py-6 gap-2 text-xs text-gray-400 */
+.gm-search__loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-block: calc(var(--gm-spacing) * 6);
+    gap: calc(var(--gm-spacing) * 2);
+    font-size: var(--gm-text-xs);
+    line-height: var(--gm-text-xs--line-height);
+    color: var(--gm-color-gray-400);
+}
+
+/* 옛: w-3 h-3 border border-orange-400 border-t-transparent rounded-full animate-spin */
+.gm-search__spinner {
+    width: calc(var(--gm-spacing) * 3);
+    height: calc(var(--gm-spacing) * 3);
+    border-style: solid;
+    border-width: 1px;
+    border-color: var(--gm-color-orange-400);
+    border-top-color: rgba(0, 0, 0, 0);
+    border-radius: var(--gm-radius-full);
+    animation: var(--gm-animate-spin);
+}
+
+/* 옛: py-6 text-center text-xs text-gray-400 */
+.gm-search__empty {
+    padding-block: calc(var(--gm-spacing) * 6);
+    text-align: center;
+    font-size: var(--gm-text-xs);
+    line-height: var(--gm-text-xs--line-height);
+    color: var(--gm-color-gray-400);
+}
+
+/* 옛: w-full flex items-start gap-2.5 px-3 py-2.5 transition-colors cursor-pointer text-left (밑줄·배경은 인라인)
+   transition-property는 Tailwind transition-colors 원래 목록 그대로(그라데이션 변수 3개 포함 — 계산값을 같게 두려고).
+   -webkit-text-decoration-color는 개발 서버(lightningcss)가 붙이는 접두사라 원본에는 적지 않는다(QA FE-5b-1 I2) */
+.gm-search__item {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: calc(var(--gm-spacing) * 2.5);
+    padding-inline: calc(var(--gm-spacing) * 3);
+    padding-block: calc(var(--gm-spacing) * 2.5);
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to;
+    transition-timing-function: var(--gm-transition-ease);
+    transition-duration: var(--gm-transition-duration);
+    cursor: pointer;
+    text-align: left;
+}
+
+/* 옛: flex-shrink-0 mt-0.5 */
+.gm-search__item-icon {
+    flex-shrink: 0;
+    margin-top: calc(var(--gm-spacing) * .5);
+}
+
+/* 옛: text-orange-400 */
+.gm-search__item-glyph {
+    color: var(--gm-color-orange-400);
+}
+
+/* 옛: min-w-0 */
+.gm-search__item-body {
+    min-width: calc(var(--gm-spacing) * 0);
+}
+
+/* 옛: text-xs font-medium text-gray-800 truncate */
+.gm-search__item-title {
+    font-size: var(--gm-text-xs);
+    line-height: var(--gm-text-xs--line-height);
+    font-weight: var(--gm-font-weight-medium);
+    color: var(--gm-color-gray-800);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+/* 옛: text-[10.5px] text-gray-400 truncate mt-0.5 */
+.gm-search__item-addr {
+    font-size: 10.5px;
+    color: var(--gm-color-gray-400);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    margin-top: calc(var(--gm-spacing) * .5);
+}
+
+/* ── 좌측 네비 (ui/shell/NavRail) ── */
+/* 옛: hidden md:flex flex-col items-center w-14 bg-white border-r border-gray-200 py-2 gap-1 flex-shrink-0 */
+.gm-nav-rail {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    width: calc(var(--gm-spacing) * 14);
+    background-color: var(--gm-color-white);
+    border-right-style: solid;
+    border-right-width: 1px;
+    border-color: var(--gm-color-gray-200);
+    padding-block: calc(var(--gm-spacing) * 2);
+    gap: calc(var(--gm-spacing) * 1);
+    flex-shrink: 0;
+}
+
+/* 옛: flex flex-col items-center gap-1 w-11 py-2 rounded-lg text-xs font-semibold transition-all
+       + 꺼짐: text-gray-400 hover:text-gray-700 hover:bg-gray-100 / 켜짐(.gm-is-active): bg-orange-50 text-orange-500 */
+.gm-nav-rail__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: calc(var(--gm-spacing) * 1);
+    width: calc(var(--gm-spacing) * 11);
+    padding-block: calc(var(--gm-spacing) * 2);
+    border-radius: var(--gm-radius-lg);
+    font-size: var(--gm-text-xs);
+    line-height: var(--gm-text-xs--line-height);
+    font-weight: var(--gm-font-weight-semibold);
+    transition-property: all;
+    transition-timing-function: var(--gm-transition-ease);
+    transition-duration: var(--gm-transition-duration);
+    color: var(--gm-color-gray-400);
+}
+
+@media (hover: hover) {
+    .gm-nav-rail__item:hover {
+        color: var(--gm-color-gray-700);
+        background-color: var(--gm-color-gray-100);
+    }
+}
+
+/* 켜짐은 hover 규칙보다 뒤(같은 명시도) → 켜진 버튼에 올려도 색이 그대로(옛: 켜짐에는 hover 클래스가 없었다) */
+.gm-nav-rail__item.gm-is-active {
+    background-color: var(--gm-color-orange-50);
+    color: var(--gm-color-orange-500);
+}
+
+/* 옛: mt-auto flex flex-col items-center gap-1 pb-1 */
+.gm-nav-rail__footer {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: calc(var(--gm-spacing) * 1);
+    padding-bottom: calc(var(--gm-spacing) * 1);
+}
+
+/* 옛: w-7 h-px bg-gray-200 mb-1 */
+.gm-nav-rail__divider {
+    width: calc(var(--gm-spacing) * 7);
+    height: 1px;
+    background-color: var(--gm-color-gray-200);
+    margin-bottom: calc(var(--gm-spacing) * 1);
+}
+
+/* ── 사이드 패널 틀 (ui/shell/SidePanel) ── */
+/* 옛: hidden md:flex flex-col overflow-hidden w-64 bg-white border-r border-gray-200
+       md:absolute md:z-20 md:h-full md:shadow-xl lg:relative lg:flex-shrink-0 lg:shadow-none */
+.gm-side-panel {
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    width: calc(var(--gm-spacing) * 64);
+    background-color: var(--gm-color-white);
+    border-right-style: solid;
+    border-right-width: 1px;
+    border-color: var(--gm-color-gray-200);
+}
+
+/* ── 상태바 (ui/statusbar/MapStatusBar) — 글꼴·숫자 폭은 인라인 ── */
+/* 옛: hidden md:flex items-center h-7 px-3 bg-white border-t border-gray-200 flex-shrink-0 text-xs text-gray-400 */
+.gm-statusbar {
+    display: none;
+    align-items: center;
+    height: calc(var(--gm-spacing) * 7);
+    padding-inline: calc(var(--gm-spacing) * 3);
+    background-color: var(--gm-color-white);
+    border-top-style: solid;
+    border-top-width: 1px;
+    border-color: var(--gm-color-gray-200);
+    flex-shrink: 0;
+    font-size: var(--gm-text-xs);
+    line-height: var(--gm-text-xs--line-height);
+    color: var(--gm-color-gray-400);
+}
+
+/* 옛: flex-1 */
+.gm-statusbar__spacer {
+    flex: 1;
+}
+
+/* 옛: flex items-center gap-1.5 px-3 (+ --divided: border-r border-gray-200) */
+.gm-statusbar__item {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--gm-spacing) * 1.5);
+    padding-inline: calc(var(--gm-spacing) * 3);
+}
+
+.gm-statusbar__item--divided {
+    border-right-style: solid;
+    border-right-width: 1px;
+    border-color: var(--gm-color-gray-200);
+}
+
+/* 옛: text-amber-700 font-semibold */
+.gm-statusbar__value {
+    color: var(--gm-color-amber-700);
+    font-weight: var(--gm-font-weight-semibold);
+}
+
+/* ── 지역명 배지 (ui/overlay/RegionBadge) ── */
+/* 옛: absolute top-3 left-1/2 -translate-x-1/2 z-10 pointer-events-none */
+.gm-region-badge {
+    position: absolute;
+    top: calc(var(--gm-spacing) * 3);
+    left: 50%;
+    --gm-translate-x: calc(calc(1 / 2 * 100%) * -1);
+    translate: var(--gm-translate-x) 0;
+    z-index: 10;
+    pointer-events: none;
+}
+
+/* 옛: flex items-center gap-1.5 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-md border border-gray-100 whitespace-nowrap */
+.gm-region-badge__pill {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--gm-spacing) * 1.5);
+    background-color: rgba(255, 255, 255, .9);
+    -webkit-backdrop-filter: blur(var(--gm-blur-sm));
+    backdrop-filter: blur(var(--gm-blur-sm));
+    padding-inline: calc(var(--gm-spacing) * 3);
+    padding-block: calc(var(--gm-spacing) * 1.5);
+    border-radius: var(--gm-radius-full);
+    box-shadow: 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -2px rgba(0, 0, 0, .1);
+    border-style: solid;
+    border-width: 1px;
+    border-color: var(--gm-color-gray-100);
+    white-space: nowrap;
+}
+
+/* 옛: text-orange-500 flex-shrink-0 */
+.gm-region-badge__icon {
+    color: var(--gm-color-orange-500);
+    flex-shrink: 0;
+}
+
+/* 옛: w-28 h-2.5 rounded-full bg-gray-200 overflow-hidden relative */
+.gm-region-badge__skeleton {
+    width: calc(var(--gm-spacing) * 28);
+    height: calc(var(--gm-spacing) * 2.5);
+    border-radius: var(--gm-radius-full);
+    background-color: var(--gm-color-gray-200);
+    overflow: hidden;
+    position: relative;
+}
+
+/* 옛: absolute inset-0 -translate-x-full animate-[shimmer_1.2s_infinite] bg-gradient-to-r from-transparent via-white/70 to-transparent
+   (앱 globals.css의 @keyframes shimmer 대신 패키지의 gm-shimmer) */
+.gm-region-badge__shimmer {
+    position: absolute;
+    inset: calc(var(--gm-spacing) * 0);
+    --gm-translate-x: -100%;
+    translate: var(--gm-translate-x) 0;
+    animation: 1.2s infinite gm-shimmer;
+    background-image: linear-gradient(to right in oklab, transparent 0%, rgba(255, 255, 255, .7) 50%, transparent 100%);
+}
+
+/* 옛: text-sm font-medium text-gray-800 */
+.gm-region-badge__text {
+    font-size: var(--gm-text-sm);
+    line-height: var(--gm-text-sm--line-height);
+    font-weight: var(--gm-font-weight-medium);
+    color: var(--gm-color-gray-800);
+}
+
+/* ── 바람 범례 (ui/overlay/WindLegend) — 배경·그림자·그라데이션은 인라인 ── */
+/* 옛: absolute bottom-4 left-3 z-10 select-none rounded-md px-3 py-2 */
+.gm-wind-legend {
+    position: absolute;
+    bottom: calc(var(--gm-spacing) * 4);
+    left: calc(var(--gm-spacing) * 3);
+    z-index: 10;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+    border-radius: var(--gm-radius-md);
+    padding-inline: calc(var(--gm-spacing) * 3);
+    padding-block: calc(var(--gm-spacing) * 2);
+}
+
+/* 옛: text-[10px] font-medium text-white/70 mb-1 */
+.gm-wind-legend__title {
+    font-size: 10px;
+    font-weight: var(--gm-font-weight-medium);
+    color: rgba(255, 255, 255, .7);
+    margin-bottom: calc(var(--gm-spacing) * 1);
+}
+
+/* 옛: w-40 h-2 rounded-full */
+.gm-wind-legend__bar {
+    width: calc(var(--gm-spacing) * 40);
+    height: calc(var(--gm-spacing) * 2);
+    border-radius: var(--gm-radius-full);
+}
+
+/* 옛: flex justify-between mt-1 */
+.gm-wind-legend__ticks {
+    display: flex;
+    justify-content: space-between;
+    margin-top: calc(var(--gm-spacing) * 1);
+}
+
+/* 옛: text-[10px] text-white/70 tabular-nums */
+.gm-wind-legend__tick {
+    font-size: 10px;
+    color: rgba(255, 255, 255, .7);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── 모바일 레이어 버튼 (ui/mobile/MobileLayerButton) — 켜짐 스위치 색·손잡이 위치는 인라인 ── */
+/* 옛: absolute bottom-4 right-4 z-30 w-12 h-12 rounded-full text-white shadow-lg flex items-center justify-center text-xl transition-all
+   + 옛 인라인 background 브랜드색(FE-5c) */
+.gm-mobile-layers__fab {
+    background: var(--gm-primary);
+    position: absolute;
+    bottom: calc(var(--gm-spacing) * 4);
+    right: calc(var(--gm-spacing) * 4);
+    z-index: 30;
+    width: calc(var(--gm-spacing) * 12);
+    height: calc(var(--gm-spacing) * 12);
+    border-radius: var(--gm-radius-full);
+    color: var(--gm-color-white);
+    box-shadow: 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -4px rgba(0, 0, 0, .1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--gm-text-xl);
+    line-height: var(--gm-text-xl--line-height);
+    transition-property: all;
+    transition-timing-function: var(--gm-transition-ease);
+    transition-duration: var(--gm-transition-duration);
+}
+
+/* 옛: absolute bottom-20 right-4 z-30 w-56 bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100 */
+.gm-mobile-layers__sheet {
+    position: absolute;
+    bottom: calc(var(--gm-spacing) * 20);
+    right: calc(var(--gm-spacing) * 4);
+    z-index: 30;
+    width: calc(var(--gm-spacing) * 56);
+    background-color: var(--gm-color-white);
+    border-radius: var(--gm-radius-xl);
+    box-shadow: 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 25px 50px -12px rgba(0, 0, 0, .25);
+    overflow: hidden;
+    border-style: solid;
+    border-width: 1px;
+    border-color: var(--gm-color-gray-100);
+}
+
+/* 옛: px-4 py-3 border-b border-gray-100 flex items-center justify-between */
+.gm-mobile-layers__head {
+    padding-inline: calc(var(--gm-spacing) * 4);
+    padding-block: calc(var(--gm-spacing) * 3);
+    border-bottom-style: solid;
+    border-bottom-width: 1px;
+    border-color: var(--gm-color-gray-100);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* 옛: text-sm font-bold text-gray-800 */
+.gm-mobile-layers__title {
+    font-size: var(--gm-text-sm);
+    line-height: var(--gm-text-sm--line-height);
+    font-weight: var(--gm-font-weight-bold);
+    color: var(--gm-color-gray-800);
+}
+
+/* 옛: text-gray-400 text-base + 글자 ✕ → lucide X(16px).
+   아래 3줄은 아이콘 교체용 추가: 옛 버튼 높이(글자 한 줄 = 1rem × 1.5 = 24px)를 그대로 두려고 */
+.gm-mobile-layers__close {
+    color: var(--gm-color-gray-400);
+    font-size: var(--gm-text-base);
+    line-height: var(--gm-text-base--line-height);
+    display: inline-flex;
+    align-items: center;
+    height: 1.5rem;
+}
+
+/* 옛: max-h-72 overflow-y-auto divide-y divide-gray-50 */
+.gm-mobile-layers__list {
+    max-height: calc(var(--gm-spacing) * 72);
+    overflow-y: auto;
+}
+
+/* 옛 divide-y divide-gray-50: 마지막을 뺀 자식 아래 1px 선. :where로 명시도 0(Tailwind와 같다) */
+:where(.gm-mobile-layers__list > :not(:last-child)) {
+    border-bottom-style: solid;
+    border-top-style: solid;
+    border-top-width: calc(1px * 0);
+    border-bottom-width: calc(1px * calc(1 - 0));
+    border-color: var(--gm-color-gray-50);
+}
+
+/* 옛: px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider bg-gray-50 */
+.gm-mobile-layers__group {
+    padding-inline: calc(var(--gm-spacing) * 4);
+    padding-block: calc(var(--gm-spacing) * 2);
+    font-size: var(--gm-text-xs);
+    line-height: var(--gm-text-xs--line-height);
+    font-weight: var(--gm-font-weight-bold);
+    color: var(--gm-color-gray-400);
+    text-transform: uppercase;
+    letter-spacing: var(--gm-tracking-wider);
+    background-color: var(--gm-color-gray-50);
+}
+
+/* 옛: flex items-center justify-between px-4 py-2.5 */
+.gm-mobile-layers__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-inline: calc(var(--gm-spacing) * 4);
+    padding-block: calc(var(--gm-spacing) * 2.5);
+}
+
+/* 옛: text-sm text-gray-700 */
+.gm-mobile-layers__name {
+    font-size: var(--gm-text-sm);
+    line-height: var(--gm-text-sm--line-height);
+    color: var(--gm-color-gray-700);
+}
+
+/* 옛: w-10 h-5 rounded-full relative transition-all flex-shrink-0 */
+.gm-mobile-layers__toggle {
+    width: calc(var(--gm-spacing) * 10);
+    height: calc(var(--gm-spacing) * 5);
+    border-radius: var(--gm-radius-full);
+    position: relative;
+    transition-property: all;
+    transition-timing-function: var(--gm-transition-ease);
+    transition-duration: var(--gm-transition-duration);
+    flex-shrink: 0;
+}
+
+/* 옛: absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all */
+.gm-mobile-layers__knob {
+    position: absolute;
+    top: calc(var(--gm-spacing) * .5);
+    width: calc(var(--gm-spacing) * 4);
+    height: calc(var(--gm-spacing) * 4);
+    background-color: var(--gm-color-white);
+    border-radius: var(--gm-radius-full);
+    box-shadow: 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), var(--gm-shadow-sm);
+    transition-property: all;
+    transition-timing-function: var(--gm-transition-ease);
+    transition-duration: var(--gm-transition-duration);
+}
+
+/* ══ FE-5b-2: 도구·패널 ══
+   Tailwind 유틸은 개발 서버 CSS에서 내던 선언을 그대로, 옛 인라인 style은 값 그대로 옮겼다(브랜드 색만 var(--gm-primary)).
+   주석의 "브랜드색" = 옛 코드에 적혀 있던 브랜드 색 리터럴(지금 --gm-primary 기본값, gis-map.css)
+   상태(켜짐·깊이·선택)에 따라 값이 바뀌는 인라인 style은 컴포넌트에 남겼다 — 인라인이 이 규칙들보다 우선한다.
+   켜짐(.gm-is-active)은 같은 명시도의 hover 규칙보다 뒤에 둔다(옛: 켜짐 클래스에는 hover 클래스가 없었다).
+   형제 사이 여백(옛 space-y-*)은 Tailwind처럼 :where(…)로 명시도 0 — 지금 그 자식들은 gm- 클래스가 없는 묶음 div라
+   리셋(.gm-root :where([class*="gm-"]), 명시도 0,1,0)과 겹치지 않는다. 자식에 gm- 클래스를 달면 리셋의 margin: 0에 진다. */
+
+/* ── 도구 모음 (ui/toolbar/MapToolbar) ── */
+/* 옛: absolute top-4 right-3 z-10 flex flex-col gap-2 select-none */
+.gm-toolbar {
+    position: absolute;
+    top: calc(var(--gm-spacing) * 4);
+    right: calc(var(--gm-spacing) * 3);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--gm-spacing) * 2);
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+}
+
+/* 옛: flex flex-col rounded-md overflow-hidden (+ 인라인 SHADOW) — 줌·바람길·초기화 묶음 */
+.gm-toolbar__group {
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--gm-radius-md);
+    overflow: hidden;
+}
+
+/* 옛: relative flex flex-col bg-white rounded-md (+ 인라인 SHADOW) — 그리기·측정·반경 묶음(패널이 밖으로 나와야 해서 overflow 없음) */
+.gm-toolbar__tools {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--gm-color-white);
+    border-radius: var(--gm-radius-md);
+}
+
+/* 옛 인라인 SHADOW = { boxShadow: '0 2px 8px rgba(0,0,0,0.15), 0 0 0 0.5px rgba(0,0,0,0.08)' } — 도구 묶음·툴팁 글자·그리기/반경 패널 */
+.gm-toolbar__group,
+.gm-toolbar__tools,
+.gm-toolbar__tip-label,
+.gm-tool-panel {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .15), 0 0 0 .5px rgba(0, 0, 0, .08);
+}
+
+/* 옛 Tip: relative */
+.gm-toolbar__tip {
+    position: relative;
+}
+
+/* 옛: absolute right-11 top-1/2 -translate-y-1/2 pointer-events-none z-50 flex items-center */
+.gm-toolbar__tip-pop {
+    position: absolute;
+    right: calc(var(--gm-spacing) * 11);
+    top: 50%;
+    translate: 0 -50%;
+    pointer-events: none;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+}
+
+/* 옛: bg-gray-800 text-white text-xs px-2.5 py-1.5 rounded-md whitespace-nowrap (+ 인라인 SHADOW) */
+.gm-toolbar__tip-label {
+    background-color: var(--gm-color-gray-800);
+    color: var(--gm-color-white);
+    font-size: var(--gm-text-xs);
+    line-height: var(--gm-text-xs--line-height);
+    padding-inline: calc(var(--gm-spacing) * 2.5);
+    padding-block: calc(var(--gm-spacing) * 1.5);
+    border-radius: var(--gm-radius-md);
+    white-space: nowrap;
+}
+
+/* 옛 인라인: width 0, height 0, borderTop/Bottom 5px solid transparent, borderLeft 6px solid #1f2937 (말풍선 꼬리) */
+.gm-toolbar__tip-arrow {
+    width: 0;
+    height: 0;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-left: 6px solid #1f2937;
+}
+
+/* 옛 TBtn: w-9 h-9 flex items-center justify-center transition-colors cursor-pointer
+       + 꺼짐: bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 / 켜짐(.gm-is-active): bg-orange-50 text-[브랜드색]
+   transition-property는 Tailwind transition-colors 목록 그대로(그라데이션 변수 3개 포함 — 계산값을 같게 두려고) */
+.gm-toolbar__btn {
+    width: calc(var(--gm-spacing) * 9);
+    height: calc(var(--gm-spacing) * 9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to;
+    transition-timing-function: var(--gm-transition-ease);
+    transition-duration: var(--gm-transition-duration);
+    cursor: pointer;
+    background-color: var(--gm-color-white);
+    color: var(--gm-color-gray-500);
+}
+
+@media (hover: hover) {
+    .gm-toolbar__btn:hover {
+        background-color: var(--gm-color-gray-50);
+        color: var(--gm-color-gray-700);
+    }
+}
+
+.gm-toolbar__btn.gm-is-active {
+    background-color: var(--gm-color-orange-50);
+    color: var(--gm-primary);
+}
+
+/* 옛 TBtn cls: rounded-t-md / rounded-b-md / rounded-md / border-b border-gray-100 */
+.gm-toolbar__btn--first {
+    border-top-left-radius: var(--gm-radius-md);
+    border-top-right-radius: var(--gm-radius-md);
+}
+
+.gm-toolbar__btn--last {
+    border-bottom-right-radius: var(--gm-radius-md);
+    border-bottom-left-radius: var(--gm-radius-md);
+}
+
+.gm-toolbar__btn--single {
+    border-radius: var(--gm-radius-md);
+}
+
+.gm-toolbar__btn--divided {
+    border-bottom-style: solid;
+    border-bottom-width: 1px;
+    border-color: var(--gm-color-gray-100);
+}
+
+/* 옛: w-9 h-9 flex items-center justify-center bg-white text-gray-400 hover:bg-red-50 hover:text-red-400 transition-colors rounded-md cursor-pointer */
+.gm-toolbar__clear {
+    width: calc(var(--gm-spacing) * 9);
+    height: calc(var(--gm-spacing) * 9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--gm-color-white);
+    color: var(--gm-color-gray-400);
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to;
+    transition-timing-function: var(--gm-transition-ease);
+    transition-duration: var(--gm-transition-duration);
+    border-radius: var(--gm-radius-md);
+    cursor: pointer;
+}
+
+@media (hover: hover) {
+    .gm-toolbar__clear:hover {
+        background-color: var(--gm-color-red-50);
+        color: var(--gm-color-red-400);
+    }
+}
+
+/* 옛: absolute right-11 top-0 z-50 (그리기 패널 자리) */
+.gm-toolbar__draw-slot {
+    position: absolute;
+    right: calc(var(--gm-spacing) * 11);
+    top: calc(var(--gm-spacing) * 0);
+    z-index: 50;
+}
+
+/* 옛: absolute right-11 bottom-0 z-50 (반경 패널 자리) */
+.gm-toolbar__radius-slot {
+    position: absolute;
+    right: calc(var(--gm-spacing) * 11);
+    bottom: calc(var(--gm-spacing) * 0);
+    z-index: 50;
+}
+
+/* ── 그리기·반경 패널 공통 (ui/toolbar/DrawPanel, RadiusPanel) ── */
+/* 옛: bg-white rounded-xl overflow-hidden (+ 인라인 SHADOW) */
+.gm-tool-panel {
+    background-color: var(--gm-color-white);
+    border-radius: var(--gm-radius-xl);
+    overflow: hidden;
+}
+
+/* 옛: text-[9px] font-semibold text-gray-400 uppercase tracking-widest (+ --head: mb-2 px-0.5 / --spaced: mb-1.5) */
+.gm-tool-panel__label {
+    font-size: 9px;
+    font-weight: var(--gm-font-weight-semibold);
+    color: var(--gm-color-gray-400);
+    text-transform: uppercase;
+    letter-spacing: var(--gm-tracking-widest);
+}
+
+.gm-tool-panel__label--head {
+    margin-bottom: calc(var(--gm-spacing) * 2);
+    padding-inline: calc(var(--gm-spacing) * .5);
+}
+
+.gm-tool-panel__label--spaced {
+    margin-bottom: calc(var(--gm-spacing) * 1.5);
+}
+
+/* ── 그리기 패널 (ui/toolbar/DrawPanel) ── */
+/* 옛 인라인 width: 208 */
+.gm-draw-panel {
+    width: 208px;
+}
+
+/* 옛: p-2.5 pb-0 */
+.gm-draw-panel__shapes {
+    padding: calc(var(--gm-spacing) * 2.5);
+    padding-bottom: calc(var(--gm-spacing) * 0);
+}
+
+/* 옛: grid grid-cols-6 gap-1 */
+.gm-draw-panel__shape-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: calc(var(--gm-spacing) * 1);
+}
+
+/* 옛: h-8 rounded-lg flex items-center justify-center transition-all
+       + 꺼짐: text-gray-500 hover:bg-gray-100 hover:text-gray-700 / 켜짐: bg-[브랜드색] text-white shadow-sm */
+.gm-draw-panel__shape {
+    height: calc(var(--gm-spacing) * 8);
+    border-radius: var(--gm-radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition-property: all;
+    transition-timing-function: var(--gm-transition-ease);
+    transition-duration: var(--gm-transition-duration);
+    color: var(--gm-color-gray-500);
+}
+
+/* 옛: text-[10px] text-gray-400 mt-1.5 px-0.5 h-4 */
+.gm-draw-panel__hint {
+    font-size: 10px;
+    color: var(--gm-color-gray-400);
+    margin-top: calc(var(--gm-spacing) * 1.5);
+    padding-inline: calc(var(--gm-spacing) * .5);
+    height: calc(var(--gm-spacing) * 4);
+}
+
+/* 옛: mx-2.5 h-px bg-gray-100 (+ --spaced: my-2.5) */
+.gm-draw-panel__divider {
+    margin-inline: calc(var(--gm-spacing) * 2.5);
+    height: 1px;
+    background-color: var(--gm-color-gray-100);
+}
+
+.gm-draw-panel__divider--spaced {
+    margin-block: calc(var(--gm-spacing) * 2.5);
+}
+
+/* 옛: px-2.5 pb-2.5 */
+.gm-draw-panel__modes {
+    padding-inline: calc(var(--gm-spacing) * 2.5);
+    padding-bottom: calc(var(--gm-spacing) * 2.5);
+}
+
+/* 옛: grid grid-cols-2 gap-1.5 */
+.gm-draw-panel__mode-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: calc(var(--gm-spacing) * 1.5);
+}
+
+/* 옛: flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs font-medium transition-all
+       + 꺼짐: bg-gray-100 text-gray-600 hover:bg-gray-200 / 켜짐: bg-[브랜드색] text-white */
+.gm-draw-panel__mode {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--gm-spacing) * 1.5);
+    padding-inline: calc(var(--gm-spacing) * 2);
+    padding-block: calc(var(--gm-spacing) * 2);
+    border-radius: var(--gm-radius-lg);
+    font-size: var(--gm-text-xs);
+    line-height: var(--gm-text-xs--line-height);
+    font-weight: var(--gm-font-weight-medium);
+    transition-property: all;
+    transition-timing-function: var(--gm-transition-ease);
+    transition-duration: var(--gm-transition-duration);
+    background-color: var(--gm-color-gray-100);
+    color: var(--gm-color-gray-600);
+}
+
+/* 옛: mt-1.5 inline-block bg-gray-100 text-gray-500 text-[10px] px-1.5 py-0.5 rounded-full font-semibold */
+.gm-draw-panel__count {
+    margin-top: calc(var(--gm-spacing) * 1.5);
+    display: inline-block;
+    background-color: var(--gm-color-gray-100);
+    color: var(--gm-color-gray-500);
+    font-size: 10px;
+    padding-inline: calc(var(--gm-spacing) * 1.5);
+    padding-block: calc(var(--gm-spacing) * .5);
+    border-radius: var(--gm-radius-full);
+    font-weight: var(--gm-font-weight-semibold);
+}
+
+/* 옛: mt-2 space-y-1.5 */
+.gm-draw-panel__select-info {
+    margin-top: calc(var(--gm-spacing) * 2);
+}
+
+:where(.gm-draw-panel__select-info > :not(:last-child)) {
+    margin-top: 0;
+    margin-bottom: calc(var(--gm-spacing) * 1.5);
+}
+
+/* 옛: text-[10px] text-gray-400 text-center py-1 */
+.gm-draw-panel__select-hint {
+    font-size: 10px;
+    color: var(--gm-color-gray-400);
+    text-align: center;
+    padding-block: calc(var(--gm-spacing) * 1);
+}
+
+/* 옛: w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-500 text-white text-xs font-medium hover:bg-red-600 transition-colors */
+.gm-draw-panel__delete {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--gm-spacing) * 1.5);
+    padding-block: calc(var(--gm-spacing) * 2);
+    border-radius: var(--gm-radius-lg);
+    background-color: var(--gm-color-red-500);
+    color: var(--gm-color-white);
+    font-size: var(--gm-text-xs);
+    line-height: var(--gm-text-xs--line-height);
+    font-weight: var(--gm-font-weight-medium);
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to;
+    transition-timing-function: var(--gm-transition-ease);
+    transition-duration: var(--gm-transition-duration);
+}
+
+/* 옛: p-2.5 space-y-2.5 */
+.gm-draw-panel__style {
+    padding: calc(var(--gm-spacing) * 2.5);
+}
+
+:where(.gm-draw-panel__style > :not(:last-child)) {
+    margin-top: 0;
+    margin-bottom: calc(var(--gm-spacing) * 2.5);
+}
+
+/* 옛: flex items-center gap-1.5 flex-wrap */
+.gm-draw-panel__swatches {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--gm-spacing) * 1.5);
+    flex-wrap: wrap;
+}
+
+/* 옛: w-5 h-5 rounded-full transition-transform hover:scale-110 flex-shrink-0 + 인라인 outlineOffset 1px
+   (배경색·외곽선·테두리는 색마다 달라 인라인) */
+.gm-draw-panel__swatch {
+    width: calc(var(--gm-spacing) * 5);
+    height: calc(var(--gm-spacing) * 5);
+    border-radius: var(--gm-radius-full);
+    transition-property: transform, translate, scale, rotate;
+    transition-timing-function: var(--gm-transition-ease);
+    transition-duration: var(--gm-transition-duration);
+    flex-shrink: 0;
+    outline-offset: 1px;
+}
+
+/* 옛: w-5 h-5 rounded-full overflow-hidden cursor-pointer flex-shrink-0 border border-gray-200 (배경은 고른 색 — 인라인) */
+.gm-draw-panel__custom-color {
+    width: calc(var(--gm-spacing) * 5);
+    height: calc(var(--gm-spacing) * 5);
+    border-radius: var(--gm-radius-full);
+    overflow: hidden;
+    cursor: pointer;
+    flex-shrink: 0;
+    border-style: solid;
+    border-width: 1px;
+    border-color: var(--gm-color-gray-200);
+}
+
+/* 옛: opacity-0 w-0 h-0 */
+.gm-draw-panel__color-input {
+    opacity: 0;
+    width: calc(var(--gm-spacing) * 0);
+    height: calc(var(--gm-spacing) * 0);
+}
+
+/* 옛: flex gap-1 */
+.gm-draw-panel__widths {
+    display: flex;
+    gap: calc(var(--gm-spacing) * 1);
+}
+
+/* 옛: flex-1 h-7 rounded-md text-xs font-medium transition-colors
+       + 꺼짐: bg-gray-100 text-gray-600 hover:bg-gray-200 / 켜짐: bg-[브랜드색] text-white */
+.gm-draw-panel__width {
+    flex: 1;
+    height: calc(var(--gm-spacing) * 7);
+    border-radius: var(--gm-radius-md);
+    font-size: var(--gm-text-xs);
+    line-height: var(--gm-text-xs--line-height);
+    font-weight: var(--gm-font-weight-medium);
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to;
+    transition-timing-function: var(--gm-transition-ease);
+    transition-duration: var(--gm-transition-duration);
+    background-color: var(--gm-color-gray-100);
+    color: var(--gm-color-gray-600);
+}
+
+/* 옛: flex justify-between items-center mb-1.5 */
+.gm-draw-panel__range-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: calc(var(--gm-spacing) * 1.5);
+}
+
+/* 옛: text-[10px] text-gray-500 tabular-nums */
+.gm-draw-panel__range-value {
+    font-size: 10px;
+    color: var(--gm-color-gray-500);
+    font-variant-numeric: tabular-nums;
+}
+
+/* 옛: w-full accent-[브랜드색] h-1.5 */
+.gm-draw-panel__range {
+    width: 100%;
+    accent-color: var(--gm-primary);
+    height: calc(var(--gm-spacing) * 1.5);
+}
+
+@media (hover: hover) {
+    .gm-draw-panel__shape:hover {
+        background-color: var(--gm-color-gray-100);
+        color: var(--gm-color-gray-700);
+    }
+
+    .gm-draw-panel__mode:hover,
+    .gm-draw-panel__width:hover {
+        background-color: var(--gm-color-gray-200);
+    }
+
+    .gm-draw-panel__delete:hover {
+        background-color: var(--gm-color-red-600);
+    }
+
+    .gm-draw-panel__swatch:hover {
+        scale: 110% 110%;
+    }
+}
+
+.gm-draw-panel__shape.gm-is-active {
+    background-color: var(--gm-primary);
+    color: var(--gm-color-white);
+    box-shadow: 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), var(--gm-shadow-sm);
+}
+
+.gm-draw-panel__mode.gm-is-active,
+.gm-draw-panel__width.gm-is-active {
+    background-color: var(--gm-primary);
+    color: var(--gm-color-white);
+}
+
+/* ── 반경 패널 (ui/toolbar/RadiusPanel) ── */
+/* 옛: p-2.5 + 인라인 width: 192 */
+.gm-radius-panel {
+    padding: calc(var(--gm-spacing) * 2.5);
+    width: 192px;
+}
+
+/* 옛: flex items-center gap-1.5 */
+.gm-radius-panel__row {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--gm-spacing) * 1.5);
+}
+
+/* 옛: w-full h-8 px-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[브랜드색] */
+.gm-radius-panel__input {
+    width: 100%;
+    height: calc(var(--gm-spacing) * 8);
+    padding-inline: calc(var(--gm-spacing) * 2);
+    border-radius: var(--gm-radius-lg);
+    border-style: solid;
+    border-width: 1px;
+    border-color: var(--gm-color-gray-200);
+    font-size: var(--gm-text-xs);
+    line-height: var(--gm-text-xs--line-height);
+}
+
+.gm-radius-panel__input:focus {
+    outline-style: none;
+    border-color: var(--gm-primary);
+}
+
+/* 옛: text-[11px] text-gray-400 shrink-0 */
+.gm-radius-panel__unit {
+    font-size: 11px;
+    color: var(--gm-color-gray-400);
+    flex-shrink: 0;
+}
+
+/* 옛: flex items-center gap-1.5 mt-2 */
+.gm-radius-panel__actions {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--gm-spacing) * 1.5);
+    margin-top: calc(var(--gm-spacing) * 2);
+}
+
+/* 옛: flex-1 h-7 rounded-lg bg-[브랜드색] text-white text-[11px] font-medium hover:bg-[#e05d19] transition-colors */
+.gm-radius-panel__apply {
+    flex: 1;
+    height: calc(var(--gm-spacing) * 7);
+    border-radius: var(--gm-radius-lg);
+    background-color: var(--gm-primary);
+    color: var(--gm-color-white);
+    font-size: 11px;
+    font-weight: var(--gm-font-weight-medium);
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to;
+    transition-timing-function: var(--gm-transition-ease);
+    transition-duration: var(--gm-transition-duration);
+}
+
+/* 옛: flex-1 h-7 rounded-lg bg-gray-100 text-gray-500 text-[11px] font-medium hover:bg-gray-200 transition-colors */
+.gm-radius-panel__reset {
+    flex: 1;
+    height: calc(var(--gm-spacing) * 7);
+    border-radius: var(--gm-radius-lg);
+    background-color: var(--gm-color-gray-100);
+    color: var(--gm-color-gray-500);
+    font-size: 11px;
+    font-weight: var(--gm-font-weight-medium);
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to;
+    transition-timing-function: var(--gm-transition-ease);
+    transition-duration: var(--gm-transition-duration);
+}
+
+@media (hover: hover) {
+    /* 옛 hover:bg-[#e05d19]: 브랜드 색을 조금 어둡게 한 값 → --gm-primary-hover(FE-5c) */
+    .gm-radius-panel__apply:hover {
+        background-color: var(--gm-primary-hover);
+    }
+
+    .gm-radius-panel__reset:hover {
+        background-color: var(--gm-color-gray-200);
+    }
+}
+
+/* 옛: text-[10px] text-gray-400 mt-1.5 px-0.5 */
+.gm-radius-panel__hint {
+    font-size: 10px;
+    color: var(--gm-color-gray-400);
+    margin-top: calc(var(--gm-spacing) * 1.5);
+    padding-inline: calc(var(--gm-spacing) * .5);
+}
+
+/* ── 사이드 패널 내용 공통 (TIFF·나만의지도 패널, 레이어 패널 머리줄) — 옛 인라인 style 값 그대로 ── */
+/* 옛 인라인: display flex, flexDirection column, height 100%, background #fff */
+.gm-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #fff;
+}
+
+/* 옛 인라인: padding 10px 10px 10px 12px, borderBottom 2px solid 브랜드색, display flex, alignItems center, justifyContent space-between, flexShrink 0 */
+.gm-panel__header {
+    padding: 10px 10px 10px 12px;
+    border-bottom: 2px solid var(--gm-primary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+}
+
+/* 옛 인라인: fontSize 12.5px, fontWeight 700, color 브랜드색 */
+.gm-panel__title {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--gm-primary);
+}
+
+/* 옛 인라인: flex 1, overflowY auto, overflowX hidden, paddingBottom 8px
+   (레이어 패널 트리 — 옛: flex-1 overflow-y-auto overflow-x-hidden + 인라인 paddingBottom 8px — 도 같은 값) */
+.gm-panel__list,
+.gm-layer-panel__tree {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 8px;
+}
+
+/* 옛 인라인: display flex, justifyContent center, padding 32px 0 (레이어 설정 패널의 불러오는 중도 같은 값) */
+.gm-panel__loading {
+    display: flex;
+    justify-content: center;
+    padding: 32px 0;
+}
+
+/* 옛 인라인 스피너: borderRadius 50%, border 2px solid 브랜드색, borderTopColor transparent, animation spin 0.8s linear infinite
+   + 크기 18px(TIFF) / 20px(레이어 설정). 앱 쪽 @keyframes spin 대신 패키지의 gm-spin(QA FE-5b-1 L1) */
+.gm-panel__spinner,
+.gm-layer-settings__spinner {
+    border-radius: 50%;
+    border: 2px solid var(--gm-primary);
+    border-top-color: transparent;
+    animation: gm-spin .8s linear infinite;
+}
+
+.gm-panel__spinner {
+    width: 18px;
+    height: 18px;
+}
+
+.gm-layer-settings__spinner {
+    width: 20px;
+    height: 20px;
+}
+
+/* 옛 인라인 lucide Loader2 style={{ animation: 'spin 0.8s linear infinite' }} (+ --primary: color 브랜드색) */
+.gm-loader {
+    animation: gm-spin .8s linear infinite;
+}
+
+.gm-loader--primary {
+    color: var(--gm-primary);
+}
+
+/* 옛 lucide Loader2 color="브랜드색"(svg stroke 속성) — TIFF 업로드 중. 글자색(color)은 그대로 두고 stroke만(FE-5c) */
+.gm-image-panel__drop-loader {
+    stroke: var(--gm-primary);
+}
+
+/* 옛 인라인: display none (숨긴 파일 선택 input) */
+.gm-file-input {
+    display: none;
+}
+
+/* 옛 인라인: padding 24px 16px, textAlign center, color #9ca3af, fontSize 11.5px */
+.gm-panel__empty {
+    padding: 24px 16px;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 11.5px;
+}
+
+/* 옛 인라인: display flex, alignItems center, gap 6px, padding 7px 10px 7px 12px, borderBottom 1px solid #f3f4f6 (켜짐 배경은 인라인) */
+.gm-panel__item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px 7px 12px;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+/* 옛 인라인: width 13px, height 13px, flexShrink 0, accentColor 브랜드색 (커서는 상태에 따라 인라인) */
+.gm-panel__item-check {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+    accent-color: var(--gm-primary);
+}
+
+/* 옛 인라인: flex 1, minWidth 0 */
+.gm-panel__item-body {
+    flex: 1;
+    min-width: 0;
+}
+
+/* 옛 인라인: fontSize 11.5px, overflow hidden, textOverflow ellipsis, whiteSpace nowrap (색·굵기는 상태에 따라 인라인) */
+.gm-panel__item-name {
+    font-size: 11.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 옛 인라인: fontSize 10.5px, color #9ca3af, marginTop 1px, display flex, alignItems center, gap 4px */
+.gm-panel__item-meta {
+    font-size: 10.5px;
+    color: #9ca3af;
+    margin-top: 1px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* 옛 인라인: color 브랜드색 | #ef4444, display flex, alignItems center, gap 3px */
+.gm-panel__item-status {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.gm-panel__item-status--busy {
+    color: var(--gm-primary);
+}
+
+.gm-panel__item-status--failed {
+    color: #ef4444;
+}
+
+/* 옛 인라인: background none, border none, cursor pointer, padding 3px, color #9ca3af(--delete: #d1d5db), display flex, flexShrink 0
+   (마우스를 올리면 핸들러가 인라인 color를 바꾼다) */
+.gm-panel__item-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 3px;
+    color: #9ca3af;
+    display: flex;
+    flex-shrink: 0;
+}
+
+.gm-panel__item-btn--delete {
+    color: #d1d5db;
+}
+
+/* ── TIFF 패널 (ui/panels/ImagePanel) ── */
+/* 옛 인라인: padding 10px 10px 6px, flexShrink 0 */
+.gm-image-panel__upload {
+    padding: 10px 10px 6px;
+    flex-shrink: 0;
+}
+
+/* 옛 인라인: borderRadius 7px, padding 14px 10px, display flex, flexDirection column, alignItems center, gap 6px,
+       transition border-color 0.15s, background 0.15s (테두리·배경·커서는 끌어다 놓기/업로드 상태에 따라 인라인) */
+.gm-image-panel__drop {
+    border-radius: 7px;
+    padding: 14px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    transition: border-color .15s, background .15s;
+}
+
+/* 옛 인라인: fontSize 11px, color #9ca3af, textAlign center, lineHeight 1.4 */
+.gm-image-panel__drop-text {
+    font-size: 11px;
+    color: #9ca3af;
+    text-align: center;
+    line-height: 1.4;
+}
+
+/* ── 나만의지도 패널 (ui/panels/MyMapPanel) ── */
+/* 옛 인라인: background none, border none, cursor pointer, color 브랜드색, display flex, alignItems center, gap 4, fontSize 11, fontWeight 600 */
+.gm-mymap-panel__upload {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--gm-primary);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* 옛 인라인: color #9ca3af, fontWeight 400 ("(공유됨)") */
+.gm-mymap-panel__shared {
+    color: #9ca3af;
+    font-weight: 400;
+}
+
+/* ── 레이어 패널 (ui/layer/LayerPanel) ── */
+/* 옛 인라인: position relative, display flex, flexDirection column, height 100% */
+.gm-layer-panel {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* 옛 인라인 background #fff (나머지는 .gm-panel__header와 같은 값) */
+.gm-layer-panel__header {
+    background: #fff;
+}
+
+/* 옛 인라인: display flex, alignItems center, gap 2px */
+.gm-layer-panel__actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+/* 옛: p-1 rounded transition-colors cursor-pointer + 인라인 color #64748b
+   (설정 버튼 색은 열림 상태에 따라 인라인, hover 배경은 마우스 핸들러가 인라인으로) */
+.gm-layer-panel__icon-btn {
+    padding: calc(var(--gm-spacing) * 1);
+    border-radius: .25rem;
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to;
+    transition-timing-function: var(--gm-transition-ease);
+    transition-duration: var(--gm-transition-duration);
+    cursor: pointer;
+    color: #64748b;
+}
+
+/* 옛 인라인: padding 24px 16px, textAlign center, color #a1a1aa, fontSize 12px */
+.gm-layer-panel__empty {
+    padding: 24px 16px;
+    text-align: center;
+    color: #a1a1aa;
+    font-size: 12px;
+}
+
+/* ── 레이어 설정 패널 (ui/layer/LayerSettingsPanel) — 옛 인라인 style 값 그대로 ── */
+/* 옛 인라인: position absolute, top/left/right/bottom 0, background #fff, zIndex 10, display flex, flexDirection column */
+.gm-layer-settings {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #fff;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 옛 인라인: padding 10px 10px 10px 12px, borderBottom 1px solid #e2e8f0, display flex, alignItems center, justifyContent space-between, flexShrink 0 */
+.gm-layer-settings__header {
+    padding: 10px 10px 10px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+}
+
+/* 옛 인라인: fontSize 12.5px, fontWeight 700, color #0f172a */
+.gm-layer-settings__title {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+/* 옛 인라인: color #94a3b8, cursor pointer, display flex */
+.gm-layer-settings__close {
+    color: #94a3b8;
+    cursor: pointer;
+    display: flex;
+}
+
+/* 옛 인라인: padding 8px 12px, borderBottom 1px solid #e2e8f0, display flex, alignItems center, gap 8px, flexShrink 0 */
+.gm-layer-settings__bar {
+    padding: 8px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* 옛 인라인: width 13px, height 13px, accentColor 브랜드색, cursor pointer (+ --fixed: flexShrink 0 — 트리 안 체크박스) */
+.gm-layer-settings__check {
+    width: 13px;
+    height: 13px;
+    accent-color: var(--gm-primary);
+    cursor: pointer;
+}
+
+.gm-layer-settings__check--fixed {
+    flex-shrink: 0;
+}
+
+/* 옛 인라인: fontSize 11px, color #64748b, flex 1 */
+.gm-layer-settings__all-label {
+    font-size: 11px;
+    color: #64748b;
+    flex: 1;
+}
+
+/* 옛 인라인: fontSize 11px, color 브랜드색, fontWeight 500 */
+.gm-layer-settings__count {
+    font-size: 11px;
+    color: var(--gm-primary);
+    font-weight: 500;
+}
+
+/* 옛 인라인: flex 1, overflowY auto, overflowX hidden, paddingTop 4px */
+.gm-layer-settings__tree {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-top: 4px;
+}
+
+/* 옛: flex items-center gap-1.5 py-1.5 + 인라인 paddingRight 12px (들여쓰기 paddingLeft는 깊이에 따라 인라인)
+   --root(그룹 없는 레이어) 옛: flex items-center gap-2 py-1.5 + 인라인 paddingLeft 28px, paddingRight 12px */
+.gm-layer-settings__row {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--gm-spacing) * 1.5);
+    padding-block: calc(var(--gm-spacing) * 1.5);
+    padding-right: 12px;
+}
+
+.gm-layer-settings__row--root {
+    gap: calc(var(--gm-spacing) * 2);
+    padding-left: 28px;
+}
+
+/* 옛: flex-shrink-0 + 인라인 color #94a3b8, display flex, alignItems center (폭은 들여쓰기 계산 상수 S_CHEV와 같이 움직여 인라인) */
+.gm-layer-settings__chevron {
+    flex-shrink: 0;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+}
+
+/* 옛 인라인 flex 1 (글자 크기·굵기·색은 깊이에 따라 인라인) */
+.gm-layer-settings__group-name {
+    flex: 1;
+}
+
+/* 옛 인라인 fontSize 11.5px (색은 선택 상태에 따라 인라인) */
+.gm-layer-settings__name {
+    font-size: 11.5px;
+}
+
+/* 옛 인라인: padding 10px 12px, borderTop 1px solid #e2e8f0, display flex, gap 6px, flexShrink 0 */
+.gm-layer-settings__footer {
+    padding: 10px 12px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* 옛 인라인: display flex, alignItems center, gap 4px, padding 6px 10px, borderRadius 6px, fontSize 11.5px,
+       background #f1f5f9, color #64748b, border 1px solid #e2e8f0, cursor pointer */
+.gm-layer-settings__reset {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+    cursor: pointer;
+}
+
+/* 옛 인라인: (초기화와 같은 6줄) + background 브랜드색, color #fff, border none, cursor pointer, flex 1, justifyContent center
+   (저장 중 흐리게 = opacity는 상태에 따라 인라인) */
+.gm-layer-settings__save {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    background: var(--gm-primary);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    flex: 1;
+    justify-content: center;
+}
+
+/* ── 레이어 트리 (ui/layer/LayerTreeItem) — 옛 인라인 style 중 고정값만(들여쓰기·깊이 색·글자·켜짐 상태는 인라인) ── */
+/* gm-layer-tree__group, gm-layer-tree__layers는 일부러 규칙이 없다: 조건부 인라인 테두리만 있는 요소를 리셋 범위([class*="gm-"])에 넣는 표식이다. 지우지 말 것 */
+/* 옛 인라인: display flex, alignItems center, gap 7px, cursor pointer (그룹 행 / 레이어 행) */
+.gm-layer-tree__group-row,
+.gm-layer-tree__layer-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    cursor: pointer;
+}
+
+/* 옛 인라인: width 3px, height 14px, borderRadius 2px, flexShrink 0 (깊이 색 막대 — 색은 인라인) */
+.gm-layer-tree__depth-bar {
+    width: 3px;
+    height: 14px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+/* 옛 인라인: width/height 14px(그룹) · 13px(레이어), accentColor #2563eb, flexShrink 0, cursor pointer */
+.gm-layer-tree__group-check,
+.gm-layer-tree__layer-check {
+    accent-color: #2563eb;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.gm-layer-tree__group-check {
+    width: 14px;
+    height: 14px;
+}
+
+.gm-layer-tree__layer-check {
+    width: 13px;
+    height: 13px;
+}
+
+/* 옛 인라인: flex 1, userSelect none */
+.gm-layer-tree__group-name {
+    flex: 1;
+    user-select: none;
+}
+
+/* 옛 인라인: color #94a3b8, flexShrink 0 (펼침 화살표) */
+.gm-layer-tree__chevron {
+    color: #94a3b8;
+    flex-shrink: 0;
+}
+
+/* 옛 인라인 background #fff (레이어 항목) */
+.gm-layer-tree__layer {
+    background: #fff;
+}
+
+/* 옛 인라인: fontSize 11.5px, flex 1, minWidth 0, overflow hidden, textOverflow ellipsis, whiteSpace nowrap, userSelect none */
+.gm-layer-tree__layer-name {
+    font-size: 11.5px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    user-select: none;
+}
+
+/* 옛 인라인: flexShrink 0, display flex, alignItems/justifyContent center, width/height 18px, borderRadius 4px, border none,
+       background transparent, color #94a3b8, cursor pointer, padding 0, transition transform 0.15s (회전은 열림 상태에 따라 인라인) */
+.gm-layer-tree__detail-btn {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 0;
+    transition: transform .15s;
+}
+
+/* 옛 인라인: paddingBottom 7px, paddingRight 10px, display flex, flexDirection column, gap 5px, minWidth 0, overflow hidden
+   (paddingLeft는 깊이에 따라 인라인) */
+.gm-layer-tree__detail {
+    padding-bottom: 7px;
+    padding-right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* 옛 인라인: display flex, alignItems center, gap 6px, minWidth 0 (투명도 줄) */
+.gm-layer-tree__opacity {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+/* 옛 인라인: fontSize 10.5px, color #94a3b8, flexShrink 0, minWidth 34px ("투명도"·"범례" 이름표) */
+.gm-layer-tree__ctrl-label,
+.gm-layer-legend__label {
+    font-size: 10.5px;
+    color: #94a3b8;
+    flex-shrink: 0;
+    min-width: 34px;
+}
+
+/* 옛 인라인: flex 1, minWidth 0, height 3px, accentColor #2563eb, cursor pointer */
+.gm-layer-tree__opacity-range {
+    flex: 1;
+    min-width: 0;
+    height: 3px;
+    accent-color: #2563eb;
+    cursor: pointer;
+}
+
+/* 옛 인라인: fontFamily ui-monospace, monospace, fontSize 10px, color #94a3b8, width 28px, textAlign right, flexShrink 0 */
+.gm-layer-tree__opacity-value {
+    font-family: ui-monospace, monospace;
+    font-size: 10px;
+    color: #94a3b8;
+    width: 28px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+/* ── 레이어 범례 (ui/layer/LayerLegend) — 견본 색·테두리·무늬는 항목마다 달라 인라인 ── */
+/* 옛 인라인: display flex, flexDirection column, gap 4px */
+.gm-layer-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* 옛 인라인: display flex, alignItems center, gap 6px */
+.gm-layer-legend__item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* 옛 인라인: width/height 20px, flexShrink 0, display flex, alignItems/justifyContent center */
+.gm-layer-legend__swatch-box {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 옛 인라인: width/height 14px, backgroundSize auto */
+.gm-layer-legend__swatch {
+    width: 14px;
+    height: 14px;
+    background-size: auto;
+}
+
+/* 옛 인라인: fontSize 10.5px, color #64748b */
+.gm-layer-legend__title {
+    font-size: 10.5px;
+    color: #64748b;
+}
+
+/* 옛 인라인: display block, width/height 20px (불러오기 실패 시 핸들러가 인라인 display none) */
+.gm-layer-legend__image {
+    display: block;
+    width: 20px;
+    height: 20px;
+}
+
+/* ── 나만의지도 업로드·공유 대화상자 (ui/mymap/MyMapUploadModal, MyMapShareDialog) — 옛 인라인 style 값 그대로 ── */
+/* 옛 인라인: position fixed, inset 0, background rgba(0,0,0,0.4), zIndex 1000, display flex, alignItems/justifyContent center */
+.gm-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .4);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 옛 인라인: background #fff, borderRadius 10, boxShadow 0 8px 30px rgba(0,0,0,0.2) + 폭 340(공유)·380(업로드, maxHeight 80vh, overflowY auto) */
+.gm-modal__dialog {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, .2);
+}
+
+.gm-share-dialog {
+    width: 340px;
+}
+
+.gm-upload-modal {
+    width: 380px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+/* 옛 인라인: padding 12px 14px, borderBottom 2px solid 브랜드색, display flex, justifyContent space-between, alignItems center */
+.gm-modal__header {
+    padding: 12px 14px;
+    border-bottom: 2px solid var(--gm-primary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* 옛 인라인: fontSize 13, fontWeight 700, color 브랜드색 */
+.gm-modal__title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gm-primary);
+}
+
+/* 옛 인라인: background none, border none, cursor pointer, color #9ca3af */
+.gm-modal__close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #9ca3af;
+}
+
+/* 옛 인라인: padding 24, textAlign center */
+.gm-modal__loading {
+    padding: 24px;
+    text-align: center;
+}
+
+/* 옛 인라인: padding 14, display flex, flexDirection column, gap 10 */
+.gm-modal__body {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* 옛 인라인: fontSize 11, color #374151, fontWeight 600 */
+.gm-modal__label {
+    font-size: 11px;
+    color: #374151;
+    font-weight: 600;
+}
+
+/* 옛 인라인: fontSize 12, padding 6px 8px, border 1px solid #e5e7eb, borderRadius 6 (input·select) */
+.gm-modal__field {
+    font-size: 12px;
+    padding: 6px 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+}
+
+/* 옛 인라인: fontSize 10.5, color #9ca3af */
+.gm-modal__note {
+    font-size: 10.5px;
+    color: #9ca3af;
+}
+
+/* 옛 인라인: fontSize 11, color #ef4444 */
+.gm-modal__error {
+    font-size: 11px;
+    color: #ef4444;
+}
+
+/* 옛 인라인: marginTop 4, padding 8px 0, borderRadius 6, border none, background 브랜드색, color #fff, fontSize 12, fontWeight 700,
+       cursor pointer, display flex, alignItems/justifyContent center, gap 6 */
+.gm-modal__submit {
+    margin-top: 4px;
+    padding: 8px 0;
+    border-radius: 6px;
+    border: none;
+    background: var(--gm-primary);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+/* 옛 인라인: display flex, borderBottom 1px solid #f3f4f6 */
+.gm-upload-modal__tabs {
+    display: flex;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+/* 옛 인라인: flex 1, padding 8px 0, fontSize 12, fontWeight 600, border none, cursor pointer (배경·색·밑줄은 선택 상태에 따라 인라인) */
+.gm-upload-modal__tab {
+    flex: 1;
+    padding: 8px 0;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+}
+
+/* 옛 인라인: border 1.5px dashed #d1d5db, borderRadius 7, padding 14px 10px, textAlign center, cursor pointer, background #f9fafb, fontSize 11, color #9ca3af */
+.gm-upload-modal__drop {
+    border: 1.5px dashed #d1d5db;
+    border-radius: 7px;
+    padding: 14px 10px;
+    text-align: center;
+    cursor: pointer;
+    background: #f9fafb;
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+/* ── 색 섞기(color-mix)를 아는 브라우저: 옛 Tailwind의 불투명도 색과 같은 식 (FE-5b-1 위젯) ── */
+@supports (color: color-mix(in lab, red, red)) {
+    .gm-region-badge__pill {
+        background-color: color-mix(in oklab, var(--gm-color-white) 90%, transparent);
+    }
+
+    .gm-region-badge__shimmer {
+        background-image: linear-gradient(to right in oklab, transparent 0%, color-mix(in oklab, var(--gm-color-white) 70%, transparent) 50%, transparent 100%);
+    }
+
+    .gm-wind-legend__title,
+    .gm-wind-legend__tick {
+        color: color-mix(in oklab, var(--gm-color-white) 70%, transparent);
+    }
+}
+
+/* ── 반응형: md(48rem = 768px) 이상 ── */
+@media (min-width: 48rem) {
+    .gm-header__actions,
+    .gm-nav-rail,
+    .gm-statusbar {
+        display: flex;
+    }
+
+    .gm-side-panel {
+        display: flex;
+        position: absolute;
+        z-index: 20;
+        height: 100%;
+        box-shadow: 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 20px 25px -5px rgba(0, 0, 0, .1), 0 8px 10px -6px rgba(0, 0, 0, .1);
+    }
+
+    .gm-mobile-layers {
+        display: none;
+    }
+}
+
+/* ── 반응형: lg(64rem = 1024px) 이상 ── */
+@media (min-width: 64rem) {
+    .gm-side-panel {
+        position: relative;
+        flex-shrink: 0;
+        box-shadow: 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0);
+    }
+}
