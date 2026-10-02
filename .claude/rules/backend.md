@@ -3,70 +3,65 @@ paths:
   - "backend/**"
 ---
 
-# Backend 아키텍처
+# Backend 규칙
+
+지도 도메인(`map`, `mymap`, `geoserver`, `geotiff`, `wind`)은 `map.md`, 봇 도메인(`bot`, `lostark`)은
+`bot.md` 규칙이 추가로 적용된다.
 
 ## 구조
+
 ```
-com.gtp/
+com.gtp
 ├── global/
-│   ├── config/     CorsConfig(허용 Origin), SecurityConfig
-│   ├── jwt/        JwtUtil, JwtFilter (principal=userId, authority=ROLE_<role>)
-│   ├── exception/  CustomException, ErrorCode(enum), GlobalExceptionHandler
-│   └── response/   ApiResponse<T>  ← 모든 API 응답 래퍼
+│   ├── config/     SecurityConfig, CorsConfig
+│   ├── jwt/        JwtUtil, JwtFilter
+│   ├── exception/  CustomException, BaseErrorCode(인터페이스), ErrorCode, GlobalExceptionHandler
+│   ├── gis/        지도 도메인 공통 — GisErrorCode, GisUserContext(+ SecurityContextGisUserContext)
+│   ├── response/   ApiResponse<T>
+│   └── init/       DataInitializer(역할·권한·관리자 시드), PostDataInitializer
 └── domain/
-    ├── blog/       게시글, 카테고리, slug 기반 조회
-    ├── bot/        command / room / schedule / log / message / discord
-    ├── geoserver/  GeoServer REST API 연동 (SLD 스타일, 레이어 publish)
-    ├── geotiff/    GeoTIFF 업로드 → COG 변환 → titiler 타일 서빙
-    ├── log/        접속 로그(access-log)
-    ├── lostark/    캐릭터 조회 API, 레이드 일정 (구글시트 연동)
-    ├── map/        레이어 트리 CRUD (Layer, LayerGroup, User/Permission Access)
-    ├── member/
-    │   ├── auth/       JWT 로그인
-    │   ├── role/       동적 역할/권한 (RoleEntity/PermissionEntity, DB 기반 — enum 아님)
-    │   └── user/       회원 CRUD
-    ├── menu/       메뉴 가시성 — 역할별 노출 메뉴 ID 화이트리스트 (menu-visibility)
-    ├── mymap/      나만의지도 (shp/엑셀 업로드 → GeoJSON 저장)
-    └── wind/       바람길 (기상청 LDAPS 바람 데이터, 스케줄 갱신)
+    blog · bot · geoserver · geotiff · log(접속로그) · lostark · map(레이어 트리)
+    member/{auth,role,user} · menu(메뉴 가시성) · mymap(나만의지도) · wind(바람길)
 ```
 
-모든 비즈니스 예외는 `throw new CustomException(ErrorCode.XXX)` 형식.
-`GlobalExceptionHandler`의 일반 `Exception` 핸들러는 반드시 `log.error(msg, e)`처럼 예외 객체를
-같이 넘겨서 스택트레이스가 로그에 남게 할 것 — 메시지만 찍으면 원인 추적이 불가능해진다
-(과거 이 문제로 프로덕션 500 에러 원인을 한참 못 찾은 적 있음).
+각 도메인은 `controller / service / repository / entity / dto` 패키지로 나눈다.
 
-## Security 규칙 (SecurityConfig)
+## 컨벤션
 
-- permitAll: `POST /api/auth/login`, `GET /api/posts`(+`/{slug}`), `GET /api/categories`,
-  `GET /api/geoserver/sld/**`, `GET /api/layers`/`tree`/`tree/**`, `GET /api/layer-groups`,
-  `GET /api/wind/**`, `GET /api/bot-log/**`
-- authenticated: `/api/categories/**`, `/api/users/**`, `/api/auth/me`, `/api/posts/**`,
-  `/api/geoserver/**`, `/api/layers/**`, `/api/layer-groups/**`, `/api/wind/refresh`,
-  `/api/bot/**`, `/api/access-log/**`, `/api/mymap/**`, `/api/menu-visibility`,
-  `GET /api/roles`(+`/**`)
-- SUPER_ADMIN 전용: `/api/admin/mymap/**`, `/api/roles/**`(GET 제외)
-- 나머지 `anyRequest()` → `permitAll()` (폴백)
-- JwtFilter: principal=userId(String), authority=`ROLE_<role>` — 컨트롤러에서
-  `SecurityContextHolder`로 꺼내 쓸 때 `ROLE_` 접두사 잘라내야 role 코드와 일치함
+- 응답은 `ApiResponse<T>` — `{ success, message, data }`. `ApiResponse.ok(data)`, `ApiResponse.fail(msg)`.
+- 비즈니스 예외는 `throw new CustomException(ErrorCode.XXX)`. 필요한 코드가 없으면 `ErrorCode`에 추가한다
+  (HttpStatus + 한국어 메시지). **지도 5개 도메인은 `GisErrorCode`(`global/gis`)에 추가**하고 `ErrorCode`를 쓰지 않는다
+  (`CustomException`은 `BaseErrorCode`를 받으므로 둘 다 던질 수 있다).
+- 새 도메인은 다른 도메인의 엔티티·리포지토리를 import하지 않는다. 사용자는 `userId` 문자열로 저장한다(FK 없음, `domain/mymap`·BK-1 이후 `domain/map`이 예시).
+  현재 사용자가 필요하면 지도 도메인은 `GisUserContext`, 그 밖은 컨트롤러에서 principal을 읽는다.
+- `GlobalExceptionHandler`의 일반 예외 처리는 `log.error(msg, e)`처럼 **예외 객체를 함께** 넘긴다.
+  메시지만 찍으면 스택트레이스가 안 남아 프로덕션 500 원인을 못 찾는다(실제로 겪었음).
+- 역할/권한은 DB 테이블(`RoleEntity`, `PermissionEntity`)이다. `member/user/entity`의 `Role`, `Permission`
+  enum은 안 쓰는 옛 코드다.
+- 테이블명은 `tbl_` 접두사(예외: `bot_*`, `geo_tiff_files`).
 
-## 독립 도메인 설계 원칙 (mymap 참고)
+## 보안 (SecurityConfig)
 
-지도 관련 신규 기능은 다른 프로젝트로 옮겨도 그 기능만 재사용 가능하도록 독립 모듈로 만든다.
-- 다른 도메인 엔티티(User, Role, Layer)를 import하지 않음
-- 소유자/공유 대상은 `ownerId`/`roleCode`를 순수 `String`으로만 저장 (FK 없음)
-- 권한 판단은 문자열 비교만 (다른 도메인 테이블 조인 없음)
+- Stateless JWT, CSRF 끔. JWT는 HS256, subject=userId, claim `role`, 만료 24시간.
+- `JwtFilter`는 principal에 userId(String), 권한에 `ROLE_<role>`을 넣는다.
+  컨트롤러에서 role 코드와 비교할 때는 `ROLE_` 접두사를 떼야 한다(지도 도메인은 `GisUserContext.currentRoleCodes()`가 떼서 준다).
+- **마지막 규칙이 `anyRequest().permitAll()`이다.** 새 엔드포인트를 만들면 SecurityConfig에 명시적으로
+  `authenticated()`나 역할 제한을 추가하지 않는 한 **로그인 없이 열린다.** 새 API마다 반드시 확인한다.
+- SUPER_ADMIN 전용: `/api/admin/mymap/**`, `/api/roles/**`(GET 제외).
+- CORS 허용 Origin은 `CorsConfig`에 있다. 새 배포 도메인이 생기면 여기에 추가한다.
 
-## 의존성 특이사항 (pom.xml)
-- GeoTools 32.1(`gt-shapefile`, `gt-geojson`)는 shp 파싱/GeoJSON 인코딩용으로만 쓰고,
-  **CRS.decode()/EPSG 조회는 쓰지 않음** — 폐쇄망/샌드박스에서 외부 네트워크를 타려다
-  응답 없이 멈추는 문제가 있어서, EPSG:4326/3857/5186/5179 변환은 표준 투영 공식을 직접
-  구현했다 (`domain/mymap/util/CoordinateTransformUtil`). `.prj` 파일도 GeoTools 없이
-  정규식으로 직접 파싱해서 판별한다 (`domain/mymap/util/PrjParser`).
-- Apache POI(`poi-ooxml`)는 엑셀 업로드 파싱용
-- grib2json(`com.github.davidmoten`)은 과거 GFS 바람 데이터용 — 현재는 기상청 LDAPS로
-  교체되어 미사용이지만 의존성은 남아있음
-- 대량 데이터(피처 수만~수십만 건) INSERT는 JPA `saveAll()` 대신
-  `domain/mymap/util/FeatureBatchInserter`(JdbcTemplate 배치)처럼 직접 배치 insert할 것 —
-  IDENTITY 채번 전략에서는 JPA saveAll이 배치가 안 걸려 건별 insert/커밋이 된다
-- `@Async` 메서드를 `@Transactional` 메서드 안에서 호출하지 말 것 — 트랜잭션 커밋 전에
-  비동기 스레드가 먼저 조회해서 빈 값을 받고 조용히 종료해버리는 레이스가 생긴다
+## DB / 설정
+
+- **로컬 `application-local.yml`의 DB는 운영 DB(호스트 주소는 저장소에 적지 않는다)다.** `ddl-auto: update`라서 엔티티를 바꾼 채
+  로컬에서 기동하면 **운영 스키마가 즉시 바뀐다.** 사용자가 명시적으로 허락하지 않는 한:
+  엔티티/매핑을 바꾼 상태로 백엔드를 기동하지 않는다, 운영 DB에 쓰기(INSERT/UPDATE/DELETE/DDL)를 일으키는
+  테스트를 하지 않는다, SQL은 작성만 하고 실행하지 않는다. 검증은 `./mvnw compile`까지.
+- 마이그레이션 도구가 없고 `ddl-auto: update`다. 컬럼 추가는 자동 반영되지만 **컬럼 삭제·타입 변경·FK 제거는
+  반영되지 않는다.** 그런 변경은 SQL을 따로 작성해 사용자에게 전달한다. (예: `tbl_layer_user_access`의 옛 `tbl_user` FK 제거 SQL —
+  설계문서 `2026-09-23-map-module-restructure.md` B1, 실행은 사용자)
+- 설정은 `application.yml`(추적됨)과 `application-local.yml`(gitignore). yml에 비밀값 기본값을 넣지 않는다.
+- `@Scheduled`는 `wind/service/WindDataService.scheduledRefresh` 하나. 같은 클래스의 `@Transactional`
+  메서드를 직접 부르면(self-invocation) 트랜잭션이 걸리지 않는다 — 스케줄러에서 트랜잭션이 필요하면
+  별도 빈으로 분리한다.
+- 테스트 코드는 없다(`src/test/java` 비어 있음). 최소한 `./mvnw compile`로 검증한다.
+- Windows 로컬에서 `"""` 텍스트 블록 컴파일 에러가 나면 `JAVA_HOME`이 Java 17 미만을 가리키는지 확인한다.

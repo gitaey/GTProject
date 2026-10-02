@@ -3,75 +3,44 @@ paths:
   - "frontend/**"
 ---
 
-# Frontend 아키텍처
+# Frontend 규칙
 
-## 핵심 데이터 흐름
-```
-Zustand Stores
-  ├── mapStore     → activeTool, flyTo, clearAll(Pub/Sub), parcel 콜백
-  ├── layerStore   → 레이어 트리(LayerGroup > LayerItem), 가시성/투명도, basemap 모드
-  ├── drawStore    → 그리기 스타일, textInput 오버레이, 선택 피처 수/삭제
-  ├── panelStore   → 열린 패널 타입 ('layer' | 'image' | 'mymap' | 'etc' | null)
-  └── menuStore    → 로그인한 role(+permission)로 GET /api/menu-visibility 조회,
-                      allowedMenus(Set) 기반 isAllowed(menuId)로 메뉴/패널 노출 제어
-          ↓
-hooks/map/          → Zustand 상태를 OL 인터랙션으로 변환
-          ↓
-OpenLayers Map 인스턴스 (MapView에서 생성, 각 훅에 전달)
-          ↓
-components/map/     → MapView → MapToolbar, PanelLeft, MapHeader 등
-```
+지도 관련 파일(`packages/gis-map/**`, `app/map`, `app/map-admin`, `app/map-dev`, `app/proxy`)은 `map.md` 규칙이 추가로 적용된다.
+지도 패키지(`frontend/packages/gis-map/`)는 이식 단위라 이 파일의 앱 규칙(`@/` 별칭, 공용 스토어, `process.env`, Tailwind)을 **쓰지 않는다**.
 
-## hooks/map/ 역할
+## 구조
 
-| 훅 | 역할 |
-|---|---|
-| `useMap` | OL Map 인스턴스 초기화 (EPSG:5186 프로젝션, WMTS 베이스맵) |
-| `useLayerManager` | `layerStore` 트리 ↔ OL WMS/WMTS 레이어 동기화 |
-| `useDrawing` | Draw / Select / Modify 인터랙션 관리. 우클릭 → 그리기 완료 + `activeTool: 'none'` |
-| `useDistanceMeasure` / `useAreaMeasure` | 거리/면적 측정 (동적 툴팁 렌더링) |
-| `useRadiusSearch` | 반경 검색 원 그리기 |
-| `useParcelHighlight` | VWorld Data API 필지 폴리곤 조회 + 핀/라벨. `registerParcelHighlighter`로 직접 콜백 등록 (Zustand 안 거치고 즉시 실행) |
-| `useRegionName` | 지도 이동 시 행정구역명 조회 |
-| `useGeoTiffLayer` | GeoTIFF 타일 레이어 (`/admin` 업로드 → titiler 타일 표시) |
-| `useWindLayer` | 바람길 레이어 (ol-wind, 줌 레벨에 따라 velocityScale/paths 동적 조정) |
-| `useMyMapLayers` | 나만의지도 GeoJSON 레이어 (`addLayer`/`removeLayer`/`zoomTo`) |
+- 라우트: `app/` 아래 각 `page.tsx`. **공통 레이아웃(route group)이 없다** — 관리자 페이지는 각자
+  `Header`와 `Sidebar`를 직접 렌더링한다. `/map`, `/login`, `/blog`는 이 둘을 쓰지 않는다.
+- `src/middleware.ts`: `token`/`role` 쿠키로 판단. 토큰 없으면 `/login`으로 보낸다(`/blog`도 보호됨).
+  `MAP_USER`는 `/` 대신 `/map`으로 보낸다. `api`, `proxy`, `_next` 경로는 제외.
+- `app/proxy/*/route.ts`: VWorld·GeoServer API 키를 브라우저에 노출하지 않기 위한 서버 프록시.
+  `region`, `wfs`, `vworld/{data,search,legend-style}`가 실제로 쓰인다.
+- 전역 스토어(`stores/`): `authStore`(user+token, localStorage `gtp-auth`, 쿠키도 기록, `getToken()` 제공),
+  `menuStore`(역할별 허용 메뉴 ID), `sidebarStore`(모바일 사이드바). 지도 상태는 전역 스토어가 아니라 지도 패키지의 엔진 인스턴스에 있다
+  (앱은 `app/map/_gtp/useGtpMapHost.ts`에서 authStore·menuStore를 읽어 `GisMapHost`로 넘긴다).
+- 공용 API 클라이언트가 **없다**. 각 페이지가 `const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'`와
+  `getToken()`을 쓰는 로컬 `apiFetch`를 둔다. 새 관리자 페이지도 이 패턴을 따르되, 지도 모듈 안에서는 금지(map.md).
+- 백엔드 응답은 `{ success, message, data }` 형태다. `success`가 false면 `message`를 에러로 보여준다.
+- `next.config.ts`는 `/api/:path*` → `http://localhost:8080`으로 리라이트한다. 상대 경로 `/api/...` 호출은
+  이 리라이트에 의존한다.
 
-## mapStore 핵심 패턴
+## 컨벤션
 
-**Pub/Sub 초기화:** `clearAll()` 호출 시 `clearListeners` Set에 등록된 모든 훅의 초기화 함수를 호출.
-각 훅은 `onClear(fn)`으로 구독 → 구독 해제 함수 반환.
+- TypeScript strict. 모든 파라미터에 타입, `any` 금지, `type`보다 `interface` 우선, props는 `interface XxxProps`.
+- 컴포넌트/타입 PascalCase, 함수/변수 camelCase, 상수 UPPER_SNAKE_CASE.
+- 클라이언트 컴포넌트는 `'use client'` 명시, 함수형만.
+- 아이콘은 `lucide-react`만 쓴다 (이모지·OS 기본 아이콘 금지).
+- Tailwind v4는 CSS-first 설정(`app/globals.css`) — `tailwind.config`가 없다.
+- Prettier: 세미콜론 없음, 작은따옴표, 들여쓰기 4칸, 줄 폭 120.
+- 경로 별칭: 앱 코드는 `@/*` → `src/*`, 지도 패키지는 `@gtp/gis-map/*`(진입점 6개, `frontend/tsconfig.json`의 paths). 패키지 **안**에서는 어느 별칭도 쓰지 않고 상대 경로만 쓴다(map.md).
 
-**직접 콜백 패턴 (parcel):**
-```ts
-registerParcelHighlighter((lon, lat, title?) => { ... })  // 레이어 훅이 등록
-highlightParcel(lon, lat, title)                          // 검색 컴포넌트가 직접 호출
-```
+## 함정
 
-**MapTool 토글:** `setActiveTool(tool)`은 같은 도구를 다시 누르면 `'none'`으로 해제.
-
-## 레이어 트리 구조 (공용 레이어)
-
-```
-LayerGroup
-  └─ LayerGroup (중첩 가능)
-       └─ LayerItem (type: 'wmts-base' | 'wms')
-```
-
-`layerStore.flattenGroupLayers()`로 트리에서 모든 LeafItem 추출.
-확장 상태는 `localStorage['layer-group-expanded']`에 유지.
-레이어 가시성/투명도는 per-user 서버 저장 (백엔드 `LayerService`).
-
-※ 나만의지도(mymap)는 이 트리에 얹지 않고 완전히 별도 스토어/API로 관리한다
-(`hooks/map/useMyMapLayers.ts`, `components/map/panel/MyMapPanel.tsx`).
-
-## 사이드바/메뉴 노출 (관리자 페이지)
-
-`components/layout/Sidebar.tsx`의 `menuItems`가 실제 표시되는 사이드바 항목의 원본이며,
-`isAllowed('sidebar.' + id)`로 필터링된다. **`/admin/menu` 관리 페이지에서 메뉴를 켜도
-`Sidebar.tsx`의 `menuItems` 배열에 해당 항목이 없으면 절대 안 보이니**, 새 관리자 페이지를
-추가하면 반드시 여기에도 링크를 추가할 것 (과거 한 번 이걸 빼먹어서 권한관리/메뉴관리
-링크가 통째로 사라졌던 적 있음).
-
-Proxy: `next.config.ts`의 `/api/*` → `http://localhost:8080/api/*` 리라이트(개발 CORS 우회),
-`frontend/src/app/proxy/`에 VWorld/GeoServer API 키를 숨기는 서버사이드 프록시 라우트 있음.
+- **새 관리자 페이지를 만들면 `components/layout/Sidebar.tsx`의 메뉴 트리에도 반드시 추가한다.**
+  `/admin/menu`에서 메뉴를 켜도 이 배열에 없으면 화면에 안 나온다(과거 권한관리/메뉴관리 링크가
+  통째로 사라진 적 있음).
+- `npm run lint`는 `eslint-plugin-next@0.0.0`(빈 패키지) 때문에 실패한다. 검증은 `npx tsc --noEmit`으로 한다.
+- 테스트 도구(jest/vitest/playwright)가 없다. 화면 동작은 개발 서버를 띄워 브라우저로 확인한다.
+- `vite`(devDependency)는 지도 패키지 UMD 빌드(`npm run build:gis-umd`)와 standalone 개발 서버(`npm run dev:gis-standalone`, 5199) 전용이다. Next 빌드·CI와 무관하고 산출물 `packages/gis-map/dist/`는 gitignore.
+- `app/globals.css`를 패키지 CSS와 동시에 고치면 Tailwind 4.1.11 캐시 경합으로 개발 서버가 옛 CSS를 줄 수 있다(map.md 함정).
