@@ -8,10 +8,8 @@ import com.gtp.domain.map.entity.LayerUserAccess;
 import com.gtp.domain.map.repository.LayerPermissionAccessRepository;
 import com.gtp.domain.map.repository.LayerRepository;
 import com.gtp.domain.map.repository.LayerUserAccessRepository;
-import com.gtp.domain.member.user.entity.User;
-import com.gtp.domain.member.user.repository.UserRepository;
 import com.gtp.global.exception.CustomException;
-import com.gtp.global.exception.ErrorCode;
+import com.gtp.global.gis.GisErrorCode;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,7 +26,6 @@ public class LayerService {
     private final LayerGroupService layerGroupService;
     private final LayerPermissionAccessRepository permissionAccessRepository;
     private final LayerUserAccessRepository userAccessRepository;
-    private final UserRepository userRepository;
     private final EntityManager entityManager;
 
     @Transactional(readOnly = true)
@@ -203,33 +200,27 @@ public class LayerService {
         }
     }
 
-    // User-level 접근 설정
+    // User-level 접근 설정 (userId = JWT principal, 사용자 존재 확인은 하지 않음 — mymap과 동일 정책)
     @Transactional(readOnly = true)
     public List<Long> getUserLayerIds(String userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-        List<LayerUserAccess> accesses = userAccessRepository.findByUser(user);
+        List<LayerUserAccess> accesses = userAccessRepository.findByUserId(userId);
         if (accesses.isEmpty()) return null; // null = 커스텀 설정 없음 (role 기반 폴백)
         return accesses.stream().map(a -> a.getLayer().getId()).toList();
     }
 
     @Transactional
     public void setUserLayers(String userId, List<Long> layerIds) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-        userAccessRepository.deleteByUser(user);
+        userAccessRepository.deleteByUserId(userId);
         entityManager.flush();
         for (Long layerId : layerIds) {
             Layer layer = findById(layerId);
-            userAccessRepository.save(LayerUserAccess.builder().user(user).layer(layer).build());
+            userAccessRepository.save(LayerUserAccess.builder().userId(userId).layer(layer).build());
         }
     }
 
     @Transactional
     public void clearUserLayers(String userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-        userAccessRepository.deleteByUser(user);
+        userAccessRepository.deleteByUserId(userId);
     }
 
     private List<LayerGroupResponse> filterEmptyGroups(List<LayerGroupResponse> groups) {
@@ -247,6 +238,6 @@ public class LayerService {
 
     public Layer findById(Long id) {
         return layerRepository.findById(id)
-                .orElseThrow(() -> new CustomException(ErrorCode.LAYER_NOT_FOUND));
+                .orElseThrow(() -> new CustomException(GisErrorCode.LAYER_NOT_FOUND));
     }
 }

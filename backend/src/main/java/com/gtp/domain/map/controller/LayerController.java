@@ -2,11 +2,10 @@ package com.gtp.domain.map.controller;
 
 import com.gtp.domain.map.dto.*;
 import com.gtp.domain.map.service.LayerService;
+import com.gtp.global.gis.GisUserContext;
 import com.gtp.global.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,6 +16,7 @@ import java.util.List;
 public class LayerController {
 
     private final LayerService layerService;
+    private final GisUserContext gisUserContext;
 
     @GetMapping
     public ApiResponse<List<LayerResponse>> getAll() {
@@ -88,7 +88,6 @@ public class LayerController {
     }
 
     private String currentUserId() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return (String) auth.getPrincipal();
+        return gisUserContext.currentUserId();
     }
 }

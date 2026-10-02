@@ -4,7 +4,7 @@ import com.gtp.domain.wind.dto.WindFrameMeta;
 import com.gtp.domain.wind.entity.WindFrameEntity;
 import com.gtp.domain.wind.repository.WindFrameRepository;
 import com.gtp.global.exception.CustomException;
-import com.gtp.global.exception.ErrorCode;
+import com.gtp.global.gis.GisErrorCode;
 import com.gtp.global.response.ApiResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,7 +46,7 @@ public class WindController {
         List<WindFrameEntity> candidates = windFrameRepository.findCurrentCandidates(now);
         WindFrameEntity frame = candidates.isEmpty()
                 ? windFrameRepository.findFirstByOrderByValidTimeAsc()
-                    .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND))
+                    .orElseThrow(() -> new CustomException(GisErrorCode.NOT_FOUND))
                 : candidates.get(0);
 
         return ApiResponse.ok(objectMapper.readTree(frame.getDataJson()));
@@ -56,7 +56,7 @@ public class WindController {
     @GetMapping("/frames/{id}")
     public ApiResponse<JsonNode> getFrame(@PathVariable Long id) throws Exception {
         WindFrameEntity frame = windFrameRepository.findById(id)
-                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND));
+                .orElseThrow(() -> new CustomException(GisErrorCode.NOT_FOUND));
         return ApiResponse.ok(objectMapper.readTree(frame.getDataJson()));
     }
 }

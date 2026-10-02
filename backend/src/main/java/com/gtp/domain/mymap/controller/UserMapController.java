@@ -3,12 +3,11 @@ package com.gtp.domain.mymap.controller;
 import com.gtp.domain.mymap.dto.*;
 import com.gtp.domain.mymap.service.UserMapService;
 import com.gtp.domain.mymap.service.UserMapUploadService;
+import com.gtp.global.gis.GisUserContext;
 import com.gtp.global.response.ApiResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,7 +16,7 @@ import java.util.List;
 
 /**
  * 나만의지도 API. 다른 도메인 컨트롤러를 참조하지 않는 독립 엔드포인트 —
- * 인증 정보(userId/role)는 SecurityContextHolder에서만 뽑아 쓴다.
+ * 인증 정보(userId/role)는 GisUserContext로만 받는다.
  */
 @RestController
 @RequestMapping("/api/mymap")
@@ -26,6 +25,7 @@ public class UserMapController {
 
     private final UserMapService userMapService;
     private final UserMapUploadService uploadService;
+    private final GisUserContext gisUserContext;
 
     @GetMapping
     public ApiResponse<List<UserMapListItem>> list() {
@@ -98,13 +98,10 @@ public class UserMapController {
     }
 
     private String currentUserId() {
-        return (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return gisUserContext.currentUserId();
     }
 
     private List<String> currentRoleCodes() {
-        return SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .map(a -> a.startsWith("ROLE_") ? a.substring(5) : a)
-                .toList();
+        return gisUserContext.currentRoleCodes();
     }
 }

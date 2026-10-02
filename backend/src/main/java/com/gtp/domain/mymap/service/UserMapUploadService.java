@@ -9,7 +9,7 @@ import com.gtp.domain.mymap.util.CoordinateTransformUtil;
 import com.gtp.domain.mymap.util.FeatureBatchInserter;
 import com.gtp.domain.mymap.util.PrjParser;
 import com.gtp.global.exception.CustomException;
-import com.gtp.global.exception.ErrorCode;
+import com.gtp.global.gis.GisErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
@@ -77,7 +77,7 @@ public class UserMapUploadService {
             else if (lower.endsWith(".prj")) prj = f;
         }
         if (shp == null || dbf == null) {
-            throw new CustomException(ErrorCode.INVALID_SHP_FILE);
+            throw new CustomException(GisErrorCode.INVALID_SHP_FILE);
         }
 
         try {
@@ -114,7 +114,7 @@ public class UserMapUploadService {
             return UserMapUploadResponse.builder()
                     .id(saved.getId()).name(saved.getName()).status(saved.getStatus()).build();
         } catch (IOException e) {
-            throw new CustomException(ErrorCode.FILE_UPLOAD_FAILED);
+            throw new CustomException(GisErrorCode.FILE_UPLOAD_FAILED);
         }
     }
 
@@ -127,7 +127,7 @@ public class UserMapUploadService {
     public ExcelPreviewResponse previewExcel(MultipartFile file) {
         String name = file.getOriginalFilename();
         if (name == null || !name.toLowerCase().endsWith(".xlsx")) {
-            throw new CustomException(ErrorCode.INVALID_EXCEL_FILE);
+            throw new CustomException(GisErrorCode.INVALID_EXCEL_FILE);
         }
         try {
             Path dir = Paths.get(uploadDir);
@@ -140,7 +140,7 @@ public class UserMapUploadService {
             try (InputStream is = Files.newInputStream(stored); Workbook wb = WorkbookFactory.create(is)) {
                 Sheet sheet = wb.getSheetAt(0);
                 Row headerRow = sheet.getRow(0);
-                if (headerRow == null) throw new CustomException(ErrorCode.INVALID_EXCEL_FILE);
+                if (headerRow == null) throw new CustomException(GisErrorCode.INVALID_EXCEL_FILE);
                 List<String> headers = new ArrayList<>();
                 for (Cell cell : headerRow) headers.add(cellToString(cell));
 
@@ -160,7 +160,7 @@ public class UserMapUploadService {
                         .uploadId(uploadId).headers(headers).sampleRows(sample).build();
             }
         } catch (IOException e) {
-            throw new CustomException(ErrorCode.FILE_UPLOAD_FAILED);
+            throw new CustomException(GisErrorCode.FILE_UPLOAD_FAILED);
         }
     }
 
@@ -168,7 +168,7 @@ public class UserMapUploadService {
     public UserMapUploadResponse confirmExcel(ExcelConfirmRequest req, String ownerId) {
         Path stored = pendingExcelUploads.get(req.getUploadId());
         if (stored == null || !Files.exists(stored)) {
-            throw new CustomException(ErrorCode.EXCEL_UPLOAD_NOT_FOUND);
+            throw new CustomException(GisErrorCode.EXCEL_UPLOAD_NOT_FOUND);
         }
 
         UserMap map = UserMap.builder()
@@ -189,7 +189,7 @@ public class UserMapUploadService {
             int latIdx = headers.indexOf(req.getLatColumn());
             int lonIdx = headers.indexOf(req.getLonColumn());
             if (latIdx < 0 || lonIdx < 0) {
-                throw new CustomException(ErrorCode.INVALID_COORDINATE_COLUMN);
+                throw new CustomException(GisErrorCode.INVALID_COORDINATE_COLUMN);
             }
 
             CoordinateTransformUtil.ToWgs84 transform = CoordinateTransformUtil.buildTransform(saved.getSourceSrid());

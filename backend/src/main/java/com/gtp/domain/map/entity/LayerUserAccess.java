@@ -1,9 +1,12 @@
 package com.gtp.domain.map.entity;
 
-import com.gtp.domain.member.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 
+/**
+ * 사용자별 레이어 접근 설정 — userId는 문자열(JWT principal)로만 저장하고
+ * 다른 도메인의 User 엔티티는 참조하지 않는다.
+ */
 @Entity
 @Table(name = "tbl_layer_user_access",
         uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "layer_id"}))
@@ -17,9 +20,8 @@ public class LayerUserAccess {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @Column(name = "user_id", nullable = false, length = 50)
+    private String userId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "layer_id", nullable = false)

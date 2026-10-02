@@ -6,7 +6,7 @@ import com.gtp.domain.geotiff.dto.GeoTiffUploadResponse;
 import com.gtp.domain.geotiff.entity.GeoTiffFile;
 import com.gtp.domain.geotiff.repository.GeoTiffFileRepository;
 import com.gtp.global.exception.CustomException;
-import com.gtp.global.exception.ErrorCode;
+import com.gtp.global.gis.GisErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,7 +39,7 @@ public class GeoTiffService {
     public GeoTiffUploadResponse upload(MultipartFile file, String uploadedBy) {
         String originalName = file.getOriginalFilename();
         if (originalName == null || (!originalName.toLowerCase().endsWith(".tif") && !originalName.toLowerCase().endsWith(".tiff"))) {
-            throw new CustomException(ErrorCode.INVALID_FILE_TYPE);
+            throw new CustomException(GisErrorCode.INVALID_FILE_TYPE);
         }
 
         String extension = originalName.substring(originalName.lastIndexOf('.'));
@@ -74,7 +74,7 @@ public class GeoTiffService {
                     .build();
 
         } catch (IOException e) {
-            throw new CustomException(ErrorCode.FILE_UPLOAD_FAILED);
+            throw new CustomException(GisErrorCode.FILE_UPLOAD_FAILED);
         }
     }
 
@@ -100,7 +100,7 @@ public class GeoTiffService {
 
     public GeoTiffStatusResponse getStatus(Long id) {
         GeoTiffFile file = geoTiffFileRepository.findById(id)
-                .orElseThrow(() -> new CustomException(ErrorCode.GEOTIFF_NOT_FOUND));
+                .orElseThrow(() -> new CustomException(GisErrorCode.GEOTIFF_NOT_FOUND));
         return GeoTiffStatusResponse.builder()
                 .id(file.getId())
                 .status(file.getStatus())
@@ -115,7 +115,7 @@ public class GeoTiffService {
 
     public void reprocessBounds(Long id) {
         GeoTiffFile file = geoTiffFileRepository.findById(id)
-                .orElseThrow(() -> new CustomException(ErrorCode.GEOTIFF_NOT_FOUND));
+                .orElseThrow(() -> new CustomException(GisErrorCode.GEOTIFF_NOT_FOUND));
         file.updateProcessing();
         geoTiffFileRepository.save(file);
         geoTiffProcessor.process(id, Paths.get(file.getFilePath()));
@@ -123,7 +123,7 @@ public class GeoTiffService {
 
     public void delete(Long id) {
         GeoTiffFile file = geoTiffFileRepository.findById(id)
-                .orElseThrow(() -> new CustomException(ErrorCode.GEOTIFF_NOT_FOUND));
+                .orElseThrow(() -> new CustomException(GisErrorCode.GEOTIFF_NOT_FOUND));
         try {
             Files.deleteIfExists(Paths.get(file.getFilePath()));
         } catch (IOException e) {

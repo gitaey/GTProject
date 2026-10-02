@@ -6,7 +6,7 @@ import com.gtp.domain.mymap.entity.UserMapUserAccess;
 import com.gtp.domain.mymap.repository.UserMapPermissionAccessRepository;
 import com.gtp.domain.mymap.repository.UserMapUserAccessRepository;
 import com.gtp.global.exception.CustomException;
-import com.gtp.global.exception.ErrorCode;
+import com.gtp.global.gis.GisErrorCode;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -40,13 +40,13 @@ public class UserMapPermissionService {
 
     public void assertCanView(UserMap map, String userId, List<String> roleCodes) {
         if (!canView(map, userId, roleCodes)) {
-            throw new CustomException(ErrorCode.USER_MAP_FORBIDDEN);
+            throw new CustomException(GisErrorCode.USER_MAP_FORBIDDEN);
         }
     }
 
     public void assertOwner(UserMap map, String userId) {
         if (!map.isOwnedBy(userId)) {
-            throw new CustomException(ErrorCode.USER_MAP_FORBIDDEN);
+            throw new CustomException(GisErrorCode.USER_MAP_FORBIDDEN);
         }
     }
 

@@ -4,13 +4,12 @@ import com.gtp.domain.geotiff.dto.GeoTiffListItem;
 import com.gtp.domain.geotiff.dto.GeoTiffStatusResponse;
 import com.gtp.domain.geotiff.dto.GeoTiffUploadResponse;
 import com.gtp.domain.geotiff.service.GeoTiffService;
+import com.gtp.global.gis.GisUserContext;
 import com.gtp.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -22,6 +21,7 @@ import java.util.List;
 public class GeoTiffController {
 
     private final GeoTiffService geoTiffService;
+    private final GisUserContext gisUserContext;
 
     @PostMapping("/upload")
     public ResponseEntity<ApiResponse<GeoTiffUploadResponse>> upload(
@@ -33,10 +33,7 @@ public class GeoTiffController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<GeoTiffListItem>>> findAll() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        String userId = (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName()))
-                ? auth.getName() : null;
-        return ResponseEntity.ok(ApiResponse.ok(geoTiffService.findAll(userId)));
+        return ResponseEntity.ok(ApiResponse.ok(geoTiffService.findAll(gisUserContext.currentUserId())));
     }
 
     @GetMapping("/{id}/status")

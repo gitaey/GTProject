@@ -5,7 +5,7 @@ import com.gtp.domain.map.dto.LayerGroupResponse;
 import com.gtp.domain.map.entity.LayerGroup;
 import com.gtp.domain.map.repository.LayerGroupRepository;
 import com.gtp.global.exception.CustomException;
-import com.gtp.global.exception.ErrorCode;
+import com.gtp.global.gis.GisErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,6 +56,6 @@ public class LayerGroupService {
 
     public LayerGroup findById(Long id) {
         return layerGroupRepository.findById(id)
-                .orElseThrow(() -> new CustomException(ErrorCode.LAYER_GROUP_NOT_FOUND));
+                .orElseThrow(() -> new CustomException(GisErrorCode.LAYER_GROUP_NOT_FOUND));
     }
 }

@@ -5,7 +5,7 @@ import com.gtp.domain.mymap.entity.UserMap;
 import com.gtp.domain.mymap.repository.UserMapFeatureRepository;
 import com.gtp.domain.mymap.repository.UserMapRepository;
 import com.gtp.global.exception.CustomException;
-import com.gtp.global.exception.ErrorCode;
+import com.gtp.global.gis.GisErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -39,7 +39,7 @@ public class UserMapService {
     @Transactional(readOnly = true)
     public UserMap findById(Long id) {
         return userMapRepository.findById(id)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_MAP_NOT_FOUND));
+                .orElseThrow(() -> new CustomException(GisErrorCode.USER_MAP_NOT_FOUND));
     }
 
     @Transactional(readOnly = true)
@@ -65,7 +65,7 @@ public class UserMapService {
         UserMap map = findById(id);
         permissionService.assertCanView(map, userId, roleCodes);
         if (!"READY".equals(map.getStatus())) {
-            throw new CustomException(ErrorCode.USER_MAP_NOT_READY);
+            throw new CustomException(GisErrorCode.USER_MAP_NOT_READY);
         }
     }
 
