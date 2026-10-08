@@ -96,6 +96,7 @@ public class BotMessageService {
         if (text.startsWith("/분배금 "))      return cmd(room, sender, "/분배금",           text.substring(5).trim(),  () -> handleDistribution(text.substring(5).trim()));
         if (text.startsWith("/로펙 "))        return cmd(room, sender, "/로펙",             text.substring(4).trim(),  () -> handleLopec(text.substring(4).trim()));
         if (text.startsWith("/원정대 "))      return cmd(room, sender, "/원정대",           text.substring(5).trim(),  () -> handleSiblings(text.substring(5).trim()));
+        if (text.startsWith("/가능성 "))      return cmd(room, sender, "/가능성",           text.substring(5).trim(),  () -> handleChance(text.substring(5).trim()));
         if (text.equals("/기빵봇"))           return BotMessageResult.of(buildHelp(room));
         if (text.equals("/오늘파티테스트"))   return cmd(room, sender, "/오늘파티테스트",   "",                        () -> handleTodayPartyTest());
 
@@ -524,6 +525,13 @@ public class BotMessageService {
         return sb.toString().trim();
     }
 
+    /** 재미용: 캐릭터 이름에 대한 0~100% 랜덤 "가능성" (호출할 때마다 새로 뽑는다) */
+    private String handleChance(String name) {
+        if (name.isEmpty()) return "캐릭터 이름을 입력해주세요.\n예) /가능성 캐릭명";
+        int percent = java.util.concurrent.ThreadLocalRandom.current().nextInt(0, 101);
+        return "【 가능성 】\n───────────────\n" + name + "  " + percent + "%";
+    }
+
     private String handleDistribution(String amountStr) {
         long price;
         try { price = Long.parseLong(amountStr.replace(",", "")); }
@@ -706,6 +714,7 @@ public class BotMessageService {
                     """);
         }
         sb.append("───────────────\n◆ 경매\n  /분배금 금액");
+        sb.append("\n───────────────\n◆ 재미\n  /가능성 캐릭명");
         return sb.toString().trim();
     }
 
