@@ -29,6 +29,10 @@ spring:
 
 server:
   port: 8080
+  compression:                # 바람길(수 MB JSON) 등 큰 JSON 응답을 gzip으로 전송. nginx가 그대로 전달한다
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/plain,text/css,application/javascript
+    min-response-size: 2KB
   servlet:
     encoding:
       charset: UTF-8
@@ -74,12 +78,12 @@ geoserver:
     password: ${GEOSERVER_ADMIN_PASSWORD:sis3047!@}
   legend-layer: ${GEOSERVER_LEGEND_LAYER:gtp:tl_scco_ctprvn}
 
-# 바람길 레이어 (기상청 LDAPS 1km 바람 데이터, 6시간마다 갱신)
+# 바람길 레이어 (기상청 LDAPS 국지예보모델 약 1km 격자, 하루 4회 발표 KST 03·09·15·21시 — 매시 30분에 갱신을 시도한다)
 wind:
-  forecast-hours: 6            # leadHour 0~5 (한 사이클당 시간별 프레임 개수)
-  source-stride: 2             # 원본 637x793 격자를 이 간격으로 샘플링
+  forecast-hours: 9            # leadHour 0~8 (발표시각부터 9시간, 사이클당 시간별 프레임 개수 = 사이클이 "완전하다"는 기준)
+  fields: temp,humi            # 바람 외에 받을 스칼라 변수(temp 기온·humi 습도·rain 강수량). 비우면 호출 0 — 기상청 일일 호출 한도를 아끼는 손잡이. rain은 시간당/누적 의미 미확인이라 기본에서 뺌
   output:
-    resolution-deg: 0.02        # 리샘플링 결과 격자 간격(도), 0.02도 ≈ 2.2km
+    resolution-deg: 0.02       # 재격자 결과 격자 간격(도), 0.02도 ≈ 2km (출력 칸마다 원본 격자를 이중선형 보간)
 
 # 기상청 API허브 (LDAPS 국지예보모델)
 kma:

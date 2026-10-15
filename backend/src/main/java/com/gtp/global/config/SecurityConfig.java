@@ -46,7 +46,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/layer-groups").permitAll()
                 .requestMatchers("/api/layer-groups/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/wind/**").permitAll()
-                .requestMatchers("/api/wind/refresh").authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/wind/refresh").hasAnyRole("SUPER_ADMIN", "MAP_ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/bot-log/**").permitAll()
                 .requestMatchers("/api/bot/**").authenticated()
                 .requestMatchers("/api/access-log/**").authenticated()

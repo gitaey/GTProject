@@ -41,6 +41,22 @@ public final class LccProjection {
         this.yo = yo;
     }
 
+    /**
+     * 위경도(도)를 0-based 격자 인덱스(x, y, 소수)로 변환 — {@link #toLonLat}의 역변환. 결과: [x, y].
+     * 격자 범위 밖이어도 값은 나온다(범위 판단은 부르는 쪽이 한다).
+     */
+    public double[] toGrid(double lon, double lat) {
+        double ra = Math.tan(Math.PI * 0.25 + lat * DEGRAD * 0.5);
+        ra = re * sf / Math.pow(ra, sn);
+        double theta = lon * DEGRAD - OLON;
+        if (theta > Math.PI) theta -= 2.0 * Math.PI;
+        if (theta < -Math.PI) theta += 2.0 * Math.PI;
+        theta *= sn;
+        double x = ra * Math.sin(theta) + xo;
+        double y = ro - ra * Math.cos(theta) + yo;
+        return new double[]{x, y};
+    }
+
     /** 0-based 격자 인덱스(x, y)를 위경도(도)로 변환. 결과: [lon, lat] */
     public double[] toLonLat(double x, double y) {
         double xn = x - xo;

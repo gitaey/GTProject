@@ -9,9 +9,9 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * GFS 바람 데이터 한 프레임(특정 유효시각의 U/V 격자 값, grib2json 포맷 JSON).
- * 사이클(cycleDate + cycleHour)마다 forecastHour(0~5) 개수만큼 저장되고,
- * 새 사이클이 들어오면 이전 사이클은 전부 삭제된다(최신 사이클만 유지).
+ * 기상청 LDAPS 바람 데이터 한 프레임(특정 유효시각의 U/V 격자 값, grib2json 포맷 JSON).
+ * 사이클(cycleDate + cycleHour, **KST** 03·09·15·21시 발표)마다 forecastHour(0 ~ wind.forecast-hours-1) 개수만큼 저장되고,
+ * 새 사이클이 모두 모이면 그보다 오래된 사이클은 삭제된다(최신 "완전한" 사이클만 유지).
  */
 @Entity
 @Table(name = "tbl_wind_frame")
@@ -24,13 +24,13 @@ public class WindFrameEntity {
     private Long id;
 
     @Column(name = "cycle_date", nullable = false)
-    private java.time.LocalDate cycleDate;
+    private java.time.LocalDate cycleDate; // 발표 날짜(KST)
 
     @Column(name = "cycle_hour", nullable = false)
-    private int cycleHour;          // 0, 6, 12, 18 (UTC)
+    private int cycleHour;          // 3, 9, 15, 21 (KST 발표 시각)
 
     @Column(name = "forecast_hour", nullable = false)
-    private int forecastHour;       // 0~5
+    private int forecastHour;       // 0 ~ wind.forecast-hours-1 (발표 + N시간)
 
     @Column(name = "valid_time", nullable = false)
     private LocalDateTime validTime; // cycle + forecastHour (UTC)
