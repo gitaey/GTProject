@@ -109,9 +109,10 @@ GTProject 구현은 JWT principal 문자열을 읽는다(`SecurityContextGisUser
 | T5 | DELETE `/api/geotiff/{id}` | **익명(규칙 없음)** | A | 선택: 업로드 |
 | T6 | POST `/api/geotiff/{id}/reprocess-bounds` | **익명(규칙 없음)** | A | 선택: 업로드 |
 | W1 | GET `/api/wind/latest` | 익명 | A | 선택: 바람길 |
-| W2 | GET `/api/wind/frames` | 익명 | - | 미사용 |
-| W3 | GET `/api/wind/frames/{id}` | 익명 | - | 미사용 |
-| W4 | POST `/api/wind/refresh` | 로그인 | - | 운영용(수동 갱신) |
+| W2 | GET `/api/wind/frames` | 익명 | A | 선택: 바람지도 탭(패널) |
+| W3 | GET `/api/wind/frames/{id}` | 익명 | A | 선택: 바람지도 탭(패널) |
+| W5 | GET `/api/wind/fields/{id}` | 익명 | A | 선택: 기온·습도 오버레이 |
+| W4 | POST `/api/wind/refresh` | SUPER_ADMIN·MAP_ADMIN | - | 운영용(수동 갱신) |
 | S1 | `/api/geoserver/**` (13개) | 로그인(`GET /sld/**`만 익명) | M | 관리(지도 화면과 무관, 8절) |
 
 보안 메모(발견만, 고치지 않음 — 설계문서 "발견한 범위 밖 문제"와 같음): T4~T6은 로그인 없이 업로드(최대 2GB)·삭제가 된다.
@@ -134,7 +135,7 @@ L7~L12, G2~G4는 로그인한 아무 사용자나 호출할 수 있다. **이식
 | 선택: 나만의지도 업로드 | U5~U7 | 같음 + 업로드 폴더 | GeoTools·POI 의존성 필요(`egov-jdk11-checklist.md` 4·5절) |
 | 선택: 나만의지도 공유 | U8, U9 | 공유 2개 테이블 | |
 | 선택: 항공영상 | T1~T3 (보기), T4~T6 (업로드) | `geo_tiff_files` | GDAL + titiler 인프라 필요 |
-| 선택: 바람길 | W1 + 스케줄러 | `tbl_wind_frame` | 기상청 API 키(`KMA_API_KEY`) 필요 |
+| 선택: 바람길 | W1~W3·W5 + 스케줄러 | `tbl_wind_frame`, `tbl_wind_scalar` | 기상청 API 키(`KMA_API_KEY`) 필요 |
 | 선택: VWorld 검색·필지·지역명·WFS·범례 | 호스트 프록시 5종(9절) | 없음 | `proxySources()`. 백엔드 API가 아니라 **호스트가 제공하는 프록시** |
 
 ---
@@ -410,46 +411,68 @@ DELETE FROM tbl_user_map                   WHERE id = #{id};
 
 ## 7. 바람 (`domain/wind`)
 
-| # | 요청 | 응답 `data` | SQL 등가물 / 주의 |
+| # | 권한 | 응답 `data` | SQL 등가물 / 주의 |
 |---|---|---|---|
-| W1 GET `/latest` | - | grib2json 배열 `[{header:{…}, data:[…]}, {…}]` (U, V) | 아래 |
-| W2 GET `/frames` | - | `[{ "id", "forecastHour", "validTime" }]` | JPA는 `SELECT * FROM tbl_wind_frame ORDER BY forecast_hour ASC`로 **data_json까지 읽는다** → 매퍼는 `SELECT id, forecast_hour, valid_time …`만 |
-| W3 GET `/frames/{id}` | - | W1과 같은 형식 | `SELECT data_json FROM tbl_wind_frame WHERE id = #{id}` → 없으면 404 `NOT_FOUND` |
-| W4 POST `/refresh` | - | `null` | 스케줄러와 같은 갱신 로직(아래) |
+| W1 GET `/latest` | 익명 | grib2json 배열 `[{header:{…}, data:[…]}, {…}]` (U, V) | `Cache-Control: no-cache` + ETag(고른 프레임 id). 같으면 304이고 `data_json`을 읽지 않는다. 아래 |
+| W2 GET `/frames` | 익명 | `[{ "id", "forecastHour", "validTime", "cycleDate", "cycleHour", "fields" }]` | **최신 "완전한" 사이클 하나**의 메타만(예보시간 오름차순). `fields`는 `{ "temp": 스칼라id, "humi": … }`이고 스칼라가 없으면 `{}`(null 아님) |
+| W3 GET `/frames/{id}` | 익명 | W1과 같은 형식 | `public, max-age=86400, immutable`(프레임 내용은 안 바뀐다). 없으면 404 `NOT_FOUND` |
+| W5 GET `/fields/{id}` | 익명 | 스칼라 한 장 `{header:{lo1,la1,lo2,la2,nx,ny,dx,dy,refTime,forecastTime,var,unit,scale}, data:[정수|null,…]}` | 값 = `data[i] × header.scale`, `null` = 자료 없음. 같은 캐시 헤더. 없으면 404 |
+| W4 POST `/refresh` | **SUPER_ADMIN·MAP_ADMIN만** | `null` | 스케줄러와 같은 갱신 로직(아래). 호출이 겹치면 두 번째는 건너뛴다(ReentrantLock) |
 
-W1 동작(코드 확인: `WindController.java:43-53`, `WindFrameRepository.java:19-26`): 지금(UTC) 이하의 유효시각 중 가장 최근 프레임, 없으면 가장 이른 프레임, 그것도 없으면 404.
+데이터 의미(코드 확인: `WindDataService`, `LdapsRegridder`): 격자는 0.02° ≈ 2km로 다시 나눈 것(출력 칸마다 원본 1km 격자를 이중선형 보간). **원본 격자 밖은 JSON `null`** 이고 프론트는 이를 "자료 없음"으로 본다(0 m/s가 아니다). 바람은 소수 둘째 자리, 스칼라는 정수로 줄여 저장한다(기온 0.1℃, 습도 1%, 강수 0.1mm 단위 → `header.scale`).
+`valid_time`은 UTC `LocalDateTime`이고 `cycle_date`/`cycle_hour`는 **KST**(03·09·15·21시)다.
+
+W1 동작: 지금(UTC) 이하의 유효시각 중 가장 최근 프레임, 없으면 가장 이른 프레임, 그것도 없으면 404. 앱의 바람 패널은 W1이 아니라 W2+W3(+W5)를 쓴다.
 
 ```sql
--- JPA 실제(추론): 후보를 전부 엔티티로 읽는다 = data_json(수 MB) × 최대 6행
-SELECT * FROM tbl_wind_frame WHERE valid_time <= #{nowUtc} ORDER BY valid_time DESC;
--- 비었으면 (findFirstByOrderByValidTimeAsc)
-SELECT * FROM tbl_wind_frame ORDER BY valid_time ASC FETCH FIRST 1 ROWS ONLY;
+-- W2: 최신 완전 사이클 키(예보시간이 서로 다른 프레임이 wind.forecast-hours개 이상), 없으면 가장 늦은 사이클
+SELECT cycle_date, cycle_hour, COUNT(DISTINCT forecast_hour) FROM tbl_wind_frame
+ GROUP BY cycle_date, cycle_hour HAVING COUNT(DISTINCT forecast_hour) >= #{minFrames}
+ ORDER BY cycle_date DESC, cycle_hour DESC LIMIT 1;
+-- 그 사이클의 메타(data_json은 읽지 않는다)
+SELECT id, forecast_hour, valid_time, cycle_date, cycle_hour FROM tbl_wind_frame
+ WHERE cycle_date = #{d} AND cycle_hour = #{h} ORDER BY forecast_hour ASC, id ASC;
+-- 같은 사이클의 스칼라 키 → fields 조립
+SELECT forecast_hour, var_code, id FROM tbl_wind_scalar
+ WHERE cycle_date = #{d} AND cycle_hour = #{h} ORDER BY forecast_hour ASC, id ASC;
 
--- 매퍼 권장: 한 행, 필요한 컬럼만
-SELECT data_json FROM tbl_wind_frame WHERE valid_time <= #{nowUtc} ORDER BY valid_time DESC LIMIT 1;
-SELECT data_json FROM tbl_wind_frame ORDER BY valid_time ASC LIMIT 1;
+-- W3 / W5: 본문 한 장만
+SELECT data_json FROM tbl_wind_frame  WHERE id = #{id};
+SELECT data_json FROM tbl_wind_scalar WHERE id = #{id};
+
+-- W1: 유효시각이 지금 이하인 가장 최근 프레임 id → 그 id의 data_json (id만 먼저 고르고 본문은 한 행)
+SELECT id FROM tbl_wind_frame WHERE valid_time <= #{nowUtc}
+ ORDER BY valid_time DESC, cycle_date DESC, cycle_hour DESC, id DESC LIMIT 1;
+SELECT id FROM tbl_wind_frame ORDER BY valid_time ASC, id DESC LIMIT 1;   -- 비었을 때 대체
 ```
 
-`#{nowUtc}`는 **UTC 기준 LocalDateTime**이어야 한다(`valid_time`이 UTC 값). 컨트롤러는 `data_json`을 `JsonNode`로 파싱해 봉투에 넣는다 —
-이식할 때 문자열을 그대로 `data` 자리에 이어 쓰면 파싱 비용과 메모리를 줄일 수 있다(추론). 로컬에서 이 API가 한 건에 수 MB·수십 초가
-걸려 OOM까지 간 기록이 있다(`.claude/rules/map.md` 함정 절).
+`#{nowUtc}`는 **UTC 기준 LocalDateTime**이어야 한다. 컨트롤러는 본문을 `RawValue`로 봉투에 이어 써서 파싱 비용을 피한다. `server.compression`(gzip)이 켜져 있어 프레임 한 장은 전송 약 2MB, 기온 한 장은 약 50KB다.
+**`SELECT *`로 여러 행을 읽지 않는다** — 프레임 한 행의 `data_json`이 수 MB다(옛 구현은 994행을 한꺼번에 읽어 느렸다).
 
-갱신(스케줄러 `cron 0 30 4,10,16,22 * * *`, `Asia/Seoul` / W4) — 코드 확인: `WindDataService.java:72-133`:
+갱신(스케줄러 `cron 0 30 * * * *`, `Asia/Seoul`, 매시 30분 / W4) — 코드 확인: `WindDataService`:
+
+1. 후보 사이클(최근 8개, 약 48시간 — 발표 후 자료가 올라오기까지 시간이 걸려서 여러 개를 본다)을 최신부터 보며 **데이터가 준비됐는지** 가볍게 확인(leadHour 0, Wspd 한 번)하고, 준비된 사이클의 `leadHour 0 ~ forecast-hours-1`(기본 9) 프레임을 받는다. **이미 있는 프레임은 건너뛰고 빠진 것만 채운다**(`existsBy…ForecastHour`). 다운로드는 트랜잭션 밖에서 하고 프레임마다 저장한다.
+2. 스칼라(`wind.fields`, 기본 `temp,humi`)는 **완전 사이클 판정에 쓰지 않는다**(바람만 본다). 빠진 스칼라는 매시 회차에 그것만 다시 받고, 같은 (사이클, 예보시간, 변수)가 연속 3회 실패하면 서버가 다시 뜰 때까지 그 사이클에서는 포기한다. `wind.fields`를 비우면 호출 0이다.
+3. 정리(`pruneOldCycles`): 완전한 사이클이 생긴 뒤에만, 같은 사이클 안의 중복 행(id 큰 쪽만 남김)과 **그 사이클보다 오래된** 사이클을 지운다(`<` 조건 — `<>`가 아니라서 다른 서버가 방금 저장한 더 새 사이클은 안 지운다). 새 사이클이 완전해지기 전에는 옛 완전 사이클을 지우지 않는다.
 
 ```sql
--- 최근 사이클부터: 이미 저장된 사이클이면 중단 (existsByCycleDateAndCycleHour)
-SELECT 1 FROM tbl_wind_frame WHERE cycle_date = #{cycleDate} AND cycle_hour = #{cycleHour} LIMIT 1;
--- 새 사이클 프레임 저장 (leadHour 0 ~ forecast-hours-1, 실패한 leadHour는 건너뜀)
+-- 이미 저장된 프레임이면 건너뜀
+SELECT 1 FROM tbl_wind_frame WHERE cycle_date = #{d} AND cycle_hour = #{h} AND forecast_hour = #{f} LIMIT 1;
 INSERT INTO tbl_wind_frame (cycle_date, cycle_hour, forecast_hour, valid_time, data_json, created_at)
-VALUES (#{cycleDate}, #{cycleHour}, #{forecastHour}, #{validTimeUtc}, #{dataJson}, now());
--- 그 사이클 외 전부 삭제 (deleteAllExceptCycle, JPQL 벌크)
-DELETE FROM tbl_wind_frame WHERE cycle_date <> #{cycleDate} OR cycle_hour <> #{cycleHour};
+VALUES (#{d}, #{h}, #{f}, #{validTimeUtc}, #{dataJson}, now());
+SELECT 1 FROM tbl_wind_scalar WHERE cycle_date = #{d} AND cycle_hour = #{h} AND forecast_hour = #{f} AND var_code = #{var} LIMIT 1;
+INSERT INTO tbl_wind_scalar (cycle_date, cycle_hour, forecast_hour, var_code, valid_time, data_json, created_at)
+VALUES (#{d}, #{h}, #{f}, #{var}, #{validTimeUtc}, #{dataJson}, now());
+-- 정리(둘 다 같은 기준 사이클 d,h)
+DELETE FROM tbl_wind_frame w USING tbl_wind_frame x
+ WHERE w.cycle_date = #{d} AND w.cycle_hour = #{h} AND x.cycle_date = #{d} AND x.cycle_hour = #{h}
+   AND x.forecast_hour = w.forecast_hour AND w.id < x.id;          -- 중복(MySQL은 다중 테이블 DELETE 문법이 다름)
+DELETE FROM tbl_wind_frame  WHERE cycle_date < #{d} OR (cycle_date = #{d} AND cycle_hour < #{h});
+DELETE FROM tbl_wind_scalar WHERE cycle_date < #{d} OR (cycle_date = #{d} AND cycle_hour < #{h});
 ```
 
-트랜잭션 주의: `refresh()`에 `@Transactional`이 있지만 스케줄러 `scheduledRefresh()`가 **같은 클래스 안에서 직접 호출**해 트랜잭션이 걸리지 않는다
-(`.claude/rules/backend.md` self-invocation 경고). 이때 벌크 DELETE가 트랜잭션 없이 실행되면 실패할 수 있다(추론).
-이식할 때는 갱신 로직을 **별도 빈의 `@Transactional` 메서드**로 두고, 수 MB INSERT 6건을 한 트랜잭션에 넣을지(롤백 가능)
-프레임마다 커밋할지(부분 성공 허용) 정한다.
+동시성 주의: 갱신 메서드 전체에는 `@Transactional`을 걸지 않는다(수 MB INSERT 9건을 한 트랜잭션에 넣지 않는다). 대신 인스턴스 안에서는 `ReentrantLock`으로 겹침을 막고, 정리는 `TransactionTemplate`으로 짧게 묶는다. 서버가 둘 이상이면 (사이클, 예보시간) 유니크 인덱스가 이중 저장을 막고, 서비스는 유니크 위반을 "다른 서버가 먼저 저장함"으로 받아들인다(`ddl.md` 5절).
+이식할 때 갱신 로직은 별도 빈에 두고, 스케줄러 자체 호출(self-invocation)로 `@Transactional`이 안 걸리는 함정(`.claude/rules/backend.md`)을 피한다.
 
 ---
 

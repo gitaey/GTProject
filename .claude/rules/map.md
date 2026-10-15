@@ -102,7 +102,7 @@ React는 `<GisMapProvider host={…}>`(바뀌면 `map.setHost`), UMD는 `GisMap.
 - 수만 건 이상 INSERT는 `saveAll()` 대신 `mymap/util/FeatureBatchInserter`(JdbcTemplate 배치). IDENTITY 채번에서는 `saveAll()`이 배치로 묶이지 않는다.
 - `@Async` 메서드(`GeoTiffProcessor.process`, `UserMapProcessor.processShp`)를 `@Transactional` 안에서 호출하지 않는다 — 커밋 전에 비동기 스레드가 조회해 빈 값을 받는다.
 - GeoTIFF는 GDAL(`gdal_translate`)로 COG 변환 후 titiler로 서빙. 로컬은 `titiler-local.sh`.
-- 바람길은 기상청 LDAPS 데이터(`KMA_API_KEY`)를 6시간마다 가져온다. `grib2json` 의존성은 남아 있지만 쓰지 않는다.
+- 바람길은 기상청 LDAPS 데이터(`KMA_API_KEY`)를 하루 4회 발표(KST 03·09·15·21시)분으로 가져온다. 발표 후 자료가 올라오기까지 시간이 걸려서 **매시 30분**에 갱신을 시도하고, 예보 9시간(`wind.forecast-hours`) 프레임이 다 모인 "완전한 사이클"만 최신으로 보고 더 오래된 사이클을 지운다. 기온·습도 스칼라는 `wind.fields: temp,humi`로 켜고 끈다(비우면 호출 0) — 완전 사이클 판정에는 쓰지 않고, 같은 키가 연속 3회 실패하면 서버를 다시 띄울 때까지 포기한다. `/api/wind/refresh`는 SUPER_ADMIN·MAP_ADMIN만. `grib2json` 의존성은 남아 있지만 쓰지 않는다.
 
 ## 함정 (실제로 겪은 것)
 
@@ -114,8 +114,8 @@ React는 `<GisMapProvider host={…}>`(바뀌면 `map.setHost`), UMD는 `GisMap.
 - **StrictMode 요청 수는 2배가 정상.** 개발 모드에서 패널 마운트 요청은 정확히 2번(TIFF `/api/geotiff` 2, 나만의지도 `/api/mymap` 2,
   진입 `tree/permission/{role}` 2·`user-access` 2), 열어 둔 뒤 증가 0, `/api/wind` 0. 셀 때는 `fetch`를 감싸 **시작 시점**에 센다 —
   `performance.getEntriesByType('resource')`는 취소된 요청을 빼서 1로 보인다.
-- **로컬 개발 서버에서 바람길을 켜지 않는다(검증 목적 포함).** `GET /api/wind/latest`가 원격 운영 DB에서 4.7MB를 읽어 한 건 약 115초,
-  요청이 겹치면 백엔드가 `OutOfMemoryError`로 멈춘다(복구는 재시작). 바람길은 앱 기억에도 넣지 않는다(켠 채 돌아오면 곧바로 재요청).
+- **`GET /api/wind/latest`를 로컬에서 부르지 않는다(검증 목적 포함).** 원격 운영 DB에서 프레임 하나를 읽어 한 건 약 115초,
+  요청이 겹치면 백엔드가 `OutOfMemoryError`로 멈춘다(복구는 재시작). 바람지도 탭(패널)은 `/frames` → `/frames/{id}`(+`/fields/{id}`)를 써서 프레임 한 장만 받으므로 짧게 켜 보는 것은 가능하지만, 로컬 DB가 운영 DB라는 점은 그대로다(`POST /refresh`는 운영 DB를 쓰니 부르지 않는다). 바람길은 앱 기억에도 넣지 않는다(켠 채 돌아오면 곧바로 재요청).
 - **앱 기억(`_gtp/mapSession.ts`) 규칙.** 패키지는 모듈 전역 상태가 없으므로 페이지 이동 간 기억은 앱이 한다: 메모리 `Map`(새로고침하면 처음부터 =
   옛 zustand 수명), 열린 패널·그리기 스타일·켠 도구·반경만, 주인(userId)이 바뀌면 지움, Provider `setup`에서 엔진 공개 API로 되살리고 엔진 스토어 구독은
   `destroy`에서 해제. sessionStorage로 바꾸면 SSR 첫 화면과 어긋난다(하이드레이션).

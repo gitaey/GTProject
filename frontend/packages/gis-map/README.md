@@ -147,6 +147,32 @@ React에서는 `<GisMapProvider host={…}>`가 바뀔 때마다 `map.setHost`�
 
 짝 백엔드 응답 형식이 다르면 해당 소스만 직접 구현해 배열 뒤쪽에 넣는다. 백엔드(Spring·MyBatis)로 옮길 때의 테이블 DDL·쿼리 명세는
 GTProject 저장소의 `.claude/skills/map-module-export/references/`에 있다.
+### 바람지도 (선택)
+
+패널을 쓰려면 플러그인과 패널을 함께 넣는다. 앱 쪽 예: `panels={[...defaultPanels, windPanel]}` (`windPanel`은 `@gtp/gis-map/ui`, 권한 키 `map.tool.wind`).
+
+```tsx
+import { createWindPlugin } from '@gtp/gis-map/core/wind'
+import { MapShell, defaultPanels, windPanel } from '@gtp/gis-map/ui'
+// 입자 단색은 배경지도에 맞춘다(기본: 위성 흰색, 그 외 #334155). 바꾸려면 monoColor에 색 또는 (basemapMode) => 색
+const setup = (map) => { map.use(createWindPlugin({ monoColor: (mode) => (mode === 'satellite' ? '#fff' : '#334155') })) }
+```
+
+`GisMapSources.wind`(`WindSource`) — `latest()`만 필수이고 나머지는 선택이다. 없으면 그 기능이 조용히 꺼진다.
+
+| 메서드 | 하는 일 | 없으면 |
+|---|---|---|
+| `latest()` | 지금 시각에 가장 가까운 프레임 한 장(툴바 바람 켜기) | 바람 기능 없음 |
+| `frames?()` | 발표 하나의 시간별 프레임 목록 `[{id, forecastHour, validTime, cycleDate, cycleHour, fields}]` | 패널의 예보시각·재생이 꺼지고 툴바만 동작 |
+| `frame?(id)` | 목록의 프레임 한 장 | 위와 같음 |
+| `field?(id)` | 스칼라 변수 한 장(기온·습도·강수량, `fields[변수]`의 id) | 색상 오버레이 선택지에 풍속만 나온다 |
+
+플러그인(`useWindPlugin()`)에서 쓰는 주요 API: `loadFrames()`·`reloadFrames()`·`setFrame(index)`·`play()`/`pause()`·`setParticlesVisible(on)`·
+`setOverlay(on)`·`setOverlayVar('none' | 'speed' | 'temp' | 'humi' | 'rain')`·`setOverlayOpacity(0~1)`·`refreshStale()`(자료 오래됨 다시 계산)·
+`valueAt(lon, lat)`·`watchPointerValues(listener)`(마우스 지점의 풍속·풍향과 선택 변수 값). 상태는 `useWindState()`(`overlayVar`·`scalarSupported`·`scalarVars`·
+`stale`·`notice`·`overlayNote` 등), 마우스 값은 `useWindPointerValues()`. 스칼라는 오버레이에서 그 변수를 고를 때만 받고(요청 0 → 고르면 한 장),
+시간을 옮기면 바람 프레임과 같이 받아 같이 바꾼다. 짝 백엔드의 응답 규칙(`null` = 자료 없음, `fields`가 비면 선택지 없음)은 `references/query-spec.md` 7절.
+
 
 ## 빌드 (GTProject `frontend/`에서)
 
