@@ -7,7 +7,7 @@ export const REQUIRED_OL_API: readonly string[] = Object.freeze([
     // 클래스
     'Map', 'Feature', 'Overlay',
     'layer.Tile', 'layer.Vector', 'layer.Image',
-    'source.Vector', 'source.XYZ', 'source.ImageWMS',
+    'source.Vector', 'source.XYZ', 'source.ImageWMS', 'source.ImageStatic',
     'format.GeoJSON',
     'interaction.Draw', 'interaction.Modify', 'interaction.Select',
     'geom.Point', 'geom.LineString', 'geom.Polygon',

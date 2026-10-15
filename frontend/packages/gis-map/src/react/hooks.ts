@@ -7,7 +7,7 @@ import {
 } from '../core'
 import type {
     GeoTiffCatalog, GisFeatureId, GisMap, GisMapHost, LayerTreeState, MyMapCatalog, RasterOverlayState, ReadableStore,
-    RegionState, VectorOverlayState, WindState,
+    RegionState, VectorOverlayState, WindPointerValues, WindSample, WindState,
 } from '../core'
 import type { WindPlugin } from '../core/wind'
 import { GisMapContext } from './context'
@@ -120,4 +120,40 @@ export function useWindPlugin(): WindPlugin | null {
 export function useWindState<S>(selector: (s: WindState) => S): S {
     const wind = useWindPlugin()
     return useStoreValue(wind?.store, selector, selector(EMPTY_WIND_STATE))
+}
+
+/**
+ * 마우스 아래의 바람(지도 pointermove, ~100ms 간격). active가 true인 동안에만 플러그인 watchPointer를 구독하고, false가 되거나 언마운트되면 해제한다.
+ * 지도 밖·격자 밖·꺼짐이면 null. 반환값은 구독이 준 객체 그대로(렌더마다 새로 만들지 않는다)
+ */
+export function useWindPointerSample(active: boolean): WindSample | null {
+    const wind = useWindPlugin()
+    const [sample, setSample] = useState<WindSample | null>(null)
+    useEffect(() => {
+        if (!wind || !active) return
+        const off = wind.watchPointer(setSample)
+        return () => {
+            off()
+            setSample(null)
+        }
+    }, [wind, active])
+    return active ? sample : null
+}
+
+/**
+ * 마우스 아래의 바람과 고른 스칼라 변수 값(기온·습도·강수량)을 함께. useWindPointerSample과 같은 규칙(active인 동안만 구독, 지도 밖이면 null).
+ * 스칼라 변수를 안 골랐으면 scalar는 null
+ */
+export function useWindPointerValues(active: boolean): WindPointerValues | null {
+    const wind = useWindPlugin()
+    const [values, setValues] = useState<WindPointerValues | null>(null)
+    useEffect(() => {
+        if (!wind || !active) return
+        const off = wind.watchPointerValues(setValues)
+        return () => {
+            off()
+            setValues(null)
+        }
+    }, [wind, active])
+    return active ? values : null
 }

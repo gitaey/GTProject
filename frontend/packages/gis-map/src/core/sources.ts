@@ -9,7 +9,7 @@ import type {
     ExcelConfirmInput, ExcelPreviewResponse, ShpUploadInput, UserMapListItem, UserMapShare, UserMapStatus,
 } from './types/mymap'
 import type { AddressSearchItem, VWorldLegendItem } from './types/search'
-import type { WindField } from './types/wind'
+import type { WindField, WindFrameMeta, WindScalarField } from './types/wind'
 
 export interface LayerUserSelectionSource {
     /** 선택 가능한 전체 범위(권한 트리) */
@@ -51,8 +51,14 @@ export interface GeoTiffSource {
 }
 
 export interface WindSource {
-    /** 데이터가 아직 없으면 null */
+    /** 지금 시각의 프레임 하나. 데이터가 아직 없으면 null */
     latest(): Promise<WindField | null>
+    /** 최신 발표(사이클)의 예보 프레임 목록(바람지도 패널용). 없으면 패널이 시간 조작 없이 latest()만 쓴다 */
+    frames?(): Promise<WindFrameMeta[]>
+    /** 프레임 하나의 바람장. 없으면 null */
+    frame?(id: number): Promise<WindField | null>
+    /** 스칼라 변수 한 장(기온·습도·강수량 — 프레임 메타의 fields[변수] id). 없으면 색상 오버레이 선택지에 풍속만 나온다. 없는 id는 null */
+    field?(fieldId: number): Promise<WindScalarField | null>
 }
 
 export interface AddressSearchSource {

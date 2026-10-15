@@ -7,6 +7,7 @@ export type { GisMapViewProps } from './GisMapView'
 export {
     useGisMap, useStoreValue, useGisHost, useFeatureAllowed, useLayerTreeState,
     useRasterOverlayState, useVectorOverlayState, useGeoTiffCatalog, useMyMapCatalog, useRegionState, useWindPlugin, useWindState,
+    useWindPointerSample, useWindPointerValues,
 } from './hooks'
 export { usePersistentExpanded, browserExpandedStorage } from './usePersistentExpanded'
 export type { PersistentExpanded } from './usePersistentExpanded'

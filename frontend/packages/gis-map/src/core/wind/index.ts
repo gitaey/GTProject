@@ -14,6 +14,9 @@ export {
 } from './WindPlugin'
 export type { WindPlugin, WindPluginOptions } from './WindPlugin'
 export { EMPTY_WIND_STATE } from '../types/wind'
-export type { WindState } from '../types/wind'
+export type {
+    WindState, WindFrameMeta, WindSample, WindFramesStatus, WindStaleKind,
+    WindScalarVar, WindOverlayVar, WindScalarField, WindScalarSample, WindPointerValues,
+} from '../types/wind'
 export { WIND_COLOR_STOPS, windSpeedColor } from '../lib/windColorScale'
 export type { WindColorStop } from '../lib/windColorScale'

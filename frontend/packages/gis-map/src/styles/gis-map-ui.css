@@ -2009,6 +2009,340 @@
     color: #9ca3af;
 }
 
+/* ── 바람지도 패널 (ui/panels/WindPanel) — 머리줄은 gm-panel__header·gm-panel__title, 슬라이더는 레이어 투명도 슬라이더(gm-layer-tree__opacity*)를 그대로 쓴다.
+   값은 TIFF·나만의지도 패널(gm-panel__item 등)과 같은 글꼴 크기·색(#f3f4f6 구분선, #94a3b8 이름표, 브랜드색 var(--gm-primary)). 패널 폭은 .gm-side-panel(256px)이 정한다 ── */
+.gm-wind-panel__body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 8px;
+}
+
+.gm-wind-panel__section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.gm-wind-panel__label {
+    font-size: 10.5px;
+    color: #64748b;
+}
+
+.gm-wind-panel__issue {
+    font-size: 12px;
+    color: #374151;
+    font-variant-numeric: tabular-nums;
+}
+
+.gm-wind-panel__time {
+    font-size: 13px;
+    font-weight: 700;
+    color: #111827;
+    font-variant-numeric: tabular-nums;
+}
+
+.gm-wind-panel__transport {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.gm-wind-panel__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #fff;
+    color: #475569;
+    cursor: pointer;
+}
+
+.gm-wind-panel__btn--play {
+    width: 40px;
+}
+
+.gm-wind-panel__btn.gm-is-active {
+    border-color: var(--gm-primary);
+    background: rgba(var(--gm-primary-rgb), .08);
+    color: var(--gm-primary);
+}
+
+.gm-wind-panel__btn:disabled {
+    opacity: .4;
+    cursor: default;
+}
+
+/* 슬라이더: 레이어 투명도 슬라이더 클래스가 flex: 1(가로 줄용)이라 세로 쌓임에서는 늘어나지 않게 한다 */
+.gm-wind-panel__range {
+    flex: none;
+    width: 100%;
+    margin-top: 2px;
+}
+
+/* 눈금 글자: 위치(left)만 인라인 — 슬라이더 막대 길이(손잡이 반폭 7px을 뺀 안쪽)에 비례 */
+.gm-wind-panel__marks {
+    position: relative;
+    height: 14px;
+}
+
+.gm-wind-panel__mark {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: #64748b;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 한 줄(이름표 + 슬라이더 + 값) 슬라이더의 눈금: 이름표 78px + 간격 6px, 값 36px + 간격 6px 만큼 안쪽 */
+.gm-wind-panel__marks--inset {
+    margin-left: 84px;
+    margin-right: 42px;
+}
+
+.gm-wind-panel__ctrl-label {
+    width: 78px;
+    min-width: 78px;
+}
+
+.gm-wind-panel__value-text {
+    width: 36px;
+}
+
+.gm-wind-panel__check {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11.5px;
+    color: #374151;
+    cursor: pointer;
+}
+
+.gm-wind-panel__check-input {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+    accent-color: var(--gm-primary);
+    cursor: pointer;
+}
+
+.gm-wind-panel__legend-bar {
+    height: 8px;
+    border-radius: var(--gm-radius-full);
+}
+
+.gm-wind-panel__legend-ticks {
+    display: flex;
+    justify-content: space-between;
+}
+
+.gm-wind-panel__legend-tick {
+    font-size: 10px;
+    color: #64748b;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 스칼라 변수 범례 눈금 — 값 위치(로그 막대 포함)에 맞춰 놓는다. 첫 눈금은 왼쪽 끝, 마지막은 오른쪽 끝에 붙인다 */
+.gm-wind-panel__legend-ticks--pos {
+    position: relative;
+    display: block;
+    height: 13px;
+}
+
+.gm-wind-panel__legend-tick--pos {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    white-space: nowrap;
+}
+
+.gm-wind-panel__legend-tick--pos:first-child {
+    transform: none;
+}
+
+.gm-wind-panel__legend-tick--pos:last-child {
+    transform: translateX(-100%);
+}
+
+.gm-wind-panel__readout {
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 6px 8px;
+    border: 1px solid #f3f4f6;
+    border-radius: 6px;
+    background: #f9fafb;
+    font-size: 11.5px;
+    line-height: 1.4;
+    color: #6b7280;
+}
+
+/* 마우스 값 두 줄(바람 + 고른 스칼라 변수) — 스칼라를 고른 동안은 한 줄일 때도 두 줄 높이로 고정해 마우스가 지도를 드나들 때 아래가 출렁이지 않게 한다 */
+.gm-wind-panel__readout--multi {
+    min-height: 50px;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
+}
+
+.gm-wind-panel__readout.gm-is-active {
+    background: rgba(var(--gm-primary-rgb), .04);
+    color: #111827;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.gm-wind-panel__toggle {
+    width: 100%;
+    height: 32px;
+    border: 1px solid var(--gm-primary);
+    border-radius: 6px;
+    background: var(--gm-primary);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.gm-wind-panel__toggle.gm-is-on {
+    background: #fff;
+    color: var(--gm-primary);
+}
+
+.gm-wind-panel__note {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #6b7280;
+}
+
+.gm-wind-panel__note--error {
+    color: #ef4444;
+}
+
+.gm-wind-panel__link {
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 11px;
+    color: var(--gm-primary);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.gm-wind-panel__notice {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+}
+
+.gm-wind-panel__notice-line {
+    padding-left: 1em;
+    text-indent: -1em;
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: #6b7280;
+}
+
+.gm-wind-panel__notice-line::before {
+    content: '※ ';
+}
+
+/* 경고 배너(자료 오래됨) — 머리줄 바로 아래, 옅은 주황 바탕 */
+.gm-wind-panel__alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #fed7aa;
+    background: #fff7ed;
+    color: #9a3412;
+}
+
+.gm-wind-panel__alert-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.gm-wind-panel__alert-body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.gm-wind-panel__alert-title {
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+.gm-wind-panel__alert-text {
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.gm-wind-panel__alert .gm-wind-panel__link {
+    align-self: flex-start;
+    color: #9a3412;
+    font-weight: 600;
+}
+
+/* 안내(오류 아님) */
+.gm-wind-panel__note--info {
+    color: #475569;
+}
+
+/* 꺼진 항목(입자를 숨기면 풍속 색 체크, 오버레이가 없으면 진하기) */
+.gm-wind-panel__check.gm-is-disabled,
+.gm-layer-tree__opacity.gm-is-disabled {
+    opacity: .45;
+}
+
+.gm-wind-panel__check.gm-is-disabled,
+.gm-wind-panel__check.gm-is-disabled .gm-wind-panel__check-input {
+    cursor: default;
+}
+
+.gm-wind-panel__select {
+    flex: 1;
+    min-width: 0;
+    height: 24px;
+    padding: 0 6px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 11.5px;
+    color: #374151;
+    cursor: pointer;
+}
+
+@media (hover: hover) {
+    .gm-wind-panel__btn:not(:disabled):hover {
+        background-color: #f1f5f9;
+    }
+
+    .gm-wind-panel__toggle:hover {
+        background-color: var(--gm-primary-hover);
+    }
+
+    .gm-wind-panel__toggle.gm-is-on:hover {
+        background-color: rgba(var(--gm-primary-rgb), .06);
+    }
+}
+
 /* ── 색 섞기(color-mix)를 아는 브라우저: 옛 Tailwind의 불투명도 색과 같은 식 (FE-5b-1 위젯) ── */
 @supports (color: color-mix(in lab, red, red)) {
     .gm-region-badge__pill {

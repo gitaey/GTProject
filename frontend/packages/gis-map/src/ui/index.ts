@@ -19,6 +19,8 @@ export { default as MapRoot } from './shell/MapRoot'
 export type { MapRootProps } from './shell/MapRoot'
 export { primaryThemeVars } from './shell/themeVars'
 export { defaultPanels, layerPanel, imagePanel, myMapPanel } from './panels/defaultPanels'
+// 옵션 패널: defaultPanels에는 없다 — 바람길 플러그인(map.use(createWindPlugin()))을 설치한 호스트만 panels에 더한다
+export { windPanel } from './panels/optionalPanels'
 
 // 개별 위젯
 export { default as MapHeader, DEFAULT_MAP_BRAND } from './shell/MapHeader'
@@ -29,6 +31,7 @@ export { default as MapToolbar } from './toolbar/MapToolbar'
 export { default as LayerPanel } from './layer/LayerPanel'
 export { default as ImagePanel } from './panels/ImagePanel'
 export { default as MyMapPanel } from './panels/MyMapPanel'
+export { default as WindPanel } from './panels/WindPanel'
 export { default as MapStatusBar, DEFAULT_STATUS_BAR_PROJECTION } from './statusbar/MapStatusBar'
 export type { MapStatusBarProps } from './statusbar/MapStatusBar'
 export { default as RegionBadge } from './overlay/RegionBadge'

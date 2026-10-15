@@ -8,7 +8,7 @@ import { createWindPlugin } from '@gtp/gis-map/core/wind'
 import { browserExpandedStorage } from '@gtp/gis-map/react'
 import { restSources } from '@gtp/gis-map/adapters/rest'
 import { proxySources } from '@gtp/gis-map/adapters/proxy'
-import { defaultPanels } from '@gtp/gis-map/ui'
+import { defaultPanels, windPanel } from '@gtp/gis-map/ui'
 import type { MapPanelDef, MapShellBrand } from '@gtp/gis-map/ui'
 import { useAuthStore } from '@/stores/authStore'
 import { useMenuStore } from '@/stores/menuStore'
@@ -38,8 +38,8 @@ const ETC_PANEL: Readonly<MapPanelDef> = Object.freeze({
     id: 'etc', label: '기타', icon: MoreHorizontal, featureId: 'map.panel.etc', render: () => <EtcPanel />,
 })
 
-/** 네비 패널: 패키지 기본 3개(레이어·TIFF·나만의지도) + 기타 */
-export const GTP_PANELS: readonly MapPanelDef[] = Object.freeze([...defaultPanels, ETC_PANEL])
+/** 네비 패널: 패키지 기본 3개(레이어·TIFF·나만의지도) + 바람지도(바람길 플러그인을 setupGtpMap에서 설치하므로) + 기타 */
+export const GTP_PANELS: readonly MapPanelDef[] = Object.freeze([...defaultPanels, windPanel, ETC_PANEL])
 
 /**
  * 기억(mapSession)의 주인 = 지금 로그인한 사용자 id(로그인 전이면 '').
