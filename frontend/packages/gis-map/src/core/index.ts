@@ -95,7 +95,7 @@ export type {
 export { sampleWind, readWindGrid, windVectorToSample, windDirectionName, formatWindSample, readScalarGrid, sampleGrid } from './lib/windGrid'
 export type { WindGridInfo, ScalarGridInfo } from './lib/windGrid'
 export { buildWindOverlayImage } from './lib/windOverlayImage'
-export { buildGridOverlayImage, buildScalarOverlayImage } from './lib/gridOverlayImage'
+export { buildGridOverlayImage, buildScalarOverlayImage, buildFlatOverlayImage, gridImageExtent } from './lib/gridOverlayImage'
 export type { OverlayGridGeom } from './lib/gridOverlayImage'
 export {
     WX_COLOR_SCALES, WX_SCALAR_VARS, isWindScalarVar, wxScalePosition, wxScaleIndex, wxScaleColorAt, wxScalePalette, wxScaleGradientStops,
@@ -106,6 +106,7 @@ export { compactWindField, expandWindField } from './lib/windCompact'
 export type { CompactWindField } from './lib/windCompact'
 export type { WindOverlayImage } from './lib/windOverlayImage'
 export { encodeIndexedPng, bytesToDataUrl } from './lib/pngIndexed'
+export { cssColorLuminance } from './lib/cssColor'
 export {
     normalizeWindFrames, parseUtcTime, kstParts, KST_OFFSET_HOURS, formatForecastTime, formatForecastHourShort, formatIssueTime,
     frameValidMs, currentFrameIndex, windStaleKind, formatForecastRange, windScalarVarsOf,
@@ -115,5 +116,6 @@ export {
     WIND_FRAME_INTERVAL_MS, WIND_FRAME_CACHE_MIN, WIND_DENSITY_MIN, WIND_DENSITY_MAX, WIND_SPEED_MIN, WIND_SPEED_MAX, WIND_SCALE_STEP,
     WIND_MONO_COLOR_LIGHT, WIND_MONO_COLOR_DARK, WIND_POINTER_THROTTLE_MS, WIND_FRAMES_TTL_MS, WIND_STALE_CHECK_MS, WIND_STALE_PAST_MS, WIND_STALE_ISSUED_MS,
     WIND_OVERLAY_OPACITY_MIN, WIND_OVERLAY_OPACITY_MAX, WIND_OVERLAY_OPACITY_DEFAULT, WIND_OVERLAY_OPACITY_STEP, WIND_LEGEND_MAX_SPEED,
+    WIND_VEIL_COLOR_DARK, WIND_VEIL_ALPHA_DARK, WIND_VEIL_COLOR_LIGHT, WIND_VEIL_ALPHA_LIGHT, WIND_PARTICLE_BRIGHT_LUMINANCE,
 } from './lib/windLimits'
 export type { GisFeatureId } from './types/feature'

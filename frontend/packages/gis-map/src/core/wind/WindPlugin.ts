@@ -26,7 +26,9 @@ import type { WindSource } from '../sources'
 import { createStore } from '../store'
 import type { ReadableStore, WritableStore } from '../store'
 import { windSpeedColor } from '../lib/windColorScale'
-import { readScalarGrid, sampleGrid, sampleWind } from '../lib/windGrid'
+import { readScalarGrid, readWindGrid, sampleGrid, sampleWind } from '../lib/windGrid'
+import { buildFlatOverlayImage, gridImageExtent } from '../lib/gridOverlayImage'
+import { cssColorLuminance } from '../lib/cssColor'
 import type { ScalarGridInfo } from '../lib/windGrid'
 import { WX_COLOR_SCALES, isWindScalarVar } from '../lib/wxColorScales'
 import { compactWindField, expandWindField } from '../lib/windCompact'
@@ -34,7 +36,7 @@ import type { CompactWindField } from '../lib/windCompact'
 import {
     WIND_DENSITY_MAX, WIND_DENSITY_MIN, WIND_FRAME_CACHE_MIN, WIND_FRAME_INTERVAL_MS, WIND_FRAMES_TTL_MS, WIND_MONO_COLOR_DARK,
     WIND_MONO_COLOR_LIGHT, WIND_OVERLAY_OPACITY_DEFAULT, WIND_OVERLAY_OPACITY_MAX, WIND_OVERLAY_OPACITY_MIN, WIND_POINTER_THROTTLE_MS,
-    WIND_SPEED_MAX, WIND_SPEED_MIN,
+    WIND_SPEED_MAX, WIND_SPEED_MIN, WIND_VEIL_ALPHA_DARK, WIND_VEIL_ALPHA_LIGHT, WIND_VEIL_COLOR_DARK, WIND_VEIL_COLOR_LIGHT, WIND_PARTICLE_BRIGHT_LUMINANCE,
 } from '../lib/windLimits'
 import { currentFrameIndex, normalizeWindFrames, windScalarVarsOf, windStaleKind } from '../lib/windFrames'
 import type { BasemapMode } from '../types/layer'
@@ -76,6 +78,8 @@ function pathsForResolution(resolution: number, minResolution: number, maxResolu
 
 /** 레이어 z: 배경지도(0) < 오버레이 < 입자. 둘 다 GeoTIFF(5)·레이어 트리(10)보다 아래(옛 입자 레이어도 0이라 그 아래였다) */
 const OVERLAY_Z_INDEX = 0.5
+/** 바탕 깔기 레이어: 배경지도(0)보다 위, 입자 바로 아래(오버레이와는 동시에 보이지 않는다) */
+const VEIL_Z_INDEX = 0.25
 const PARTICLE_Z_INDEX = 1
 
 type WindColorScaleOption = NonNullable<Parameters<InstanceType<typeof WindLayer>['setWindOptions']>[0]>['colorScale']
@@ -91,6 +95,8 @@ export interface WindPlugin extends GisMapPlugin {
     toggle(): void
     /** 지금 지도에 붙어 있는 바람 입자 레이어(입자를 숨겼거나 꺼져 있으면 null) */
     getOlLayer(): InstanceType<typeof WindLayer> | null
+    /** 지금 지도에 붙어 있는 바탕 깔기 레이어(안 보일 때 null) */
+    getVeilLayer(): ReturnType<typeof createWindOverlay>['layer'] | null
     /** 지금 지도에 붙어 있는 색상 오버레이 레이어(꺼져 있으면 null) */
     getOverlayLayer(): ReturnType<typeof createWindOverlay>['layer'] | null
 
@@ -126,6 +132,11 @@ export interface WindPlugin extends GisMapPlugin {
     setColorBySpeed(colorBySpeed: boolean): void
     /** 바람 입자만 보이기/숨기기 — 데이터·오버레이·재생은 그대로(켜져 있을 때 적용). 숨기면 입자 레이어를 떼어 CPU를 쓰지 않는다 */
     setParticlesVisible(visible: boolean): void
+    /**
+     * 바탕 깔기 켜기/끄기 — 색상 오버레이가 없음일 때 바람 자료 영역에 반투명 단색 바탕을 입자 아래에 깐다(위성 = 어두움, 그 밖 = 밝음, 배경지도를 바꾸면 따라 바뀜).
+     * 바람이 꺼져 있거나 입자 표출을 껐거나 오버레이가 있으면 보이지 않는다(입자가 없으면 바탕도 필요 없고, 오버레이가 바탕 역할을 한다). 자료 요청 0
+     */
+    setBaseVeil(on: boolean): void
     /** 풍속 색상 오버레이 켜기/끄기(켜져 있을 때 적용) — 입자와 같은 데이터. 켜면 풍속(이미 다른 값이 골라져 있으면 그대로), 끄면 없음 */
     setOverlay(on: boolean): void
     /**
@@ -174,6 +185,9 @@ interface WindSession {
     layer: InstanceType<typeof WindLayer> | null
     /** 색상 오버레이(꺼져 있으면 null) */
     overlay: WindOverlay | null
+    /** 바탕 깔기 레이어(안 보일 때 null)와 지금 올린 이미지의 키(배경지도 모드 + 범위) — 같으면 이미지를 다시 만들지 않는다 */
+    veil: WindOverlay | null
+    veilKey: string | null
     unsubscribeResolution: (() => void) | null
     /** 데이터 요청 번호 — 가장 나중 요청의 결과만 쓴다 */
     requestId: number
@@ -281,7 +295,7 @@ class WindPluginImpl implements WindPlugin {
             densityScale: 1, speedScale: 1, colorBySpeed: true,
             particlesVisible: true, overlayVisible: false, overlayOpacity: WIND_OVERLAY_OPACITY_DEFAULT,
             framesLoadedAt: null, stale: null, notice: null,
-            overlayVar: 'none', scalarSupported: false, scalarVars: [], overlayNote: null,
+            overlayVar: 'none', scalarSupported: false, scalarVars: [], overlayNote: null, baseVeil: true,
         })
         this.store = this.state
     }
@@ -297,6 +311,8 @@ class WindPluginImpl implements WindPlugin {
             this.basemapMode = s.basemapMode
             // 단색 입자는 배경지도가 바뀌면 바로 색을 바꾼다
             if (!this.state.getState().colorBySpeed) this.session?.layer?.setWindOptions({ colorScale: this.colorScale() })
+            // 바탕 깔기는 입자 색에 맞춘다 — 단색 입자의 색이 배경지도마다 다르므로 배경지도가 바뀌면 다시 정한다
+            if (this.session) this.renderVeil(this.session)
         })
     }
 
@@ -321,6 +337,10 @@ class WindPluginImpl implements WindPlugin {
 
     getOverlayLayer(): ReturnType<typeof createWindOverlay>['layer'] | null {
         return this.session?.overlay?.layer ?? null
+    }
+
+    getVeilLayer(): ReturnType<typeof createWindOverlay>['layer'] | null {
+        return this.session?.veil?.layer ?? null
     }
 
     destroy(): void {
@@ -777,6 +797,18 @@ class WindPluginImpl implements WindPlugin {
         if (this.destroyed) return
         this.state.setState({ colorBySpeed: !!colorBySpeed })
         this.session?.layer?.setWindOptions({ colorScale: this.colorScale() })
+        // 입자 색이 바뀌면 바탕 색도 거기에 맞춘다
+        if (this.session && this.session.field) this.renderVeil(this.session)
+    }
+
+    /**
+     * 입자가 밝은 색인가 — 풍속 색 입자(저속 파랑~고속 빨강, 중간 밝기)와 밝은 단색(위성의 흰색)은 어두운 바탕 위에서, 어두운 단색(#334155)은 밝은 바탕 위에서 잘 보인다.
+     * 단색의 밝기는 실제로 쓰는 단색(monoColor 옵션 포함)의 상대 휘도로 판단한다. 못 읽는 색 이름이면 위성 배경일 때만 밝다고 본다
+     */
+    private brightParticles(): boolean {
+        if (this.state.getState().colorBySpeed) return true
+        const lum = cssColorLuminance(this.monoColor())
+        return lum === null ? this.basemapMode === 'satellite' : lum >= WIND_PARTICLE_BRIGHT_LUMINANCE
     }
 
     setParticlesVisible(visible: boolean): void {
@@ -784,6 +816,13 @@ class WindPluginImpl implements WindPlugin {
         this.state.setState({ particlesVisible: !!visible })
         const s = this.session
         if (s && s.field) this.renderLayers(s)
+    }
+
+    setBaseVeil(on: boolean): void {
+        if (this.destroyed) return
+        this.state.setState({ baseVeil: !!on })
+        const s = this.session
+        if (s && s.field) this.renderVeil(s)
     }
 
     setOverlay(on: boolean): void {
@@ -811,6 +850,7 @@ class WindPluginImpl implements WindPlugin {
         this.notifyData() // 마우스 값 칸이 옛 변수 값을 붙들고 있지 않게(새 값이 올 때까지 '자료 없음')
         if (!s || !s.field) return
         this.renderOverlay(s)
+        this.renderVeil(s)
         if (isWindScalarVar(v)) this.syncScalar(s)
     }
 
@@ -953,7 +993,7 @@ class WindPluginImpl implements WindPlugin {
         if (!map || !source) return
         const session: WindSession = {
             cancelled: false, layer: null, overlay: null, unsubscribeResolution: null,
-            requestId: 0, field: null, shownFrameId: null, shownValid: null, shownList: null, busy: false, scalar: null, scalarToken: 0, scalarRecoveredKey: null, view: null, minResolution: 0, maxResolution: 0,
+            veil: null, veilKey: null, requestId: 0, field: null, shownFrameId: null, shownValid: null, shownList: null, busy: false, scalar: null, scalarToken: 0, scalarRecoveredKey: null, view: null, minResolution: 0, maxResolution: 0,
         }
         this.session = session
         const frameSource = typeof source.frame === 'function' ? source : null
@@ -1112,6 +1152,45 @@ class WindPluginImpl implements WindPlugin {
             this.removeParticleLayer(session)
         }
         this.renderOverlay(session)
+        this.renderVeil(session)
+    }
+
+    /** 바탕 깔기를 보일 조건이면 입자 바로 아래에 만들고·색을 맞추고, 아니면 뗀다. 자료 요청은 없다(이미 받은 바람 격자의 범위만 읽는다) */
+    private renderVeil(session: WindSession): void {
+        const map = this.map
+        const data = session.field
+        if (!map || !data) return
+        const st = this.state.getState()
+        const grid = st.baseVeil && st.particlesVisible && st.overlayVar === 'none' ? readWindGrid(data) : null
+        if (!grid) {
+            this.removeVeil(session)
+            return
+        }
+        const dark = this.brightParticles()
+        const key = (dark ? 'dark' : 'light') + ':' + gridImageExtent(grid).join(',')
+        try {
+            if (!session.veil) {
+                session.veil = createWindOverlay({ opacity: 1, zIndex: VEIL_Z_INDEX })
+                map.olMap.addLayer(session.veil.layer)
+                session.veilKey = null
+            }
+            if (session.veilKey !== key) {
+                session.veil.setImage(buildFlatOverlayImage(grid,
+                    dark ? WIND_VEIL_COLOR_DARK : WIND_VEIL_COLOR_LIGHT, dark ? WIND_VEIL_ALPHA_DARK : WIND_VEIL_ALPHA_LIGHT))
+                session.veilKey = key
+            }
+        } catch {
+            // 바탕은 보조 장식이다 — 이미지를 못 만들어도(이미지 API 없는 환경 등) 바람 그리기·재생·값 표시를 막지 않는다
+            try { this.removeVeil(session) } catch { session.veil = null; session.veilKey = null }
+        }
+    }
+
+    private removeVeil(session: WindSession): void {
+        if (!session.veil) return
+        this.map?.olMap.removeLayer(session.veil.layer)
+        session.veil.destroy()
+        session.veil = null
+        session.veilKey = null
     }
 
     /** 색상 오버레이를 고른 값(overlayVar)에 맞게 만들고·바꾸고·뗀다. 스칼라는 그 프레임 것을 받았을 때만 칠하고 아니면 비운다(옛 시각 그림이 남지 않게) */
@@ -1206,6 +1285,7 @@ class WindPluginImpl implements WindPlugin {
         session.cancelled = true
         this.removeParticleLayer(session)
         this.removeOverlay(session)
+        this.removeVeil(session)
         session.field = null
         this.clearCache()
         if (!this.destroyed) {

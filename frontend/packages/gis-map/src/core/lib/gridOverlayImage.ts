@@ -27,6 +27,28 @@ export interface OverlayGridGeom {
     northFirst: boolean
 }
 
+/** 격자 가장자리 기준 EPSG:4326 범위 [서, 남, 동, 북] — 격자점이 칸의 가운데이므로 가장자리에서 반 칸씩 넓힌다 */
+export function gridImageExtent(geom: OverlayGridGeom): [number, number, number, number] {
+    const { lo1, la1, dx, dy, nx, ny, northFirst } = geom
+    const west = lo1 - dx / 2
+    const east = lo1 + (nx - 1) * dx + dx / 2
+    const north = (northFirst ? la1 : la1 + (ny - 1) * dy) + dy / 2
+    const south = (northFirst ? la1 - (ny - 1) * dy : la1) - dy / 2
+    return [west, south, east, north]
+}
+
+/**
+ * 격자 범위 전체를 한 가지 색(알파 0~1)으로 덮는 1x1 이미지 — 바탕 깔기용. 자료 없는 칸도 덮는다(격자의 사각 범위).
+ * rgb는 '#rrggbb'. 팔레트 PNG 인코더를 그대로 써서 새 ol API 없이 ImageStatic으로 올린다
+ */
+export function buildFlatOverlayImage(geom: OverlayGridGeom, color: string, alpha: number): WindOverlayImage {
+    const m = /^#([0-9a-f]{6})$/i.exec(color)
+    const rgb = m ? [parseInt(m[1].slice(0, 2), 16), parseInt(m[1].slice(2, 4), 16), parseInt(m[1].slice(4, 6), 16)] : [255, 255, 255]
+    const a = Math.round(Math.min(1, Math.max(0, Number.isFinite(alpha) ? alpha : 0)) * 255)
+    const png = encodeIndexedPng(1, 1, new Uint8Array([0]), new Uint8Array(rgb), new Uint8Array([a]))
+    return { dataUrl: bytesToDataUrl(png, 'image/png'), extent: gridImageExtent(geom), width: 1, height: 1 }
+}
+
 /**
  * 격자 기하 + 팔레트로 이미지를 만든다. indexAt(cell)은 격자 칸 번호(행 우선, 격자 원래 행 순서 srcRow*nx+col)의 팔레트 번호, 없으면 -1.
  * 팔레트는 최대 255색(투명 한 칸이 더 필요하다)
@@ -36,7 +58,7 @@ export function buildGridOverlayImage(
     palette: ReadonlyArray<readonly [number, number, number]>,
     indexAt: (cell: number) => number,
 ): WindOverlayImage {
-    const { lo1, la1, dx, dy, nx, ny, northFirst } = geom
+    const { nx, ny, northFirst } = geom
     const levels = palette.length
     const rgb = new Uint8Array((levels + 1) * 3)
     const alpha = new Uint8Array(levels + 1)
@@ -58,12 +80,8 @@ export function buildGridOverlayImage(
         }
     }
 
-    const west = lo1 - dx / 2
-    const east = lo1 + (nx - 1) * dx + dx / 2
-    const north = (northFirst ? la1 : la1 + (ny - 1) * dy) + dy / 2
-    const south = (northFirst ? la1 - (ny - 1) * dy : la1) - dy / 2
     const png = encodeIndexedPng(nx, ny, indices, rgb, alpha)
-    return { dataUrl: bytesToDataUrl(png, 'image/png'), extent: [west, south, east, north], width: nx, height: ny }
+    return { dataUrl: bytesToDataUrl(png, 'image/png'), extent: gridImageExtent(geom), width: nx, height: ny }
 }
 
 /** 스칼라 격자를 변수별 색 규칙(wxColorScales)으로 이미지로. 값이 없는 칸(NaN)·transparentBelow 미만(비 없음)은 투명 */

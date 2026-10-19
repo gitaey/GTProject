@@ -33,5 +33,19 @@ export const WIND_OVERLAY_OPACITY_MIN = 0.1
 export const WIND_OVERLAY_OPACITY_MAX = 1
 export const WIND_OVERLAY_OPACITY_DEFAULT = 0.6
 export const WIND_OVERLAY_OPACITY_STEP = 0.05
+/**
+ * 바탕 깔기(색상 오버레이가 없음일 때 입자 아래에 까는 반투명 단색 바탕) — 입자가 배경지도 위에서 잘 보이게 한다.
+ * 바탕 색은 **입자 색에 맞춘다**(배경지도가 아니라): 입자가 밝은 색이면(풍속 색 입자, 또는 밝은 단색 — 위성의 흰색) 어두운 바탕,
+ * 입자가 어두운 단색이면(일반 지도의 #334155) 밝은 바탕. 알파는 0~1.
+ * 값의 근거(대비비 계산)는 _workspace/wind-panel/v2/03_impl.md "바탕 깔기 후속"과 v2/tools/veil-contrast*.cjs:
+ *   어두운 바탕 #0f172a 알파 0.2 = 사용자가 "0.65는 너무 어둡다"고 해 0.4 → 0.2로 거듭 낮춘 값(2026-10-19). 대비비 표: 0.65는 입자 최소 1.92·지도 글자 3.09(3:1 이상으로 읽히는 가장 진한 값), 0.5는 입자 1.20·글자 4.95. 0.2는 지도가 거의 그대로 보이는 대신 입자 대비가 0.5보다 훨씬 낮다
+ *   밝은 바탕 흰색 알파 0.45 = 진회색 입자(#334155)의 일반 지도 위 최소 대비 3.00(바탕 없음) → 5.6 이상
+ */
+export const WIND_VEIL_COLOR_DARK = '#0f172a'
+export const WIND_VEIL_ALPHA_DARK = 0.2
+export const WIND_VEIL_COLOR_LIGHT = '#ffffff'
+export const WIND_VEIL_ALPHA_LIGHT = 0.45
+/** 단색 입자가 "밝은 색"인지 가르는 상대 휘도(0~1) 기준 — 이 이상이면 어두운 바탕을 깐다(흰색 1.0·#334155 0.05) */
+export const WIND_PARTICLE_BRIGHT_LUMINANCE = 0.35
 /** 범례·오버레이 색 막대의 끝 풍속(m/s) */
 export const WIND_LEGEND_MAX_SPEED = 25

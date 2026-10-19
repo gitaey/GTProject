@@ -105,6 +105,11 @@ export interface WindState {
     scalarVars: readonly WindScalarVar[]
     /** 색상 오버레이 안내(오류 아님) — 예: '이 시각의 기온 자료가 아직 없습니다'. 없으면 null */
     overlayNote: string | null
+    /**
+     * 바탕 깔기 — 색상 오버레이가 없음일 때 바람 자료 영역에 반투명 단색 바탕(위성 어두움·그 밖 밝음)을 입자 아래에 깐다. 기본 true.
+     * 실제로 보이는 조건: 바람 켜짐 + 입자 표출 켜짐 + overlayVar 'none' + baseVeil. 자료 요청은 없다
+     */
+    baseVeil: boolean
 }
 
 const NO_FRAMES: readonly WindFrameMeta[] = Object.freeze([])
@@ -115,5 +120,5 @@ export const EMPTY_WIND_STATE: Readonly<WindState> = Object.freeze({
     frames: NO_FRAMES, framesStatus: 'idle', frameIndex: -1, playing: false,
     densityScale: 1, speedScale: 1, colorBySpeed: true,
     particlesVisible: true, overlayVisible: false, overlayOpacity: 0.6, framesLoadedAt: null, stale: null, notice: null,
-    overlayVar: 'none', scalarSupported: false, scalarVars: NO_SCALAR_VARS, overlayNote: null,
+    overlayVar: 'none', scalarSupported: false, scalarVars: NO_SCALAR_VARS, overlayNote: null, baseVeil: true,
 } as WindState)

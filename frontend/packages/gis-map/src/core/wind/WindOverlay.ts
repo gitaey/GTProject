@@ -16,6 +16,8 @@ export interface WindOverlay {
     update(field: WindField): boolean
     /** 스칼라 변수 격자(기온·습도·강수량)로 이미지를 다시 만들어 바꾼다 */
     updateScalar(grid: ScalarGridInfo, scale: WxColorScale): void
+    /** 만들어 둔 이미지(data URL + 범위)를 그대로 올린다 — 바탕 깔기가 쓴다 */
+    setImage(img: WindOverlayImage): void
     /** 그림을 비운다(레이어는 둔다) — 그 시각 자료가 없거나 아직 받는 중일 때 옛 그림이 남지 않게 */
     clear(): void
     setOpacity(opacity: number): void
@@ -47,6 +49,7 @@ export function createWindOverlay(opts: { opacity: number; zIndex: number }): Wi
         updateScalar(grid: ScalarGridInfo, scale: WxColorScale): void {
             setImage(buildScalarOverlayImage(grid, scale))
         },
+        setImage,
         clear(): void {
             const old = layer.getSource()
             layer.setSource(null)

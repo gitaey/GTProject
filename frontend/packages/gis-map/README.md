@@ -168,8 +168,8 @@ const setup = (map) => { map.use(createWindPlugin({ monoColor: (mode) => (mode =
 | `field?(id)` | 스칼라 변수 한 장(기온·습도·강수량, `fields[변수]`의 id) | 색상 오버레이 선택지에 풍속만 나온다 |
 
 플러그인(`useWindPlugin()`)에서 쓰는 주요 API: `loadFrames()`·`reloadFrames()`·`setFrame(index)`·`play()`/`pause()`·`setParticlesVisible(on)`·
-`setOverlay(on)`·`setOverlayVar('none' | 'speed' | 'temp' | 'humi' | 'rain')`·`setOverlayOpacity(0~1)`·`refreshStale()`(자료 오래됨 다시 계산)·
-`valueAt(lon, lat)`·`watchPointerValues(listener)`(마우스 지점의 풍속·풍향과 선택 변수 값). 상태는 `useWindState()`(`overlayVar`·`scalarSupported`·`scalarVars`·
+`setOverlay(on)`·`setOverlayVar('none' | 'speed' | 'temp' | 'humi' | 'rain')`·`setOverlayOpacity(0~1)`·`setBaseVeil(on)`(오버레이가 없음일 때 입자 아래에 반투명 단색 바탕을 깐다 — 바탕 색은 입자 색에 맞춘다: 풍속 색 입자·밝은 단색이면 어두운 바탕 `#0f172a` 0.65, 어두운 단색(#334155)이면 흰 바탕 0.45. 기본 켜짐, 자료 요청 없음, 값은 `windLimits`의 `WIND_VEIL_*`)·`refreshStale()`(자료 오래됨 다시 계산)·
+`valueAt(lon, lat)`·`watchPointerValues(listener)`(마우스 지점의 풍속·풍향과 선택 변수 값). 상태는 `useWindState()`(`overlayVar`·`scalarSupported`·`scalarVars`·`baseVeil`·
 `stale`·`notice`·`overlayNote` 등), 마우스 값은 `useWindPointerValues()`. 스칼라는 오버레이에서 그 변수를 고를 때만 받고(요청 0 → 고르면 한 장),
 시간을 옮기면 바람 프레임과 같이 받아 같이 바꾼다. 짝 백엔드의 응답 규칙(`null` = 자료 없음, `fields`가 비면 선택지 없음)은 `references/query-spec.md` 7절.
 

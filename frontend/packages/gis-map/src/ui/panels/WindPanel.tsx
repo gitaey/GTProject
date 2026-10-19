@@ -207,8 +207,9 @@ function WindFramesSection({ wind, state }: WindSectionProps) {
 
 /** 표출(입자 · 입자 풍속 색 · 색상 오버레이 + 진하기) + 입자 밀도 + 애니메이션 속도 */
 function WindOptionsSection({ wind, state }: WindSectionProps) {
-    const { particlesVisible, colorBySpeed, overlayVisible, overlayVar, overlayNote, scalarSupported, scalarVars, overlayOpacity, densityScale, speedScale } = state
+    const { particlesVisible, colorBySpeed, baseVeil, overlayVisible, overlayVar, overlayNote, scalarSupported, scalarVars, overlayOpacity, densityScale, speedScale } = state
     const onParticles = useCallback((e: ChangeEvent<HTMLInputElement>) => wind.setParticlesVisible(e.target.checked), [wind])
+    const onVeil = useCallback((e: ChangeEvent<HTMLInputElement>) => wind.setBaseVeil(e.target.checked), [wind])
     const onColor = useCallback((e: ChangeEvent<HTMLInputElement>) => wind.setColorBySpeed(e.target.checked), [wind])
     const onRetry = useCallback(() => wind.retry(), [wind])
     const onOverlay = useCallback((e: ChangeEvent<HTMLSelectElement>) => {
@@ -231,6 +232,10 @@ function WindOptionsSection({ wind, state }: WindSectionProps) {
                 <label className={cx('gm-wind-panel__check', !particlesVisible && 'gm-is-disabled')}>
                     <input type="checkbox" className="gm-wind-panel__check-input" checked={colorBySpeed} disabled={!particlesVisible} onChange={onColor} />
                     <span>입자에 풍속 색상</span>
+                </label>
+                <label className={cx('gm-wind-panel__check', (!particlesVisible || overlayVar !== OVERLAY_NONE) && 'gm-is-disabled')}>
+                    <input type="checkbox" className="gm-wind-panel__check-input" checked={baseVeil} disabled={!particlesVisible || overlayVar !== OVERLAY_NONE} onChange={onVeil} />
+                    <span>바탕 깔기</span>
                 </label>
             </div>
             <div className="gm-wind-panel__section">
