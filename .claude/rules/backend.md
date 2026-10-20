@@ -56,6 +56,7 @@ com.gtp
   로컬에서 기동하면 **운영 스키마가 즉시 바뀐다.** 사용자가 명시적으로 허락하지 않는 한:
   엔티티/매핑을 바꾼 상태로 백엔드를 기동하지 않는다, 운영 DB에 쓰기(INSERT/UPDATE/DELETE/DDL)를 일으키는
   테스트를 하지 않는다, SQL은 작성만 하고 실행하지 않는다. 검증은 `./mvnw compile`까지.
+- **`spring-boot-devtools`가 있어서 로컬 백엔드(IntelliJ)가 떠 있는 동안 `./mvnw compile`을 하면 앱이 자동 재시작되고, 그때 `ddl-auto: update`가 운영 DB에 적용된다**(2026-10-20 실제로 일어남 — 에이전트의 compile이 `tbl_user_map` 새 칸을 운영 DB에 만들었다. 표가 비어 있어 피해는 없었다). 엔티티를 바꾸는 작업은 로컬 백엔드를 끄고, 에이전트에게도 compile 전에 8080이 떠 있는지 확인시킨다. NOT NULL 칸은 기존 행이 있으면 실패하므로 `DEFAULT`를 넣은 SQL을 먼저 실행한다.
 - 마이그레이션 도구가 없고 `ddl-auto: update`다. 컬럼 추가는 자동 반영되지만 **컬럼 삭제·타입 변경·FK 제거는
   반영되지 않는다.** 그런 변경은 SQL을 따로 작성해 사용자에게 전달한다. (예: `tbl_layer_user_access`의 옛 `tbl_user` FK 제거 SQL —
   설계문서 `2026-09-23-map-module-restructure.md` B1, 실행은 사용자)

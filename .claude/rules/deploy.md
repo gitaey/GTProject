@@ -25,17 +25,23 @@ Secrets: `SERVER_HOST`, `SERVER_USER`, `SSH_PRIVATE_KEY`.
 
 ## 서버 구성 (docker compose)
 
-| 서비스 | 포트(호스트→컨테이너) | 비고 |
-|---|---|---|
-| nginx | host network | 설정은 서버 `/gtp/nginx` (저장소에 없음) |
-| frontend | 49092→3000 | gitaey-dev.com |
-| backend | 49090→8080 | api.gitaey-dev.com, `/gtp/geotiff` 마운트, GDAL 포함 이미지 |
-| bot | 49093→8081 | 서버의 8081은 다른 Tomcat 서비스가 쓰므로 호스트 포트는 49093 |
-| postgis 16-3.4 | 49091→5432 | DB `gtpdb`, external volume |
-| geoserver 2.25.2 | 49094→8080 | geo.gitaey-dev.com |
-| titiler | 49095→8000 | `/gtp/geotiff` 마운트 |
+| 서비스 | 컨테이너 이름 | 포트(호스트→컨테이너) | 비고 |
+|---|---|---|---|
+| nginx | `gtp-nginx` | host network | 설정은 서버 `/gtp/nginx` (저장소에 없음). 인증서 갱신은 `docker stop gtp-nginx` → certbot → `docker start gtp-nginx` |
+| frontend | `gtp-frontend` (`node:18`) | 49092→3000 | gitaey-dev.com |
+| backend | `gtp-backend` | 49090→8080 | api.gitaey-dev.com, `/gtp/geotiff` 마운트, GDAL 포함 이미지 |
+| bot | `gtp-bot` | 49093→8081 | 서버의 8081은 다른 Tomcat 서비스가 쓰므로 호스트 포트는 49093 |
+| postgis 16-3.4 | `gtp-postgres` (`postgis/postgis:16-3.4`) | 49091→5432 | DB `gtpdb`, external volume. psql은 `docker exec -it gtp-postgres psql -U <계정> -d <DB>` |
+| geoserver 2.25.2 | `gtp-geoserver` (`kartoza/geoserver:2.25.2`) | 49094→8080 | geo.gitaey-dev.com |
+| titiler | `gtp-titiler` | 49095→8000 | `/gtp/geotiff` 마운트 |
 
 환경 변수는 서버 `/gtp/docker/.env`. 저장소 루트의 `docker-compose.yml`은 서버 구성을 옮겨 둔 사본이다.
+
+## 서버 디스크 배치 (2026-10-19 `df -h` 기준)
+
+- 루트 `/` 50GB(여유 약 34GB). 서버의 `/gtp`(compose `/gtp/docker`, 저장소 `/gtp/GTProject`, nginx `/gtp/nginx`, `/gtp/geotiff` 업로드)가 **루트 디스크에 있다.**
+- `/data` 7.3TB(여유 약 4.7TB) — docker 저장소(`/data/docker`)가 여기 있어 이름 있는 볼륨의 데이터는 `/data` 쪽에 들어간다. `/project` 3.1TB(여유 2.4TB), `/home` 500GB.
+- DB(`gtp-postgres`) 데이터는 이름 있는 볼륨이라 `/data/docker/volumes/...`(= `/data` 디스크)에 있다(2026-10-19 확인). 큰 데이터(연속지적도 등)는 루트가 아니라 `/data`나 `/project`에 두어야 한다. GeoTIFF 업로드(`/gtp/geotiff`)는 루트를 쓰니 용량을 늘릴 일이 있으면 옮길 것.
 
 ## 주의
 
