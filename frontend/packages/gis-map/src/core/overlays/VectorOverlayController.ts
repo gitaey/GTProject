@@ -13,7 +13,7 @@ import type { MyMapSource } from '../sources'
 import { createStore } from '../store'
 import type { ReadableStore, WritableStore } from '../store'
 import type { MapResources } from '../tracker'
-import type { UserMapListItem, UserMapStatus } from '../types/mymap'
+import type { MyMapQuota, UserMapListItem, UserMapStatus } from '../types/mymap'
 import { CatalogBase } from './catalog'
 import type { Catalog, CatalogState } from './catalog'
 
@@ -29,13 +29,17 @@ export const EMPTY_VECTOR_OVERLAY_STATE: Readonly<VectorOverlayState> = Object.f
     loadingIds: Object.freeze([]) as readonly number[],
 })
 
-export type MyMapCatalogState = CatalogState<UserMapListItem>
+export interface MyMapCatalogState extends CatalogState<UserMapListItem> {
+    /** 한도·적재 범위(source.quota가 있고 조회에 성공했을 때). 없으면 null — 화면은 한도 표시를 뺀다 */
+    quota: MyMapQuota | null
+}
 
 /** 목록이 아직 없을 때(첫 렌더·SSR) 위젯이 쓰는 상태 — 옛 MyMapPanel 초기값(loading: true) */
 export const EMPTY_MYMAP_CATALOG_STATE: Readonly<MyMapCatalogState> = Object.freeze({
     items: Object.freeze([]) as readonly UserMapListItem[],
     loading: true,
     error: null,
+    quota: null,
 })
 
 export type MyMapCatalog = Catalog<UserMapListItem, MyMapCatalogState>
@@ -75,17 +79,60 @@ export function myMapStyle(color: string): Style {
     })
 }
 
+/** 상태 응답에서 목록 항목에 반영하는 선택 필드(응답에 있는 것만 — 옛 서버는 없다) */
+const STATUS_EXTRA_KEYS = ['errorMessage', 'progressTotal', 'progressDone', 'matchedCount', 'failedCount', 'parcelVersion', 'geomType'] as const
+
+/**
+ * 상태 조회 결과를 목록 항목에 합친다. status·featureCount는 옛 코드 그대로, 진행률·매칭/실패 수·실패 이유는 응답에 있을 때만 덮는다.
+ * 바뀐 값이 하나도 없으면 받은 항목 객체를 그대로 돌려준다(진행 중 폴링이 같은 값으로 화면을 다시 그리지 않게)
+ */
+export function mergeMyMapStatus(item: UserMapListItem, s: UserMapStatus): UserMapListItem {
+    let next: UserMapListItem = item
+    const set = (patch: Partial<UserMapListItem>) => {
+        next = { ...next, ...patch }
+    }
+    if (item.status !== s.status) set({ status: s.status })
+    if (item.featureCount !== s.featureCount) set({ featureCount: s.featureCount })
+    for (const key of STATUS_EXTRA_KEYS) {
+        const v = s[key]
+        if (v !== undefined && item[key] !== v) set({ [key]: v })
+    }
+    return next
+}
+
 class MyMapCatalogImpl extends CatalogBase<UserMapListItem, UserMapStatus, MyMapCatalogState> implements MyMapCatalog {
+    private quotaRequested = false
+    private readonly quotaSource: MyMapSource | undefined
+
     constructor(source: MyMapSource | undefined, onRemoved: (id: number) => void, onDisposed: () => void) {
-        super({ items: [], loading: true, error: null }, {
+        super({ items: [], loading: true, error: null, quota: null }, {
             list: source ? () => source.list() : undefined,
             status: source ? id => source.status(id) : undefined,
             remove: source ? id => source.remove(id) : undefined,
-            // 옛 코드: status와 featureCount만 바꾼다
-            merge: (i, s) => ({ ...i, status: s.status, featureCount: s.featureCount }),
+            merge: mergeMyMapStatus,
+            // 처리 중에도 진행률(progressDone/Total)을 목록에 반영한다
+            mergeWhileProcessing: true,
             onRemoved,
             onDisposed,
         })
+        this.quotaSource = source
+    }
+
+    /** 목록을 받을 때 한도도 한 번 받는다(이 목록 객체 수명 동안 1번 — 업로드 뒤 load()에서는 다시 받지 않는다). 실패하면 한도 표시만 빠진다 */
+    override async load(): Promise<void> {
+        const source = this.quotaSource
+        if (source?.quota && !this.quotaRequested && !this.disposed) {
+            this.quotaRequested = true
+            void (async () => {
+                try {
+                    const q = await source.quota?.()
+                    if (q) this.patch({ quota: q })
+                } catch {
+                    // 한도 조회 실패는 조용히(옛 서버·권한 문제) — quota는 null 그대로
+                }
+            })()
+        }
+        await super.load()
     }
 }
 

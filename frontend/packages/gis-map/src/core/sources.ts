@@ -6,7 +6,8 @@ import type { GeoJsonObject } from './types/geojson'
 import type { GeoTiffItem, GeoTiffStatus } from './types/geotiff'
 import type { LayerDef, LayerTree } from './types/layer'
 import type {
-    ExcelConfirmInput, ExcelPreviewResponse, ShpUploadInput, UserMapListItem, UserMapShare, UserMapStatus,
+    ExcelConfirmInput, ExcelPreviewResponse, MyMapConfirmResult, MyMapImportReport, MyMapImportReportQuery, MyMapQuota, MyMapSampleKind,
+    ShpUploadInput, UserMapListItem, UserMapShare, UserMapStatus,
 } from './types/mymap'
 import type { AddressSearchItem, VWorldLegendItem } from './types/search'
 import type { WindField, WindFrameMeta, WindScalarField } from './types/wind'
@@ -35,9 +36,19 @@ export interface MyMapSource {
     remove(id: number): Promise<void>
     uploadShp?(input: ShpUploadInput): Promise<void>
     previewExcel?(file: File): Promise<ExcelPreviewResponse>
-    confirmExcel?(input: ExcelConfirmInput): Promise<void>
+    /** 새 서버는 { id, parcelVersion? }을 돌려준다(처리는 비동기 — 목록 폴링으로 진행률). 옛 서버·옛 소스는 아무것도 안 돌려줘도 된다 */
+    confirmExcel?(input: ExcelConfirmInput): Promise<void | MyMapConfirmResult>
     getShare?(id: number): Promise<UserMapShare>
     setShare?(id: number, share: UserMapShare): Promise<void>
+    // ── 1단계(PNU 엑셀·보고서·샘플). 전부 옵셔널 — 없으면 그 화면 요소가 조용히 빠진다 ──
+    /** 내 레이어 수·한도·행 한도·지적도 기준월. 없으면 "내 레이어 n/20"과 한도 안내가 안 나온다 */
+    quota?(): Promise<MyMapQuota>
+    /** 샘플 엑셀 파일(바이트). 없으면 샘플 받기 링크가 안 나온다 */
+    downloadSample?(kind: MyMapSampleKind): Promise<Blob>
+    /** 업로드 결과 보고서(소유자만). 없으면 `매칭 N · 실패 M`이 글자로만 나온다 */
+    importReport?(id: number, query?: MyMapImportReportQuery): Promise<MyMapImportReport>
+    /** 실패 행 엑셀(원본 컬럼 + 실패 사유) */
+    downloadImportFailures?(id: number): Promise<Blob>
 }
 
 export interface GeoTiffSource {

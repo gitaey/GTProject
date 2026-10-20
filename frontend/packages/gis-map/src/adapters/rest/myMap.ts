@@ -1,13 +1,30 @@
 // 나만의지도 소스 — 짝 백엔드 api/mymap 계약. 옛 hooks/map/useMyMapLayers.ts(geojson)와
 // components/map/panel/MyMapPanel.tsx(목록·상태·삭제), mymap/MyMapUploadModal.tsx(shp·엑셀 업로드), mymap/MyMapShareDialog.tsx(공유)의
 // fetch 호출을 여기로 모았다. 업로드는 FormData라 Content-Type을 직접 넣지 않는다(브라우저가 boundary를 붙임).
+// 1단계: quota·samples·import-report(.xlsx), 엑셀 확인의 mode·pnuColumn·addressColumn.
 import type {
-    ExcelConfirmInput, ExcelPreviewResponse, GeoJsonObject, MyMapSource, ShpUploadInput, SourceContext,
-    UserMapListItem, UserMapShare, UserMapStatus,
+    ExcelConfirmInput, ExcelPreviewResponse, GeoJsonObject, MyMapConfirmResult, MyMapImportReport, MyMapImportReportQuery, MyMapQuota,
+    MyMapSampleKind, MyMapSource, ShpUploadInput, SourceContext, UserMapListItem, UserMapShare, UserMapStatus,
 } from '../../core'
-import { apiUrl, readEnvelope } from './envelope'
+import { apiUrl, readBlob, readEnvelope } from './envelope'
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' }
+
+/** 엑셀 확인 본문. 옛 호출(mode 없음)은 옛 본문과 키·순서가 같다. 값이 없는 키는 보내지 않는다 */
+function confirmBody(input: ExcelConfirmInput): string {
+    const body: Record<string, string> = { uploadId: input.uploadId, name: input.name }
+    const add = (key: string, value: string | undefined) => {
+        if (value !== undefined && value !== '') body[key] = value
+    }
+    add('latColumn', input.latColumn)
+    add('lonColumn', input.lonColumn)
+    add('sourceSrid', input.sourceSrid)
+    add('mode', input.mode)
+    add('pnuColumn', input.pnuColumn)
+    add('addressColumn', input.addressColumn)
+    add('description', input.description)
+    return JSON.stringify(body)
+}
 
 export function restMyMap(ctx: SourceContext): MyMapSource {
     const url = (path: string) => apiUrl(ctx.host(), '/api/mymap' + path)
@@ -49,19 +66,15 @@ export function restMyMap(ctx: SourceContext): MyMapSource {
             )
         },
 
-        async confirmExcel(input: ExcelConfirmInput): Promise<void> {
-            // 본문 키 순서도 옛 코드와 같게
-            const body = JSON.stringify({
-                uploadId: input.uploadId,
-                name: input.name,
-                latColumn: input.latColumn,
-                lonColumn: input.lonColumn,
-                sourceSrid: input.sourceSrid,
-            })
-            await readEnvelope<unknown>(
-                await ctx.http.fetch(url('/upload/excel/confirm'), { method: 'POST', headers: JSON_HEADERS, body }),
+        async confirmExcel(input: ExcelConfirmInput): Promise<void | MyMapConfirmResult> {
+            const data = await readEnvelope<{ id: number; parcelVersion?: string | null } | null>(
+                await ctx.http.fetch(url('/upload/excel/confirm'), { method: 'POST', headers: JSON_HEADERS, body: confirmBody(input) }),
                 '업로드 실패',
             )
+            // 옛 서버는 data가 null
+            if (!data || typeof data.id !== 'number') return undefined
+            // PNU 모드의 "예정" 기준월(좌표 모드는 null). 옛 서버는 필드 없음
+            return data.parcelVersion !== undefined ? { id: data.id, parcelVersion: data.parcelVersion } : { id: data.id }
         },
 
         async getShare(id: number): Promise<UserMapShare> {
@@ -71,6 +84,29 @@ export function restMyMap(ctx: SourceContext): MyMapSource {
         async setShare(id: number, share: UserMapShare): Promise<void> {
             const body = JSON.stringify({ userIds: share.userIds, roleCodes: share.roleCodes })
             await readEnvelope<unknown>(await ctx.http.fetch(url(`/${id}/share`), { method: 'PUT', headers: JSON_HEADERS, body }))
+        },
+
+        async quota(): Promise<MyMapQuota> {
+            return readEnvelope<MyMapQuota>(await ctx.http.fetch(url('/quota')), '한도 조회 실패')
+        },
+
+        /** 봉투 없는 xlsx 바이트 */
+        async downloadSample(kind: MyMapSampleKind): Promise<Blob> {
+            return readBlob(await ctx.http.fetch(url(`/samples/${kind}`)), '샘플을 받지 못했습니다')
+        },
+
+        async importReport(id: number, query?: MyMapImportReportQuery): Promise<MyMapImportReport> {
+            const params: string[] = []
+            if (query?.page !== undefined) params.push(`page=${query.page}`)
+            if (query?.size !== undefined) params.push(`size=${query.size}`)
+            if (query?.reason) params.push(`reason=${encodeURIComponent(query.reason)}`)
+            const qs = params.length > 0 ? `?${params.join('&')}` : ''
+            return readEnvelope<MyMapImportReport>(await ctx.http.fetch(url(`/${id}/import-report${qs}`)), '보고서를 불러오지 못했습니다')
+        },
+
+        /** 봉투 없는 xlsx 바이트 */
+        async downloadImportFailures(id: number): Promise<Blob> {
+            return readBlob(await ctx.http.fetch(url(`/${id}/import-report.xlsx`)), '실패 행 엑셀을 받지 못했습니다')
         },
     }
 }

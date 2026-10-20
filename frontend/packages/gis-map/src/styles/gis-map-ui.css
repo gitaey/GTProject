@@ -1893,8 +1893,15 @@
 }
 
 .gm-upload-modal {
-    width: 380px;
-    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    width: 560px;
+    max-width: calc(100vw - 24px);
+    max-height: 85vh;
+    overflow: hidden;
+}
+
+.gm-upload-modal .gm-modal__body {
     overflow-y: auto;
 }
 
@@ -1979,22 +1986,6 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-}
-
-/* 옛 인라인: display flex, borderBottom 1px solid #f3f4f6 */
-.gm-upload-modal__tabs {
-    display: flex;
-    border-bottom: 1px solid #f3f4f6;
-}
-
-/* 옛 인라인: flex 1, padding 8px 0, fontSize 12, fontWeight 600, border none, cursor pointer (배경·색·밑줄은 선택 상태에 따라 인라인) */
-.gm-upload-modal__tab {
-    flex: 1;
-    padding: 8px 0;
-    font-size: 12px;
-    font-weight: 600;
-    border: none;
-    cursor: pointer;
 }
 
 /* 옛 인라인: border 1.5px dashed #d1d5db, borderRadius 7, padding 14px 10px, textAlign center, cursor pointer, background #f9fafb, fontSize 11, color #9ca3af */
@@ -2357,6 +2348,626 @@
     .gm-wind-legend__tick {
         color: color-mix(in oklab, var(--gm-color-white) 70%, transparent);
     }
+}
+
+/* ── 나만의지도 1단계: 패널(한도·묶음·진행률·결과) · 업로드 마법사(gm-wizard) · 결과 보고서(gm-report) ── */
+.gm-mymap-panel__upload:disabled {
+    color: #d1d5db;
+    cursor: default;
+}
+
+/* 머리줄 아래 `내 레이어 n/20` */
+.gm-mymap-panel__quota {
+    flex-shrink: 0;
+    padding: 4px 12px;
+    font-size: 10.5px;
+    color: #64748b;
+    background: #f9fafb;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.gm-mymap-panel__quota.gm-is-full {
+    color: #ef4444;
+}
+
+/* 내 레이어 / 공유받은 레이어 묶음 제목 */
+.gm-mymap-panel__group {
+    padding: 8px 12px 4px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.gm-mymap-panel__group span {
+    font-weight: 400;
+}
+
+.gm-mymap-panel__lock {
+    vertical-align: -1px;
+}
+
+.gm-mymap-panel__sender {
+    font-size: 10px;
+    color: #9ca3af;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gm-mymap-panel__meta {
+    flex-wrap: wrap;
+}
+
+/* 종류 배지(SHP·PNU·주소·좌표) — 종류를 아는 새 서버일 때만 배지 모양 */
+.gm-mymap-panel__kind--badge {
+    padding: 0 5px;
+    border-radius: 4px;
+    font-size: 9.5px;
+    font-weight: 600;
+}
+
+.gm-mymap-panel__kind--shp {
+    background: #f1f5f9;
+    color: #334155;
+}
+
+.gm-mymap-panel__kind--pnu {
+    background: #e0e7ff;
+    color: #3730a3;
+}
+
+.gm-mymap-panel__kind--address {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.gm-mymap-panel__kind--coord {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.gm-mymap-panel__version {
+    color: #94a3b8;
+}
+
+.gm-mymap-panel__progress {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 3px;
+}
+
+.gm-mymap-panel__progress-bar {
+    flex: 1;
+    height: 5px;
+    border-radius: 3px;
+    background: #f3f4f6;
+    overflow: hidden;
+}
+
+.gm-mymap-panel__progress-fill {
+    height: 100%;
+    background: var(--gm-primary);
+    transition: width .3s;
+}
+
+.gm-mymap-panel__progress-text {
+    font-size: 10px;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+.gm-mymap-panel__result {
+    margin-top: 2px;
+    font-size: 10.5px;
+    color: #64748b;
+}
+
+.gm-mymap-panel__fail-link {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-size: inherit;
+    color: #b91c1c;
+    text-decoration: underline;
+}
+
+.gm-mymap-panel__fail-text {
+    color: #b91c1c;
+}
+
+.gm-mymap-panel__error {
+    margin-top: 2px;
+    font-size: 10px;
+    line-height: 1.35;
+    color: #ef4444;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+}
+
+/* 업로드 마법사 — 머리줄 단계 표시(① 종류 → ② 파일·컬럼 → ③ 이름) */
+.gm-wizard__steps {
+    display: flex;
+    gap: 10px;
+    flex: 1;
+    list-style: none;
+    margin: 0 8px 0 12px;
+    padding: 0;
+}
+
+.gm-wizard__step {
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+.gm-wizard__step.gm-is-active {
+    color: var(--gm-primary);
+    font-weight: 700;
+}
+
+.gm-wizard__step.gm-is-done {
+    color: #64748b;
+}
+
+.gm-wizard__cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.gm-wizard__card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.gm-wizard__card:hover {
+    border-color: rgba(var(--gm-primary-rgb), .5);
+}
+
+.gm-wizard__card.gm-is-active {
+    padding: 9px 11px;
+    border: 2px solid var(--gm-primary);
+    background: rgba(var(--gm-primary-rgb), .05);
+}
+
+.gm-wizard__card-title {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.gm-wizard__card.gm-is-active .gm-wizard__card-title {
+    color: var(--gm-primary);
+}
+
+.gm-wizard__card-desc {
+    font-size: 10.5px;
+    color: #4b5563;
+}
+
+.gm-wizard__samples {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.gm-wizard__samples-label {
+    font-size: 10.5px;
+    color: #374151;
+}
+
+.gm-wizard__sample {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    color: #374151;
+    font-size: 10.5px;
+    cursor: pointer;
+}
+
+.gm-wizard__sample:hover:not(:disabled) {
+    border-color: var(--gm-primary);
+    color: var(--gm-primary);
+}
+
+.gm-wizard__sample:disabled {
+    cursor: default;
+    opacity: .6;
+}
+
+/* 알림 줄: 안내(info) · 주의(warn) · 막힘(error) */
+.gm-wizard__banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.gm-wizard__banner svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.gm-wizard__banner--info {
+    background: #f8fafc;
+    color: #334155;
+}
+
+.gm-wizard__banner--warn {
+    border: 1px solid #fcd9a8;
+    background: #fff7eb;
+    color: #78350f;
+}
+
+.gm-wizard__banner--error {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+.gm-wizard__file {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: #f8fafc;
+    font-size: 11px;
+    color: #334155;
+}
+
+.gm-wizard__file-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 700;
+}
+
+.gm-wizard__file-meta {
+    flex: 1;
+    white-space: nowrap;
+}
+
+.gm-wizard__link {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--gm-primary);
+    text-decoration: underline;
+}
+
+/* 미리보기 표 — 가로로 넘치면 표 안에서만 스크롤 */
+.gm-wizard__table-wrap {
+    max-height: 190px;
+    overflow: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+}
+
+.gm-wizard__table {
+    border-collapse: collapse;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.gm-wizard__table th,
+.gm-wizard__table td {
+    padding: 4px 8px;
+    border-bottom: 1px solid #f1f5f9;
+    max-width: 170px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+}
+
+.gm-wizard__table th {
+    position: sticky;
+    top: 0;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 10.5px;
+    font-weight: 600;
+}
+
+.gm-wizard__table th.gm-is-selected,
+.gm-wizard__table td.gm-is-selected {
+    background: rgba(var(--gm-primary-rgb), .07);
+}
+
+.gm-wizard__table th.gm-is-selected {
+    color: var(--gm-primary);
+}
+
+.gm-wizard__modes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.gm-wizard__mode {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    color: #374151;
+    cursor: pointer;
+}
+
+.gm-wizard__mode input {
+    margin: 0;
+    accent-color: var(--gm-primary);
+}
+
+.gm-wizard__mode.gm-is-active {
+    font-weight: 600;
+}
+
+.gm-wizard__recommend {
+    font-size: 10.5px;
+    color: var(--gm-primary);
+}
+
+.gm-wizard__field-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.gm-wizard__field-label {
+    flex: 0 0 90px;
+    font-size: 11px;
+    color: #475569;
+}
+
+.gm-wizard__field-select {
+    flex: 1;
+    min-width: 0;
+}
+
+.gm-wizard__footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.gm-wizard__footer-note {
+    flex: 1;
+    font-size: 10.5px;
+    line-height: 1.4;
+    color: #64748b;
+}
+
+.gm-wizard__back {
+    padding: 6px 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 12px;
+    color: #374151;
+}
+
+.gm-wizard__submit {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 16px;
+    border: none;
+    border-radius: 6px;
+    background: var(--gm-primary);
+    color: #fff;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.gm-wizard__submit:disabled {
+    background: #d1d5db;
+    cursor: default;
+}
+
+/* 결과 보고서 */
+.gm-report {
+    width: 520px;
+    max-width: calc(100vw - 24px);
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+.gm-report__cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.gm-report__card {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+
+.gm-report__card--ok {
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+    color: #166534;
+}
+
+.gm-report__card--fail {
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.gm-report__card-label {
+    font-size: 10.5px;
+    opacity: .85;
+}
+
+.gm-report__card-value {
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.gm-report__dup {
+    padding: 5px 8px;
+    border-radius: 6px;
+    background: #f8fafc;
+    font-size: 11px;
+    color: #334155;
+}
+
+.gm-report__reasons {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.gm-report__reason {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 6px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: none;
+    cursor: pointer;
+    font-size: 11px;
+    color: #374151;
+    text-align: left;
+}
+
+.gm-report__reason:hover,
+.gm-report__reason.gm-is-active {
+    border-color: #fca5a5;
+    background: #fef2f2;
+}
+
+.gm-report__reason-name {
+    flex: 0 0 190px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gm-report__reason-bar {
+    flex: 1;
+    height: 8px;
+    border-radius: 4px;
+    background: #f1f5f9;
+    overflow: hidden;
+}
+
+.gm-report__reason-fill {
+    display: block;
+    height: 100%;
+    background: #ef4444;
+}
+
+.gm-report__reason-count {
+    flex: 0 0 40px;
+    text-align: right;
+    font-weight: 600;
+}
+
+.gm-report__table-wrap {
+    max-height: 240px;
+    overflow: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+}
+
+.gm-report__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    table-layout: fixed;
+}
+
+.gm-report__table th,
+.gm-report__table td {
+    padding: 5px 8px;
+    border-bottom: 1px solid #f1f5f9;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+}
+
+.gm-report__table th {
+    position: sticky;
+    top: 0;
+    background: #f8fafc;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #475569;
+}
+
+.gm-report__table td:nth-child(3) {
+    color: #991b1b;
+}
+
+.gm-report__table th:nth-child(1),
+.gm-report__table td:nth-child(1) {
+    width: 48px;
+}
+
+.gm-report__table th:nth-child(2),
+.gm-report__table td:nth-child(2) {
+    width: 150px;
+}
+
+.gm-report__table th:nth-child(4),
+.gm-report__table td:nth-child(4) {
+    width: 110px;
+}
+
+.gm-report__pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 11px;
+    color: #64748b;
+}
+
+.gm-report__page-btn {
+    display: inline-flex;
+    padding: 3px;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    color: #374151;
+}
+
+.gm-report__page-btn:disabled {
+    cursor: default;
+    color: #d1d5db;
 }
 
 /* ── 반응형: md(48rem = 768px) 이상 ── */

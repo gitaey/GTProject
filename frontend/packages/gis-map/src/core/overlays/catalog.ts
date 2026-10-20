@@ -44,6 +44,11 @@ export interface CatalogOptions<T extends CatalogItemBase, St extends { status: 
     remove?: (id: number) => Promise<void>
     /** status 응답이 PROCESSING이 아닐 때 항목에 반영 */
     merge: (item: T, status: St) => T
+    /**
+     * true면 status 응답이 아직 PROCESSING일 때도 merge를 적용한다(진행률 표시용). 이때 merge는 바뀐 게 없으면 받은 항목 객체를
+     * 그대로 돌려줘야 한다(같은 객체면 목록 상태를 갱신하지 않는다). 기본 false = 옛 동작(끝났을 때만 반영)
+     */
+    mergeWhileProcessing?: boolean
     /** 목록에서 뺄 때(삭제) 지도 표시도 끈다 */
     onRemoved: (id: number) => void
     /** dispose될 때(엔진이 열린 목록을 추적하는 데 씀) */
@@ -151,8 +156,19 @@ implements Catalog<T, S> {
         if (!status) return
         processing.forEach(item => {
             status(item.id).then(s => {
-                if (this.isDisposed || s.status === 'PROCESSING') return
-                this.setItems(this.state.getState().items.map(i => (i.id === item.id ? this.opts.merge(i, s) : i)))
+                if (this.isDisposed) return
+                const stillProcessing = s.status === 'PROCESSING'
+                if (stillProcessing && !this.opts.mergeWhileProcessing) return
+                const current = this.state.getState().items
+                let changed = false
+                const next = current.map(i => {
+                    if (i.id !== item.id) return i
+                    const merged = this.opts.merge(i, s)
+                    if (merged !== i) changed = true
+                    return merged
+                })
+                // 진행 중에는 바뀐 게 있을 때만 갱신(3초마다 같은 값으로 화면을 다시 그리지 않는다). 끝났을 때는 옛 동작대로 항상 갱신
+                if (changed || !stillProcessing) this.setItems(next)
             }).catch(() => {
                 // 옛 코드: success:false·네트워크 오류 모두 조용히 넘어가고 다음 틱에 다시 묻는다
             })

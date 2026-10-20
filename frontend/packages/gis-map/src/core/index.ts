@@ -84,6 +84,8 @@ export type { MapTool, DrawStyle } from './types/draw'
 export type { GeoJsonObject } from './types/geojson'
 export type {
     UserMapListItem, UserMapStatus, ExcelPreviewResponse, ShpUploadInput, ExcelConfirmInput, UserMapShare,
+    MyMapSourceKind, MyMapUploadMode, MyMapSampleKind, MyMapLimits, MyMapQuota, MyMapCoverage, MyMapConfirmResult, ExcelSuggestions, ExcelPreviewWarning,
+    MyMapImportReport, MyMapImportReportRow, MyMapImportReportQuery,
 } from './types/mymap'
 export type { GeoTiffItem, GeoTiffStatus } from './types/geotiff'
 export type { AddressSearchItem, VWorldLegendItem } from './types/search'

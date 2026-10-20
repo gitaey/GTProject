@@ -142,11 +142,44 @@ React에서는 `<GisMapProvider host={…}>`가 바뀔 때마다 `map.setHost`�
 | 소스 | 하는 일 | 기본 구현 |
 |---|---|---|
 | `layerTree` (+ `userSelection`) | 그릴 레이어 트리 / 개인 레이어 선택 저장 | `restSources()` |
-| `myMap` · `geoTiff` · `wind` | 나만의지도 GeoJSON · GeoTIFF 타일 · 바람장 | `restSources()` |
+| `myMap` · `geoTiff` · `wind` | 나만의지도(목록·업로드·결과 보고서·샘플) · GeoTIFF 타일 · 바람장 | `restSources()` |
 | `addressSearch` · `parcel` · `regionName` · `legend` · `wfs` | 주소 검색 · 필지 폴리곤 · 지역명 · 범례 · WFS URL | `proxySources()` |
 
 짝 백엔드 응답 형식이 다르면 해당 소스만 직접 구현해 배열 뒤쪽에 넣는다. 백엔드(Spring·MyBatis)로 옮길 때의 테이블 DDL·쿼리 명세는
 GTProject 저장소의 `.claude/skills/map-module-export/references/`에 있다.
+### 나만의지도 (`GisMapSources.myMap`)
+
+`MyMapSource`의 `list`·`status`·`geojson`·`remove`만 필수이고 나머지는 전부 선택이다. **없는 메서드의 화면 요소는 조용히 빠진다**(옛 소스는 옛 화면 그대로).
+
+| 메서드 | 하는 일 | 없으면 |
+|---|---|---|
+| `list()` · `status(id)` · `geojson(id)` · `remove(id)` | 목록 · 처리 상태 폴링 · GeoJSON(EPSG:4326) · 삭제 | 나만의지도 기능 없음 |
+| `uploadShp?` · `previewExcel?` · `confirmExcel?` | SHP·엑셀 업로드 | 해당 업로드가 안 됨 |
+| `getShare?` · `setShare?` | 공유 설정 | 공유 칸이 비어 있음 |
+| `quota?()` | `{ownedLayers, maxLayers, maxRows:{pnu,address,coord}, maxShpFeatures, maxExcelMb, maxShpMb, coverage}` — `coverage`는 아래 | 패널의 `내 레이어 n/20`과 한도·지적도 기준월 문구가 빠진다(패널을 열 때 1번만 받는다) |
+| `downloadSample?(kind)` | `'pnu' \| 'coord'`(`'address'`는 2단계) 샘플 xlsx **바이트(Blob)**. 저장은 위젯이 `<a download>`로 한다 | 업로드 창의 "샘플 받기"가 없다 |
+| `importReport?(id, {page, size, reason})` | 소유자 전용 결과 보고서 `{total, matched, failed, byReason, rows:[{rowNo, reason, message, input, candidates}], page, size, totalRows}` | `실패 N 보기`가 링크 대신 글자 |
+| `downloadImportFailures?(id)` | 실패 행 xlsx 바이트 | 보고서에 "실패 행 엑셀 받기"가 없다 |
+
+- `confirmExcel(input)`은 `{ id }`를 돌려줄 수 있다(처리는 비동기 — 패널이 목록 폴링으로 진행률을 본다). 옛 소스처럼 아무것도 안 돌려줘도 된다. 입력의 `mode`(`'PNU' | 'ADDRESS' | 'COORD'`)·`pnuColumn`·`addressColumn`은 선택이고
+  없으면 좌표(`latColumn`·`lonColumn`·`sourceSrid`)다. 주소 모드는 2단계에서 켜지므로 업로드 창은 PNU·좌표만 보여 준다.
+- `previewExcel`의 응답에 `suggestions`가 있으면 모드·컬럼을 미리 고르고, **없으면 옛 서버로 보고 좌표(위도·경도) 하나뿐인 옛 흐름**으로 동작한다. `totalRows`·`limits`·`warnings`
+  (`NUMERIC_PNU_CELLS`·`DUPLICATE_FILE`·`OVER_LIMIT`)가 있으면 경고 배너와 행 한도 검사(모드별 `limits`, 없으면 `quota.maxRows`)를 한다. 모르는 경고 코드도 `message`를 그대로 보여 준다.
+- 목록 항목의 새 필드(전부 선택): `ownerId`(공유받은 항목의 "보낸 사람")·`sourceKind`(`SHP|EXCEL_COORD|EXCEL_PNU|EXCEL_ADDRESS` — 있으면 종류 배지)·`progressTotal`/`progressDone`(처리 중 막대)·
+  `matchedCount`/`failedCount`(`매칭 N · 실패 M`)·`parcelVersion`·`errorMessage`. `status(id)` 응답에도 같은 진행률·건수 필드를 실을 수 있고, 있으면 처리 중에도 목록에 반영한다(없으면 옛 동작 — 끝났을 때만).
+- `quota().coverage`(= `MyMapCoverage`): `{ sidoCodes, parcelVersion, loaded?, nationwide?, restrictedSidoCodes? }`. **`nationwide`가 있는 새 서버**에서는 `sidoCodes` = 실제 적재된 시도(지역 제한이 있으면 그 교집합), `parcelVersion` = 그 중 가장 이른 기준월,
+  `loaded` = 시도별 기준월, `nationwide` = 전국 기준 시도(서버 설정, 기본 현행 16개)가 전부 적재되고 제한이 없을 때만 true, `restrictedSidoCodes` = 지역 제한 설정값. **빈 `sidoCodes`는 전국이 아니다.** 업로드 창 문구:
+  `nationwide` → "지적도 기준월 2026-10(전국)" / 일부 → "제공 지역: 세종 · 기준월 2026-10"(시도 4개 이상은 "제공 지역: 일부 시도(n/16) · 기준월 …", 시도별 기준월은 마우스를 올리면) + "적재된 시도 밖의 PNU는 실패합니다" 안내 / 비어 있으면 "지적도 자료 준비 중입니다"(PNU 확정은 서버가 503).
+  **`nationwide`가 없는 옛 서버**에서는 `sidoCodes`를 지역 제한 설정값으로 보고(비면 "(전국)", 있으면 "(제공 지역: …)") 옛 문구를 그대로 쓴다. 시도 이름표는 `ui/mymap/format.ts`의 `SIDO_NAMES`(12 전남광주·42·45 포함).
+- 목록 항목 `errorMessage`(실패한 레이어의 이유)는 패널에 그대로 보이고, `status(id)` 응답의 `parcelVersion`·`geomType`은 끝났을 때 목록에 합친다(목록을 다시 받지 않아도 "지적도 YYYY-MM"이 나온다).
+- `confirmExcel`의 반환 `MyMapConfirmResult { id, parcelVersion? }`: PNU 모드의 "예정" 기준월이면 패널이 처리 중인 동안 "지적도 2026-10 예정"으로 보이고, 끝나면 상태·목록의 확정값으로 바뀐다. `importReport`의 `duplicatePnuCount`(같은 PNU가 여러 행이라 피처가 겹친 수)가 0보다 크면 보고서에 "중복 PNU N건" 한 줄.
+- 서버가 거절하면(5,001행부터 미리보기 400, 미리보기·확정·shp 동시 실행 429 등) 서버 `message`를 업로드 창에 그대로 보여 준다. 파일 고르는 단계에는 "수식은 값으로 붙여넣은 파일" 안내 한 줄이 있다(서버가 수식 셀을 엑셀이 저장한 계산값으로 읽는다).
+- 파일 저장(샘플·실패 행 엑셀)은 `<a download>`를 클릭하고 **30초 뒤에** `URL.revokeObjectURL`한다(Firefox가 클릭 직후 해제를 취소로 처리하는 것을 피함). 실패 행이 보관 기간(30일)이 지나 지워진 레이어는 보고서가 안내만 보여 준다.
+- `adapters/rest`: 응답 본문이 JSON이 아니면(프록시의 413·502 HTML 등) "Unexpected token" 대신 호출부의 기본 문구, 413은 "파일이 너무 큽니다(서버 한도)"로 던진다.
+- 엔진: `map.vector.openCatalog()`의 상태(`MyMapCatalogState`)에 `quota: MyMapQuota | null`이 늘었다. 훅은 새로 만들지 않았다(`useMyMapCatalog()`로 같은 상태). 패널은 내 레이어 / 공유받은 레이어 두 묶음으로 나눠 그린다
+  (공유받은 항목이 있을 때만 묶음 제목이 나온다).
+- 어댑터: `restSources()`의 `myMap`이 위 메서드를 `/api/mymap/{quota, samples/{kind}, {id}/import-report(.xlsx)}`로 구현한다. 파일 응답은 봉투가 없고, 오류 본문의 `message`가 있으면 그 글을 `Error`로 던진다.
+
 ### 바람지도 (선택)
 
 패널을 쓰려면 플러그인과 패널을 함께 넣는다. 앱 쪽 예: `panels={[...defaultPanels, windPanel]}` (`windPanel`은 `@gtp/gis-map/ui`, 권한 키 `map.tool.wind`).
