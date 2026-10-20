@@ -2,6 +2,7 @@ package com.gtp.domain.mymap.util;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,7 +16,8 @@ public class FeatureBatchInserter implements AutoCloseable {
 
     private static final int BATCH_SIZE = 1000;
     private static final String SQL =
-            "INSERT INTO tbl_user_map_feature (user_map_id, geometry_json, properties_json) VALUES (?, ?, ?)";
+            "INSERT INTO tbl_user_map_feature (user_map_id, geometry_json, properties_json, pnu, row_no) VALUES (?, ?, ?, ?, ?)";
+    private static final int[] TYPES = {Types.BIGINT, Types.VARCHAR, Types.VARCHAR, Types.VARCHAR, Types.INTEGER};
 
     private final JdbcTemplate jdbcTemplate;
     private final Long userMapId;
@@ -28,7 +30,12 @@ public class FeatureBatchInserter implements AutoCloseable {
     }
 
     public void add(String geometryJson, String propertiesJson) {
-        buffer.add(new Object[]{userMapId, geometryJson, propertiesJson});
+        add(geometryJson, propertiesJson, null, null);
+    }
+
+    /** pnu·rowNo는 엑셀 PNU 가져오기에서만 채운다(다시 매칭·내보내기용). */
+    public void add(String geometryJson, String propertiesJson, String pnu, Integer rowNo) {
+        buffer.add(new Object[]{userMapId, geometryJson, propertiesJson, pnu, rowNo});
         if (buffer.size() >= BATCH_SIZE) {
             flush();
         }
@@ -36,13 +43,13 @@ public class FeatureBatchInserter implements AutoCloseable {
 
     public void flush() {
         if (buffer.isEmpty()) return;
-        jdbcTemplate.batchUpdate(SQL, buffer);
+        jdbcTemplate.batchUpdate(SQL, buffer, TYPES);
         totalInserted += buffer.size();
         buffer.clear();
     }
 
     public int totalInserted() {
-        return totalInserted;
+        return totalInserted + buffer.size();
     }
 
     @Override

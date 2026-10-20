@@ -19,6 +19,19 @@ public class UserMapListItem {
     private final String styleConfig;
     private final LocalDateTime createdAt;
 
+    // 1단계(엑셀 PNU·좌표 가져오기) 추가 필드
+    private final String ownerId;
+    /** SHP | EXCEL_COORD | EXCEL_PNU | EXCEL_ADDRESS (옛 행은 sourceType으로 채움) */
+    private final String sourceKind;
+    private final int matchedCount;
+    private final int failedCount;
+    private final int progressTotal;
+    private final int progressDone;
+    /** 매칭에 쓴 연속지적도 기준월(YYYY-MM). PNU 레이어만 */
+    private final String parcelVersion;
+    /** FAILED 레이어의 이유(그 밖에는 null) — 새로고침 뒤에도 사유를 보여 주려고 목록에도 싣는다 */
+    private final String errorMessage;
+
     public UserMapListItem(UserMap m, boolean owner) {
         this.id = m.getId();
         this.name = m.getName();
@@ -31,5 +44,14 @@ public class UserMapListItem {
         this.owner = owner;
         this.styleConfig = m.getStyleConfig();
         this.createdAt = m.getCreatedAt();
+        this.ownerId = m.getOwnerId();
+        this.sourceKind = m.getSourceKind() != null ? m.getSourceKind()
+                : ("SHP".equals(m.getSourceType()) ? "SHP" : "EXCEL_COORD");
+        this.matchedCount = m.getMatchedCount();
+        this.failedCount = m.getFailedCount();
+        this.progressTotal = m.getProgressTotal();
+        this.progressDone = m.getProgressDone();
+        this.parcelVersion = m.getParcelVersion();
+        this.errorMessage = m.getErrorMessage();
     }
 }

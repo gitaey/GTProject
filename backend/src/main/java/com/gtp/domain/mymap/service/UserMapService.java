@@ -3,6 +3,8 @@ package com.gtp.domain.mymap.service;
 import com.gtp.domain.mymap.dto.*;
 import com.gtp.domain.mymap.entity.UserMap;
 import com.gtp.domain.mymap.repository.UserMapFeatureRepository;
+import com.gtp.domain.mymap.repository.UserMapImportFailureRepository;
+import com.gtp.domain.mymap.util.StyleConfigValidator;
 import com.gtp.domain.mymap.repository.UserMapRepository;
 import com.gtp.global.exception.CustomException;
 import com.gtp.global.gis.GisErrorCode;
@@ -22,16 +24,20 @@ public class UserMapService {
 
     private final UserMapRepository userMapRepository;
     private final UserMapFeatureRepository featureRepository;
+    private final UserMapImportFailureRepository failureRepository;
     private final UserMapPermissionService permissionService;
     private final JdbcTemplate jdbcTemplate;
 
     private static final int STREAM_FETCH_SIZE = 500;
 
+    /** 역할이 없는 사용자의 IN 목록 자리 값(빈 IN 목록을 피한다). 실제 역할 코드와 겹치지 않는다. */
+    public static final String NO_ROLE = "__NO_ROLE__";
+
     @Transactional(readOnly = true)
     public List<UserMapListItem> findVisibleTo(String userId, List<String> roleCodes) {
-        List<Long> sharedIds = permissionService.findSharedUserMapIds(userId, roleCodes);
-        return userMapRepository.findAllByOrderByCreatedAtDesc().stream()
-                .filter(m -> m.isOwnedBy(userId) || sharedIds.contains(m.getId()))
+        // 소유 OR 공유(사용자·역할)를 SQL 한 번으로 가린다 — 전체 레이어를 읽어 자바에서 거르지 않는다
+        List<String> roles = roleCodes == null || roleCodes.isEmpty() ? List.of(NO_ROLE) : roleCodes;
+        return userMapRepository.findVisibleTo(userId, roles).stream()
                 .map(m -> new UserMapListItem(m, m.isOwnedBy(userId)))
                 .toList();
     }
@@ -51,6 +57,12 @@ public class UserMapService {
                 .status(map.getStatus())
                 .errorMessage(map.getErrorMessage())
                 .featureCount(map.getFeatureCount())
+                .progressTotal(map.getProgressTotal())
+                .progressDone(map.getProgressDone())
+                .matchedCount(map.getMatchedCount())
+                .failedCount(map.getFailedCount())
+                .parcelVersion(map.getParcelVersion())
+                .geomType(map.getGeomType())
                 .build();
     }
 
@@ -121,7 +133,8 @@ public class UserMapService {
     public void update(Long id, String userId, UserMapUpdateRequest req) {
         UserMap map = findById(id);
         permissionService.assertOwner(map, userId);
-        map.updateMeta(req.getName(), req.getDescription(), req.getStyleConfig(), req.isVisible());
+        StyleConfigValidator.validate(req.getStyleConfig());
+        map.applyPatch(req.getName(), req.getDescription(), req.getStyleConfig(), req.getVisible());
     }
 
     @Transactional
@@ -130,6 +143,7 @@ public class UserMapService {
         permissionService.assertOwner(map, userId);
         permissionService.deleteAllAccessFor(map);
         featureRepository.deleteByUserMap(map);
+        failureRepository.deleteByUserMapId(map.getId());
         userMapRepository.delete(map);
     }
 
@@ -163,6 +177,7 @@ public class UserMapService {
         UserMap map = findById(id);
         permissionService.deleteAllAccessFor(map);
         featureRepository.deleteByUserMap(map);
+        failureRepository.deleteByUserMapId(map.getId());
         userMapRepository.delete(map);
     }
 }

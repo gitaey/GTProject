@@ -1,0 +1,7 @@
+# 시험 전용 설정 — 메인 application.yml(운영 DB 주소·PostgreSQL dialect)을 가리고 H2로 돈다.
+# 메인 yml의 mymap.* 값은 MyMapConfigGuardTest가 파일을 직접 읽어 따로 검사한다.
+spring:
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop

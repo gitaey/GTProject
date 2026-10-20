@@ -62,6 +62,33 @@ public class UserMap {
     @Column(name = "feature_count", nullable = false)
     private int featureCount = 0;
 
+    // ---- 엑셀 가져오기(PNU·좌표) — 설계 6.2 1단계 SQL(S1)이 먼저 실행돼 있어야 한다 ----
+
+    @Column(name = "source_kind", length = 20)
+    private String sourceKind; // SHP, EXCEL_COORD, EXCEL_PNU, EXCEL_ADDRESS
+
+    @Builder.Default
+    @Column(name = "progress_total", nullable = false)
+    private int progressTotal = 0;
+
+    @Builder.Default
+    @Column(name = "progress_done", nullable = false)
+    private int progressDone = 0;
+
+    @Builder.Default
+    @Column(name = "matched_count", nullable = false)
+    private int matchedCount = 0;
+
+    @Builder.Default
+    @Column(name = "failed_count", nullable = false)
+    private int failedCount = 0;
+
+    @Column(name = "file_hash", length = 64)
+    private String fileHash; // sha256 — 같은 사람이 같은 파일을 다시 올리면 미리보기에서 경고
+
+    @Column(name = "parcel_version", length = 7)
+    private String parcelVersion; // 매칭에 쓴 연속지적도 기준월 YYYY-MM
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -79,14 +106,22 @@ public class UserMap {
 
     public void markFailed(String errorMessage) {
         this.status = "FAILED";
-        this.errorMessage = errorMessage;
+        this.errorMessage = clip(errorMessage, ERROR_MESSAGE_MAX);
     }
 
-    public void updateMeta(String name, String description, String styleConfig, boolean visible) {
-        this.name = name;
-        this.description = description;
-        this.styleConfig = styleConfig;
-        this.visible = visible;
+    /** 부분 수정: null인 값은 그대로 둔다. 이름은 비어 있으면 무시하고 길이는 칸 크기에 맞춘다. styleConfig는 빈 문자열이면 지운다. */
+    public void applyPatch(String name, String description, String styleConfig, Boolean visible) {
+        if (name != null && !name.isBlank()) this.name = clip(name.strip(), 100);
+        if (description != null) this.description = clip(description, 300);
+        if (styleConfig != null) this.styleConfig = styleConfig.isBlank() ? null : styleConfig;
+        if (visible != null) this.visible = visible;
+    }
+
+    public static final int ERROR_MESSAGE_MAX = 500;
+
+    public static String clip(String s, int max) {
+        if (s == null) return null;
+        return s.length() > max ? s.substring(0, max) : s;
     }
 
     public boolean isOwnedBy(String userId) {

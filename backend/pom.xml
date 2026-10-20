@@ -96,6 +96,12 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- 나만의지도 시험: 가짜 DB(H2)로 SQL·엔티티 매핑을 돌린다. test scope라 운영 빌드에 들어가지 않는다 -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
 
         <!-- Google Sheets API (GoogleSheetsService, 레이드 일정) -->
         <dependency>
@@ -178,6 +184,14 @@
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <!-- 시험만: JDK 25에서 돌릴 때 Mockito의 Byte Buddy가 아직 25를 공식 지원하지 않아 experimental 플래그가 필요하다(JDK 17에서는 무해) -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>-Dnet.bytebuddy.experimental=true -Dfile.encoding=UTF-8</argLine>
                 </configuration>
             </plugin>
             <plugin>

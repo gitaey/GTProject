@@ -29,4 +29,12 @@ public class UserMapFeature {
 
     @Column(name = "properties_json", columnDefinition = "TEXT")
     private String propertiesJson;
+
+    /** PNU 가져오기로 만든 피처의 PNU(다시 매칭·내보내기용). 그 밖에는 null */
+    @Column(name = "pnu", length = 19)
+    private String pnu;
+
+    /** 원본 엑셀 행 번호(머리글 = 1). 엑셀이 아니면 null */
+    @Column(name = "row_no")
+    private Integer rowNo;
 }
