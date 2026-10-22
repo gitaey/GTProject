@@ -39,10 +39,12 @@ public class UserMapImportStore {
                 done, total, now(), id) > 0;
     }
 
-    public boolean markReady(long id, String geomType, int featureCount, int matched, int failed, int processed, String parcelVersion) {
+    /** @param columnSchema 컬럼 통계 JSON(ColumnStatsCollector 형식 v1) — 스타일 대화상자·스타일 검증용. null이면 비워 둔다(나중에 요청 때 계산) */
+    public boolean markReady(long id, String geomType, int featureCount, int matched, int failed, int processed, String parcelVersion,
+                             String columnSchema) {
         return jdbc.update("UPDATE tbl_user_map SET status = 'READY', geom_type = ?, feature_count = ?, matched_count = ?, "
-                        + "failed_count = ?, progress_done = ?, progress_total = ?, parcel_version = ?, error_message = NULL, updated_at = ? WHERE id = ?",
-                geomType, featureCount, matched, failed, processed, processed, parcelVersion, now(), id) > 0;
+                        + "failed_count = ?, progress_done = ?, progress_total = ?, parcel_version = ?, column_schema = ?, error_message = NULL, updated_at = ? WHERE id = ?",
+                geomType, featureCount, matched, failed, processed, processed, parcelVersion, columnSchema, now(), id) > 0;
     }
 
     public boolean markFailed(long id, String message) {

@@ -54,6 +54,7 @@ class SecurityContractTest {
                 "POST /upload/excel/preview", "previewExcel",
                 "POST /upload/excel/confirm", "confirmExcel",
                 "GET /{id}/status", "status",
+                "GET /{id}/columns", "columns",
                 "PATCH /{id}", "update");
         for (Map.Entry<String, String> e : expected.entrySet()) {
             String[] parts = e.getKey().split(" ", 2);

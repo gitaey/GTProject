@@ -153,6 +153,8 @@ public class UserMapImportJob {
         final Set<String> usedSidos = new TreeSet<>();
         final List<FailureRow> failureBuf = new ArrayList<>();
         final List<PnuRow> batch = new ArrayList<>();
+        /** 지도에 오른(매칭된) 행의 컬럼 통계 — 머리글을 읽은 뒤 만든다 */
+        ColumnStatsCollector stats;
 
         Run(Request req) {
             this.req = req;
@@ -180,6 +182,7 @@ public class UserMapImportJob {
                 // 시트를 한 행씩 스트리밍으로 읽는다(메모리에 시트 전체를 올리지 않는다)
                 ExcelSheet.read(req.file(), h -> {
                     headers = h;
+                    stats = new ColumnStatsCollector(h);
                     keyIdx[0] = columnIndex(req.pnuColumn(), GisErrorCode.MYMAP_COLUMN_REQUIRED.exception(ImportMode.PNU.label()));
                 }, row -> {
                     if (processed >= maxRows) {
@@ -228,6 +231,7 @@ public class UserMapImportJob {
                 }
                 inserter.add(shape.geometryJson(), pr.properties(), pr.pnu(), pr.row().rowNo());
                 matched++;
+                stats.addRow(plainValues(pr.row()));
                 usedSidos.add(pr.pnu().substring(0, 2));
                 if (geomType == null) geomType = geometryTypeOf(shape.geometryJson());
             }
@@ -265,6 +269,7 @@ public class UserMapImportJob {
             try (FeatureBatchInserter inserter = new FeatureBatchInserter(jdbc, id)) {
                 ExcelSheet.read(req.file(), h -> {
                     headers = h;
+                    stats = new ColumnStatsCollector(h);
                     idx[0] = columnIndex(req.latColumn(), new CustomException(GisErrorCode.INVALID_COORDINATE_COLUMN));
                     idx[1] = columnIndex(req.lonColumn(), new CustomException(GisErrorCode.INVALID_COORDINATE_COLUMN));
                 }, row -> {
@@ -288,6 +293,7 @@ public class UserMapImportJob {
                             } else {
                                 inserter.add(pointJson(c), propertiesOf(row), null, row.rowNo());
                                 matched++;
+                                stats.addRow(plainValues(row));
                             }
                         }
                     }
@@ -329,7 +335,8 @@ public class UserMapImportJob {
         void finish(String parcelVersion) {
             store.insertFailures(id, failureBuf);
             failureBuf.clear();
-            if (!store.markReady(id, geomType, matched, matched, failed, processed, parcelVersion)) throw new LayerGone();
+            String columnSchema = stats == null ? null : stats.toJson(false);
+            if (!store.markReady(id, geomType, matched, matched, failed, processed, parcelVersion, columnSchema)) throw new LayerGone();
             log.info("[나만의지도] 가져오기 완료 id={} mode={} 처리={} 매칭={} 실패={}", id, req.mode(), processed, matched, failed);
         }
 
@@ -338,6 +345,13 @@ public class UserMapImportJob {
             ObjectNode n = om.createObjectNode();
             for (int c = 0; c < headers.size(); c++) n.put(headers.get(c), row.cells().get(c).plain());
             return n.toString();
+        }
+
+        /** 통계용 값(속성으로 저장하는 값과 같다 — 숫자는 서식 없이). */
+        List<String> plainValues(ExcelSheet.Row row) {
+            List<String> out = new ArrayList<>(row.cells().size());
+            for (CellData c : row.cells()) out.add(c.plain());
+            return out;
         }
 
         /** 실패 행 원본: 엑셀에서 보이던 그대로. */

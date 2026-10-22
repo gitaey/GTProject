@@ -35,6 +35,7 @@ public class UserMapController {
     private final UserMapUploadService uploadService;
     private final ImportReportService reportService;
     private final MyMapQuotaService quotaService;
+    private final MyMapColumnService columnService;
     private final SampleService sampleService;
     private final GisUserContext gisUserContext;
 
@@ -64,6 +65,12 @@ public class UserMapController {
     @GetMapping("/{id}/status")
     public ApiResponse<UserMapStatusResponse> status(@PathVariable Long id) {
         return ApiResponse.ok(userMapService.getStatus(id, currentUserId(), currentRoleCodes()));
+    }
+
+    /** 레이어 컬럼 통계(스타일 대화상자용) — 볼 수 있는 사람(소유자·공유 대상). 형식은 ColumnStatsCollector 주석 */
+    @GetMapping("/{id}/columns")
+    public ApiResponse<com.fasterxml.jackson.databind.JsonNode> columns(@PathVariable Long id) {
+        return ApiResponse.ok(columnService.columnsFor(id, currentUserId(), currentRoleCodes()));
     }
 
     /** 엑셀 가져오기 결과 보고서(레이어 주인만) */

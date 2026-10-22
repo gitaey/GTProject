@@ -3,6 +3,7 @@ package com.gtp.domain.mymap.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
@@ -10,8 +11,12 @@ import java.time.LocalDateTime;
 /**
  * 나만의지도 — 사용자가 업로드한 shp/엑셀 데이터를 담는 지도 한 장.
  * 다른 도메인(Layer, User)을 참조하지 않는 독립 엔티티 — ownerId는 JWT의 principal 문자열을 그대로 저장한다.
+ *
+ * {@code @DynamicUpdate}: 바뀐 칸만 UPDATE한다. 가져오기 작업·컬럼 통계 계산이 JDBC로 직접 쓰는 칸(status·진행률·matched/failed·column_schema 등)을
+ * 같은 트랜잭션의 옛 엔티티 값이 전체 칸 UPDATE로 덮어쓰는 일(lost update)을 막는다. DDL에는 영향이 없다(INSERT는 그대로).
  */
 @Entity
+@DynamicUpdate
 @Table(name = "tbl_user_map")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -49,7 +54,7 @@ public class UserMap {
     private String errorMessage;
 
     @Column(name = "column_schema", columnDefinition = "TEXT")
-    private String columnSchema; // 속성 컬럼명 목록 (JSON 배열 문자열)
+    private String columnSchema; // 속성 컬럼 통계(JSON, ColumnStatsCollector v1). 옛 레이어는 비었거나 컬럼명 배열 — 요청 때 다시 계산
 
     @Column(name = "style_config", columnDefinition = "TEXT")
     private String styleConfig; // 색상 등 표시 스타일 (JSON 문자열)
@@ -102,6 +107,10 @@ public class UserMap {
         this.geomType = geomType;
         this.featureCount = featureCount;
         this.errorMessage = null;
+    }
+
+    public void applyColumnSchema(String json) {
+        this.columnSchema = json;
     }
 
     public void markFailed(String errorMessage) {

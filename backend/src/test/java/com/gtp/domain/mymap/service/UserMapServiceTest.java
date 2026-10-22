@@ -45,7 +45,7 @@ class UserMapServiceTest {
     @BeforeEach
     void setUp() {
         UserMapPermissionService perm = new UserMapPermissionService(userAccess, permAccess, em);
-        service = new UserMapService(repo, featureRepo, failureRepo, perm, jdbc);
+        service = new UserMapService(repo, featureRepo, failureRepo, perm, new MyMapColumnService(repo, perm, jdbc), jdbc);
         mine = repo.saveAndFlush(UserMap.builder().name("내 것").description("설명").styleConfig("{\"v\":1}").ownerId("alice")
                 .sourceType("EXCEL").sourceKind("EXCEL_PNU").sourceSrid("EPSG:4326").parcelVersion("2026-10").build());
         shared = repo.saveAndFlush(UserMap.builder().name("공유받음").ownerId("bob").sourceType("SHP").sourceSrid("EPSG:5186").build());

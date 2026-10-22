@@ -190,6 +190,25 @@ class UserMapImportJobTest {
 
         assertThat(Files.exists(file)).isFalse();            // 처리한 원본은 지운다
         assertThat(guard.isActive(OWNER)).isFalse();         // 자물쇠를 푼다
+
+        // 컬럼 통계(스타일 대화상자용)는 지도에 오른 3행(1100·900·1)만으로 기록된다 — 실패 행은 빠진다
+        JsonNode schema = OM.readTree(columnSchema(id));
+        assertThat(schema.get("v").asInt()).isEqualTo(1);
+        assertThat(schema.get("rowCount").asLong()).isEqualTo(3);
+        assertThat(schema.get("columns")).extracting(n -> n.get("name").asText()).containsExactly("PNU", "이름", "직원수");
+        JsonNode staff = schema.get("columns").get(2);
+        assertThat(staff.get("kind").asText()).isEqualTo("number");
+        assertThat(staff.get("min").asLong()).isEqualTo(1);
+        assertThat(staff.get("max").asLong()).isEqualTo(1100);
+        List<String> topValues = new ArrayList<>();
+        staff.get("top").forEach(t -> topValues.add(t.get("value").asText()));
+        assertThat(topValues).containsExactlyInAnyOrder("1100", "900", "1");   // 서식(1,100) 없는 속성 값으로 센다
+        assertThat(schema.get("columns").get(0).get("kind").asText()).isEqualTo("text");   // PNU(19자리)는 숫자가 아니라 글자
+        assertThat(schema.get("columns").get(1).get("distinct").asLong()).isEqualTo(3);
+    }
+
+    private String columnSchema(long id) {
+        return jdbc.queryForObject("SELECT column_schema FROM tbl_user_map WHERE id = ?", String.class, id);
     }
 
     @Test
@@ -418,6 +437,13 @@ class UserMapImportJobTest {
         assertThat(g.get("coordinates").get(1).asDouble()).isEqualTo(37.5663);
         assertThat(f.get(0).get("pnu")).isNull();
         assertThat(failures(id).get(1).get("input")).isEqualTo("abc, 127");
+
+        JsonNode schema = OM.readTree(columnSchema(id));
+        assertThat(schema.get("rowCount").asLong()).isEqualTo(4);
+        assertThat(schema.get("columns").get(0).get("name").asText()).isEqualTo("위도");
+        assertThat(schema.get("columns").get(0).get("kind").asText()).isEqualTo("number");
+        assertThat(schema.get("columns").get(0).get("max").asDouble()).isEqualTo(37.5663);
+        assertThat(schema.get("columns").get(2).get("kind").asText()).isEqualTo("text");
     }
 
     @Test
@@ -459,6 +485,7 @@ class UserMapImportJobTest {
         job.execute(new Request(id, OWNER, ImportMode.PNU, xlsx(List.of(row("A"), row(SEOUL))), 1, "PNU", null, null, "EPSG:4326"));
         assertThat(layerRow(id).get("STATUS")).isEqualTo("FAILED");
         assertThat((String) layerRow(id).get("ERROR_MESSAGE")).isEqualTo("PNU에 쓸 컬럼을 선택하세요.");
+        assertThat(columnSchema(id)).isNull();
     }
 
     @Test

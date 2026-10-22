@@ -26,6 +26,7 @@ public class UserMapService {
     private final UserMapFeatureRepository featureRepository;
     private final UserMapImportFailureRepository failureRepository;
     private final UserMapPermissionService permissionService;
+    private final MyMapColumnService columnService;
     private final JdbcTemplate jdbcTemplate;
 
     private static final int STREAM_FETCH_SIZE = 500;
@@ -133,7 +134,10 @@ public class UserMapService {
     public void update(Long id, String userId, UserMapUpdateRequest req) {
         UserMap map = findById(id);
         permissionService.assertOwner(map, userId);
-        StyleConfigValidator.validate(req.getStyleConfig());
+        // 스타일에 쓴 컬럼이 이 레이어에 있는지·구간형이 숫자 컬럼인지까지 본다(컬럼 통계가 없으면 모양·범위만)
+        if (req.getStyleConfig() != null && !req.getStyleConfig().isBlank()) {
+            StyleConfigValidator.validate(req.getStyleConfig(), columnService.validationColumns(map));
+        }
         map.applyPatch(req.getName(), req.getDescription(), req.getStyleConfig(), req.getVisible());
     }
 

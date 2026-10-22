@@ -44,6 +44,7 @@ class UserMapProcessorTest {
         tb.setName("pts");
         tb.add("the_geom", Point.class);
         tb.add("name", String.class);
+        tb.add("n", Integer.class);
         SimpleFeatureType type = tb.buildFeatureType();
 
         Path file = dir.resolve("t" + System.nanoTime() + ".shp");
@@ -58,6 +59,7 @@ class UserMapProcessorTest {
                 SimpleFeature f = w.next();
                 f.setAttribute(0, gf.createPoint(new Coordinate(126.9 + i * 0.001, 37.5)));
                 f.setAttribute(1, "p" + i);
+                f.setAttribute(2, i + 1);
                 w.write();
             }
         }
@@ -91,6 +93,14 @@ class UserMapProcessorTest {
         assertThat(got.getFeatureCount()).isEqualTo(5);
         assertThat(featureCount(m.getId())).isEqualTo(5);
         assertThat(file.toFile()).doesNotExist();   // 처리 뒤 임시 shp 정리
+        // 컬럼 통계: 지오메트리 컬럼은 빠지고 속성만, 정수 속성 n은 숫자 컬럼, 이름은 글자 컬럼
+        com.fasterxml.jackson.databind.JsonNode schema = new com.fasterxml.jackson.databind.ObjectMapper().readTree(got.getColumnSchema());
+        assertThat(schema.get("rowCount").asLong()).isEqualTo(5);
+        assertThat(schema.get("columns")).extracting(c -> c.get("name").asText()).containsExactly("name", "n");
+        assertThat(schema.get("columns").get(0).get("kind").asText()).isEqualTo("text");
+        assertThat(schema.get("columns").get(1).get("kind").asText()).isEqualTo("number");
+        assertThat(schema.get("columns").get(1).get("min").asLong()).isEqualTo(1);
+        assertThat(schema.get("columns").get(1).get("max").asLong()).isEqualTo(5);
         assertThat(guard.isActive("alice")).isFalse();   // 처리가 끝나면 사용자당 1건 자물쇠를 푼다
     }
 
@@ -125,6 +135,7 @@ class UserMapProcessorTest {
         assertThat(got.getStatus()).isEqualTo("FAILED");
         assertThat(got.getErrorMessage()).contains("최대 3개").contains("처리하지 못했습니다");
         assertThat(featureCount(m.getId())).isZero();
+        assertThat(got.getColumnSchema()).isNull();   // 실패한 레이어에는 통계를 남기지 않는다
     }
 
     @Test

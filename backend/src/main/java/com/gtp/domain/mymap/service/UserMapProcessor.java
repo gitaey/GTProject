@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.gtp.domain.mymap.config.MyMapProperties;
 import com.gtp.domain.mymap.entity.UserMap;
+import com.gtp.domain.mymap.util.ColumnStatsCollector;
 import com.gtp.domain.mymap.repository.UserMapRepository;
 import com.gtp.domain.mymap.util.CoordinateTransformUtil;
 import com.gtp.domain.mymap.util.FeatureBatchInserter;
@@ -25,6 +26,10 @@ import org.springframework.stereotype.Component;
 import java.io.File;
 import java.io.StringWriter;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * shp 파일 세트를 비동기로 파싱해서 UserMapFeature로 적재하는 컴포넌트.
@@ -74,6 +79,12 @@ public class UserMapProcessor {
             String geomType = null;
             int count = 0;
 
+            List<String> attrNames = new ArrayList<>();
+            for (AttributeDescriptor attr : source.getSchema().getAttributeDescriptors()) {
+                if (!Geometry.class.isAssignableFrom(attr.getType().getBinding())) attrNames.add(attr.getLocalName());
+            }
+            ColumnStatsCollector stats = new ColumnStatsCollector(attrNames);
+
             org.geotools.data.simple.SimpleFeatureCollection collection = source.getFeatures();
             try (org.geotools.data.simple.SimpleFeatureIterator it = collection.features();
                  FeatureBatchInserter inserter = new FeatureBatchInserter(jdbcTemplate, userMapId)) {
@@ -93,18 +104,23 @@ public class UserMapProcessor {
                     geometryJSON.write(transformed, geomWriter);
 
                     ObjectNode properties = objectMapper.createObjectNode();
+                    Map<String, String> statRow = new HashMap<>();
                     for (AttributeDescriptor attr : feature.getFeatureType().getAttributeDescriptors()) {
                         String attrName = attr.getLocalName();
                         Object value = feature.getAttribute(attrName);
                         if (value instanceof Geometry) continue;
-                        properties.put(attrName, value != null ? value.toString() : null);
+                        String text = value != null ? value.toString() : null;
+                        properties.put(attrName, text);
+                        statRow.put(attrName, text);
                     }
+                    stats.addRow(statRow);
 
                     inserter.add(geomWriter.toString(), properties.toString());
                     count++;
                 }
             }
             map.markReady(geomType, count);
+            map.applyColumnSchema(stats.toJson(false));
             userMapRepository.save(map);
             log.info("나만의지도(shp) 처리 완료 id={} count={}", userMapId, count);
         } catch (Exception e) {
