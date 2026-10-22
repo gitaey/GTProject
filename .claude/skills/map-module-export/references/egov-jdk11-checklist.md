@@ -15,6 +15,7 @@
 | 그대로(문법만 손봄) | `…/domain/{map,mymap,geotiff,wind,geoserver}`의 `controller`, `dto`, `service`, `mymap/util` | 패키지명 변경 + 1·2절 치환 |
 | 그대로 | `…/global/response/ApiResponse`, `…/global/exception/{BaseErrorCode, CustomException}`, `…/global/gis/{GisErrorCode, GisUserContext}` | 5파일. 9절 참고 |
 | 새로 씀 | `GisUserContext` 구현 1개 | 8절 스켈레톤 |
+| 새로 씀(공유 기능을 쓸 때) | `GisShareDirectory` 구현 1개 — 공유 상대 사용자 검색·역할(세부권한) 목록 | 호스트의 사용자·역할 저장소에 맞는 SQL/서비스로 `{userId, name, groupLabel}`·`{code, label, parentCode?}`를 돌려준다(이메일 등 개인정보는 주지 않는다). 그리고 `GisUserContext.currentShareGroupCodes()`가 호스트의 "역할·부서" 코드(`역할:세부`)를 돌려주도록 |
 | 새로 씀 | `entity` → VO(어노테이션 제거), `repository` → MyBatis Mapper 인터페이스 + XML | 7절 예시, SQL은 `query-spec.md` 10절 |
 | 새로 씀 | 예외 핸들러(`@RestControllerAdvice`, 지도 패키지로 범위 제한) | 9절 |
 | 새로 씀 | 호스트 프록시 5종(VWorld 검색·데이터·범례, WFS, 지역명) | `query-spec.md` 9절 |

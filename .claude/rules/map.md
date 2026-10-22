@@ -73,7 +73,7 @@ React는 `<GisMapProvider host={…}>`(바뀌면 `map.setHost`), UMD는 `GisMap.
 감사가 못 잡는 것: 숨은 전역 CSS 의존(keyframes 등), GTProject 전용 개념이 타입에 섞였는지, 소스 인터페이스를 우회한 fetch, 다른 이름에 담은 전역 쓰기.
 
 **호스트가 제공해야 하는 것:** `{proxyBaseUrl}` 아래 `/vworld/search`·`/vworld/legend-style`·`/vworld/data`·`/wfs`·`/region`(키 숨김 프록시),
-`{apiBaseUrl}/api/` 아래 `layers`·`mymap`·`geotiff`·`wind`(쓰는 기능만). 엔드포인트·DDL은 `.claude/skills/map-module-export/references/`.
+`{apiBaseUrl}/api/` 아래 `layers`·`mymap`·`geotiff`·`wind`·`gis/share-directory`(공유 상대 검색, 쓰는 기능만 — 없으면 아이디·역할 코드를 직접 입력하는 폴백). 엔드포인트·DDL은 `.claude/skills/map-module-export/references/`.
 
 ## 프론트 구조
 

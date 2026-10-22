@@ -104,6 +104,10 @@ GTProject 구현은 JWT principal 문자열을 읽는다(`SecurityContextGisUser
 | U16 | GET `/api/mymap/{id}/import-report` | 소유자만 | A | 선택: 업로드 결과 보고서 |
 | U17 | GET `/api/mymap/{id}/import-report.xlsx` | 소유자만 | A | 선택: 실패 행 엑셀 |
 | U18 | GET `/api/mymap/{id}/columns` | 볼 수 있는 사람 | A | 선택: 스타일 컬럼 통계 |
+| U19 | GET `/api/mymap/shares?ids=` | 소유자만(소유한 것만) | A | 선택: 일괄 공유(현재 대상) |
+| U20 | POST `/api/mymap/shares/bulk` | 소유자만(소유한 것만) | A | 선택: 일괄 공유 |
+| U21 | GET `/api/gis/share-directory/users` | 로그인 | A | 선택: 공유 상대 사용자 검색 |
+| U22 | GET `/api/gis/share-directory/groups` | 로그인 | A | 선택: 공유 대상 역할 목록 |
 | U11 | GET `/api/mymap/srid-options` | 로그인 | - | 미사용(프론트는 자체 목록 `ui/mymap/sridOptions.ts`) |
 | U12 | GET `/api/admin/mymap` | SUPER_ADMIN | M | 관리 |
 | U13 | DELETE `/api/admin/mymap/{id}` | SUPER_ADMIN | M | 관리 |
@@ -372,14 +376,25 @@ DELETE FROM tbl_user_map                   WHERE id = #{id};
   5. `UPDATE tbl_user_map SET status='READY', geom_type='POINT', feature_count=<건수> …`
   6. 그 밖의 예외는 잡아서 `status='FAILED'`로 **커밋하고 200 성공 응답**(이미 넣은 피처도 커밋, 추론). 임시 파일·메모리 항목은 항상 삭제.
 
-### U8·U9. `/api/mymap/{id}/share` (소유자만)
+### U8·U9. `/api/mymap/{id}/share` (소유자만) — 공유 대상 조회·저장(통째로 바꾸기)
 
-| | 요청 | 응답 `data` | SQL |
-|---|---|---|---|
-| U8 GET | - | `{ "userIds": [...], "roleCodes": [...] }` | 존재·소유자 확인 → `SELECT user_id FROM tbl_user_map_user_access WHERE user_map_id = #{id}` / `SELECT role_code FROM tbl_user_map_permission_access WHERE user_map_id = #{id}` |
-| U9 PUT | `{ "userIds": [...], "roleCodes": [...] }` | `null` | 존재·소유자 확인 → 두 테이블 `DELETE … WHERE user_map_id` → (flush) → 빈 문자열/NULL을 건너뛰고 INSERT (`UserMapPermissionService.java:64-81`) |
+- U8 GET → `{ users:[{userId, name, state}], roles:[{code, label, state}] }`. `state`는 `ACTIVE`·`INACTIVE`(비활성 사용자)·`MISSING`(없는 대상 — 예전에 세부권한 코드 단독으로 저장돼 죽은 공유 등). 소유자가 아니면 403.
+- U9 PUT `{ userIds:[…], roleCodes:[…] }` → `null`. 두 목록을 통째로 바꾼다. **같은 값이 중복돼도 500이 아니라 한 번만 저장**, 본인(소유자)은 조용히 제외, **새로 추가하는 대상만** 존재를 검사(이미 있던 대상은 검사하지 않음), 대상은 사용자+역할 합쳐 100개까지(초과 400), 잘못된 대상은 400이고 아무것도 바꾸지 않는다.
+- 저장 구조: `tbl_user_map_user_access(user_map_id, user_id)`·`tbl_user_map_permission_access(user_map_id, role_code)`. 역할 칸의 값은 `역할코드` 또는 `역할코드:세부권한`(예: `MAP_USER:DEPT_A`)이다. **세부권한 코드에는 `:`를 쓸 수 없다**(400).
+- 공유받은 쪽의 보임 판정은 현재 사용자의 그룹 코드 `[역할, 역할:세부]`(`GisUserContext.currentShareGroupCodes()`)로 한다. 이식할 때 이 메서드가 호스트의 "역할·부서" 체계에 맞는 코드 목록을 돌려주면 된다(기본 구현은 `currentRoleCodes()`만).
 
-`userIds`/`roleCodes`가 `null`이면 그 종류는 "전부 해제"와 같다. 같은 값이 두 번 들어오면 UNIQUE 위반으로 500(추론). 사용자·역할이 실제로 있는지는 검사하지 않는다(도메인 독립).
+### U19·U20. 일괄 공유 `GET /api/mymap/shares?ids=` · `POST /api/mymap/shares/bulk`
+
+- GET: 선택한 레이어들(최대 50개, 중복 제거 후 초과·비었거나 숫자가 아니면 400 `SHARE_BULK_INVALID`)의 현재 공유를 레이어별로 `[{ id, users:[{userId, name, state}], roles:[{code, label, state}] }]`(요청 순서)로 준다 — 항목 모양은 U8과 같다. 프론트가 "2/3개 레이어" 같은 표시를 이 목록에서 센다. 남의 레이어나 없는 레이어는 응답에서 제외(존재 여부를 드러내지 않는다).
+- POST `{ ids:[…], mode:"ADD"|"REMOVE", userIds:[…], roleCodes:[…] }` → `{ succeededIds:[…], failed:[{id, reason:"NOT_AVAILABLE"|"LIMIT_EXCEEDED"}] }`. **더하기/빼기만 있고 덮어쓰기는 없다.** ADD는 새 대상의 존재를 검사하고(틀리면 400·무변경), REMOVE는 검사하지 않는다. 레이어 50개·대상 100개 상한, 소유한 레이어만 처리(남의/없는 레이어는 `NOT_AVAILABLE`로 건너뜀), 전체를 한 트랜잭션으로 처리한다.
+- 목록 `GET /api/mymap` 항목에 `ownerName`(**공유받은 항목에만**, 이름을 못 찾으면 null — 목록은 그대로 나간다)과 `shareCount`(**내 레이어에만**, 공유가 없으면 0, 공유받은 레이어는 null)가 붙는다.
+
+### U21·U22. 공유 상대 검색 — `GET /api/gis/share-directory/users` · `/groups` (로그인만, 지도 도메인 밖 `global/gis/share`)
+
+- `users?q=&limit=`: 이름·아이디 부분 일치(**2~50자**, 아이디는 앞부분 일치만, LIKE 특수문자 이스케이프), 최대 20건, **본인과 비활성 사용자 제외**, 사용자별 분당 60회 제한(넘으면 429 `SHARE_DIRECTORY_RATE_LIMITED` "잠시 후 다시 검색하세요."), 검색어가 2~50자가 아니면 400 `SHARE_QUERY_INVALID`. 응답 `[{userId, name, groupLabel}]` — **이메일·역할은 주지 않는다**(개인정보 최소화).
+- `groups`: 공유 대상으로 고를 역할 목록 `[{code, label, parentCode?}]`(한글 이름은 DB의 label, 세부권한은 `역할:세부` 코드 + `parentCode`), **슈퍼관리자 역할은 제외**.
+- 구현은 인터페이스 `GisShareDirectory`(`global/gis/share`)와 GTProject용 `JdbcGisShareDirectory`(SQL로만 조회, member 도메인 import 없음)다. **이식할 때 이 구현 하나를 호스트의 사용자·역할 저장소에 맞게 다시 쓴다**(전자정부 스켈레톤: `egov-jdk11-checklist.md` 8절).
+- 보안: `/api/gis/**`는 `SecurityConfig`에서 `authenticated()`로 등록해야 한다(빠뜨리면 `anyRequest().permitAll()`로 로그인 없이 열린다). 같은 설정에서 `/api/users/**`는 `hasAnyRole(SUPER_ADMIN, ADMIN, MAP_ADMIN)`로 제한한다(예전에는 로그인만 하면 사용자 쓰기까지 열려 있었다).
 
 ### U10. PATCH `/api/mymap/{id}` — 부분 수정(스타일 저장에 쓴다)
 

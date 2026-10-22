@@ -10,7 +10,7 @@ GTProject 지도 백엔드(Spring Boot 3 · Java 17 · JPA)를 업무 프로젝�
 | 1 | [`query-spec.md`](query-spec.md) 2·3절 | 무엇을 만들어야 하는지 정할 때 | 엔드포인트 전체 표(권한·프론트 사용처), **최소 구현(레이어 트리 L1) / 선택 목록** |
 | 2 | [`ddl.md`](ddl.md) | DB를 만들 때 | 10개 테이블 PostgreSQL DDL(FK 없음), 논리 관계, 권장 인덱스, seed, Hibernate 실제 스키마와 다른 점, Oracle/Tibero 변환 |
 | 3 | [`query-spec.md`](query-spec.md) 4~13절 | 매퍼·서비스를 짤 때 | 엔드포인트별 요청/응답 JSON·에러·SQL 등가물, Repository 28개 ↔ SQL 대조표, **깨지기 쉬운 계약**, 프론트-백엔드 불일치 |
-| 4 | [`egov-jdk11-checklist.md`](egov-jdk11-checklist.md) | 코드를 옮기고 설정할 때 | Java 17 문법 위치와 대체, `jakarta`→`javax`, Boot 자동 설정 → XML, 의존성 충돌, 업로드·비동기·스케줄러, 보안(JWT→세션), MyBatis XML 예시, `GisUserContext`·예외 핸들러 스켈레톤, 이식 순서 체크리스트 |
+| 4 | [`egov-jdk11-checklist.md`](egov-jdk11-checklist.md) | 코드를 옮기고 설정할 때 | Java 17 문법 위치와 대체, `jakarta`→`javax`, Boot 자동 설정 → XML, 의존성 충돌, 업로드·비동기·스케줄러, 보안(JWT→세션), MyBatis XML 예시, `GisUserContext`(공유를 쓰면 `GisShareDirectory`도)·예외 핸들러 스켈레톤, 이식 순서 체크리스트 |
 
 ## 한 줄 요약
 
