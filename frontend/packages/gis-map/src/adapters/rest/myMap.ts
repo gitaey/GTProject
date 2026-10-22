@@ -4,7 +4,7 @@
 // 1단계: quota·samples·import-report(.xlsx), 엑셀 확인의 mode·pnuColumn·addressColumn.
 import type {
     ExcelConfirmInput, ExcelPreviewResponse, GeoJsonObject, MyMapConfirmResult, MyMapImportReport, MyMapImportReportQuery, MyMapQuota,
-    MyMapSampleKind, MyMapSource, ShpUploadInput, SourceContext, UserMapListItem, UserMapShare, UserMapStatus,
+    MyMapSampleKind, MyMapSource, MyMapUpdateInput, ShpUploadInput, SourceContext, UserMapListItem, UserMapShare, UserMapStatus,
 } from '../../core'
 import { apiUrl, readBlob, readEnvelope } from './envelope'
 
@@ -107,6 +107,18 @@ export function restMyMap(ctx: SourceContext): MyMapSource {
         /** 봉투 없는 xlsx 바이트 */
         async downloadImportFailures(id: number): Promise<Blob> {
             return readBlob(await ctx.http.fetch(url(`/${id}/import-report.xlsx`)), '실패 행 엑셀을 받지 못했습니다')
+        },
+
+        /** PATCH /api/mymap/{id} — 등록자만(아니면 403 + message). 값이 있는 키만 보낸다: 서버는 null을 "그대로"로 본다. styleConfig ''는 지움 */
+        async update(id: number, patch: MyMapUpdateInput): Promise<void> {
+            const body: Record<string, string> = {}
+            if (patch.name !== undefined) body.name = patch.name
+            if (patch.description !== undefined) body.description = patch.description
+            if (patch.styleConfig !== undefined) body.styleConfig = patch.styleConfig
+            await readEnvelope<unknown>(
+                await ctx.http.fetch(url(`/${id}`), { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(body) }),
+                '저장하지 못했습니다',
+            )
         },
     }
 }

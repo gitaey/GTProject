@@ -112,3 +112,10 @@ export function sampleFileName(kind: MyMapSampleKind): string {
 export function safeFileName(name: string): string {
     return name.replace(/[\\/:*?"<>|\r\n]+/g, '_').trim() || 'mymap'
 }
+
+/** 숫자 → 천 단위 쉼표 + 소수 넷째 자리까지('1,234.5'). 시스템 로캘에 따라 달라지지 않게 직접 만든다 */
+export function formatNumber(n: number): string {
+    if (!Number.isFinite(n)) return '-'
+    const [int, frac] = String(Number(n.toFixed(4))).split('.')
+    return int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (frac ? `.${frac}` : '')
+}

@@ -1,4 +1,4 @@
-/* gis-map 코어 스타일: .gm-root 최소 리셋 + --gm-* 변수 + 코어 DOM(측정 툴팁·텍스트 입력·커서 안내) + OL 축척 막대(.gm-root 안). gm- 접두사만(OL 컨트롤 꾸밈은 .gm-root 아래로 한정), @layer 밖에 작성. */
+/* gis-map 코어 스타일: .gm-root 최소 리셋 + --gm-* 변수 + 코어 DOM(측정 툴팁·텍스트 입력·커서 안내·나만의지도 팝업) + OL 축척 막대(.gm-root 안). gm- 접두사만(OL 컨트롤 꾸밈은 .gm-root 아래로 한정), @layer 밖에 작성. */
 /* 불러오는 순서: gis-map.css → gis-map-ui.css (리셋이 코어·위젯 규칙보다 앞에 와야 한다 — 명시도가 같아서 뒤에 오는 규칙이 이긴다) */
 
 /* ── .gm-root 상속 기본값 (FE-5b-2, QA FE-5b-1 M1) ──
@@ -442,6 +442,141 @@
     .gm-measure-tooltip__hint {
         color: color-mix(in oklab, #fff 60%, transparent);
     }
+}
+
+/* ── 나만의지도 클릭 팝업 (core/overlays/MyMapPopup.ts) — ol.Overlay 요소 안에 그린다. attach 모드에서는 .gm-root 밖에 그려지므로
+   리셋을 규칙마다 직접 둔다(측정 툴팁과 같은 방식). 색은 --gm-* 변수 없이 고정값 ── */
+.gm-mymap-popup {
+    position: relative;
+    box-sizing: border-box;
+    width: max-content;
+    min-width: 160px;
+    max-width: 300px;
+    margin: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: .5rem;
+    padding: 0;
+    background-color: #fff;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -4px rgba(0, 0, 0, .1);
+    color: #1e2939;
+    font-size: 12px;
+    line-height: 1.4;
+    text-align: left;
+    pointer-events: auto;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* 말풍선 꼬리(오버레이 offset 10px 안에 들어간다) */
+.gm-mymap-popup::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    margin-left: -6px;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid #fff;
+    filter: drop-shadow(0 1px 0 #e5e7eb);
+}
+
+.gm-mymap-popup__header {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    border: 0 solid;
+    border-bottom: 1px solid #f1f5f9;
+    padding: 6px 6px 6px 10px;
+}
+
+.gm-mymap-popup__title {
+    box-sizing: border-box;
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.gm-mymap-popup__close {
+    box-sizing: border-box;
+    flex: none;
+    margin: 0;
+    border: 0 solid;
+    border-radius: 0;
+    padding: 2px;
+    background-color: transparent;
+    font: inherit;
+    letter-spacing: inherit;
+    color: #99a1af;
+    opacity: 1;
+    cursor: pointer;
+    -webkit-appearance: button;
+    -moz-appearance: button;
+    appearance: button;
+}
+
+@media (hover: hover) {
+    .gm-mymap-popup__close:hover {
+        color: #4a5565;
+    }
+}
+
+.gm-mymap-popup__close svg {
+    display: block;
+    vertical-align: middle;
+}
+
+.gm-mymap-popup__body {
+    box-sizing: border-box;
+    max-height: 220px;
+    margin: 0;
+    border: 0 solid;
+    padding: 6px 10px 8px;
+    overflow: auto;
+}
+
+.gm-mymap-popup__table {
+    width: 100%;
+    margin: 0;
+    border: 0 solid;
+    border-collapse: collapse;
+}
+
+.gm-mymap-popup__table th,
+.gm-mymap-popup__table td {
+    box-sizing: border-box;
+    margin: 0;
+    border: 0 solid;
+    padding: 2px 0;
+    font-size: 12px;
+    line-height: 1.4;
+    vertical-align: top;
+    text-align: left;
+}
+
+.gm-mymap-popup__table th {
+    max-width: 110px;
+    padding-right: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.gm-mymap-popup__table td {
+    overflow-wrap: anywhere;
+    color: #111827;
 }
 
 /* ── OL 축척 막대(ol.control.ScaleLine) 모양 (FE-6b, QA FE-6a F1) ──

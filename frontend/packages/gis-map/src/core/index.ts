@@ -28,7 +28,21 @@ export type { CreateOlLayerOptions } from './layers/createOlLayer'
 export { EMPTY_RASTER_OVERLAY_STATE, EMPTY_GEOTIFF_CATALOG_STATE } from './overlays/RasterOverlayController'
 export type { RasterOverlayController, RasterOverlayState, GeoTiffCatalog, GeoTiffCatalogState } from './overlays/RasterOverlayController'
 export { EMPTY_VECTOR_OVERLAY_STATE, EMPTY_MYMAP_CATALOG_STATE, myMapStyle } from './overlays/VectorOverlayController'
-export type { VectorOverlayController, VectorOverlayState, MyMapCatalog, MyMapCatalogState } from './overlays/VectorOverlayController'
+export type { VectorOverlayController, VectorOverlayState, MyMapCatalog, MyMapCatalogState, MyMapFeatureHit } from './overlays/VectorOverlayController'
+// 나만의지도 스타일(styleConfig v1) — 순수 함수(스키마·검증·구간·팔레트·컬럼 요약)와 ol 스타일 함수
+export {
+    MYMAP_STYLE_VERSION, MYMAP_STYLE_MAX_BYTES, STYLE_FILL_OPACITY, STYLE_STROKE_WIDTH, STYLE_POINT_RADIUS, STYLE_POINT_STROKE_WIDTH,
+    STYLE_LABEL_SIZE, STYLE_LABEL_MIN_ZOOM, STYLE_MAX_CATEGORIES, STYLE_MIN_BREAK_CLASSES, STYLE_MAX_BREAK_CLASSES, STYLE_MAX_POPUP_FIELDS, STYLE_MAX_TEXT,
+    POPUP_DEFAULT_FIELD_COUNT, DEFAULT_OTHER_COLOR, DEFAULT_LABEL_SIZE, DEFAULT_LABEL_COLOR, DEFAULT_LABEL_HALO, DEFAULT_LABEL_MIN_ZOOM,
+    CATEGORY_PALETTE, COLOR_RAMPS, findRamp, findRampIdByColors, rampColors, readNumberDetail, NUMBER_ABS_LIMIT, BREAK_ABS_LIMIT, defaultMyMapStyle, parseMyMapStyle, serializeMyMapStyle, sameMyMapStyle,
+    isDefaultMyMapStyle, utf8Length, readNumber, categoryKey, makeClassColorFn, computeBreaks, summarizeColumns, categoryCounts,
+    numericValues, buildCategorizedStyle, buildGraduatedStyle, labelFloorZoom, effectiveLabelMinZoom, displayText, popupFieldsFor,
+} from './lib/mymapStyleConfig'
+export type {
+    ColorRamp, NumberRead, PropertyReader, CategoryCount, CategoryCounts, GraduatedRequest, GraduatedResult,
+} from './lib/mymapStyleConfig'
+export { createMyMapStyle, createMyMapLabelStyle, createMyMapAnchors, MYMAP_LABEL_FONT_FAMILY } from './lib/mymapStyle'
+export type { MyMapAnchors } from './lib/mymapStyle'
 export { CATALOG_POLL_INTERVAL_MS } from './overlays/catalog'
 export type { Catalog, CatalogState } from './overlays/catalog'
 // 필지 강조·지역명
@@ -86,6 +100,8 @@ export type {
     UserMapListItem, UserMapStatus, ExcelPreviewResponse, ShpUploadInput, ExcelConfirmInput, UserMapShare,
     MyMapSourceKind, MyMapUploadMode, MyMapSampleKind, MyMapLimits, MyMapQuota, MyMapCoverage, MyMapConfirmResult, ExcelSuggestions, ExcelPreviewWarning,
     MyMapImportReport, MyMapImportReportRow, MyMapImportReportQuery,
+    MyMapDisplay, MyMapStyleClass, MyMapCategorizedStyle, MyMapBreakMethod, MyMapGraduatedStyle, MyMapClassify, MyMapLabelStyle,
+    MyMapPopupStyle, MyMapStyleConfig, MyMapColumnInfo, MyMapUpdateInput,
 } from './types/mymap'
 export type { GeoTiffItem, GeoTiffStatus } from './types/geotiff'
 export type { AddressSearchItem, VWorldLegendItem } from './types/search'

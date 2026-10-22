@@ -142,7 +142,7 @@ React에서는 `<GisMapProvider host={…}>`가 바뀔 때마다 `map.setHost`�
 | 소스 | 하는 일 | 기본 구현 |
 |---|---|---|
 | `layerTree` (+ `userSelection`) | 그릴 레이어 트리 / 개인 레이어 선택 저장 | `restSources()` |
-| `myMap` · `geoTiff` · `wind` | 나만의지도(목록·업로드·결과 보고서·샘플) · GeoTIFF 타일 · 바람장 | `restSources()` |
+| `myMap` · `geoTiff` · `wind` | 나만의지도(목록·업로드·결과 보고서·샘플·스타일 저장) · GeoTIFF 타일 · 바람장 | `restSources()` |
 | `addressSearch` · `parcel` · `regionName` · `legend` · `wfs` | 주소 검색 · 필지 폴리곤 · 지역명 · 범례 · WFS URL | `proxySources()` |
 
 짝 백엔드 응답 형식이 다르면 해당 소스만 직접 구현해 배열 뒤쪽에 넣는다. 백엔드(Spring·MyBatis)로 옮길 때의 테이블 DDL·쿼리 명세는
@@ -160,6 +160,7 @@ GTProject 저장소의 `.claude/skills/map-module-export/references/`에 있다.
 | `downloadSample?(kind)` | `'pnu' \| 'coord'`(`'address'`는 2단계) 샘플 xlsx **바이트(Blob)**. 저장은 위젯이 `<a download>`로 한다 | 업로드 창의 "샘플 받기"가 없다 |
 | `importReport?(id, {page, size, reason})` | 소유자 전용 결과 보고서 `{total, matched, failed, byReason, rows:[{rowNo, reason, message, input, candidates}], page, size, totalRows}` | `실패 N 보기`가 링크 대신 글자 |
 | `downloadImportFailures?(id)` | 실패 행 xlsx 바이트 | 보고서에 "실패 행 엑셀 받기"가 없다 |
+| `update?(id, {name?, description?, styleConfig?})` | 부분 수정(PATCH, **등록자만** — 아니면 서버가 403 + message로 reject). 빠진 키는 그대로, `styleConfig: ''`는 지움 | 패널의 스타일 단추(팔레트 아이콘)가 없다 — 스타일은 읽기만 한다 |
 
 - `confirmExcel(input)`은 `{ id }`를 돌려줄 수 있다(처리는 비동기 — 패널이 목록 폴링으로 진행률을 본다). 옛 소스처럼 아무것도 안 돌려줘도 된다. 입력의 `mode`(`'PNU' | 'ADDRESS' | 'COORD'`)·`pnuColumn`·`addressColumn`은 선택이고
   없으면 좌표(`latColumn`·`lonColumn`·`sourceSrid`)다. 주소 모드는 2단계에서 켜지므로 업로드 창은 PNU·좌표만 보여 준다.
@@ -179,6 +180,53 @@ GTProject 저장소의 `.claude/skills/map-module-export/references/`에 있다.
 - 엔진: `map.vector.openCatalog()`의 상태(`MyMapCatalogState`)에 `quota: MyMapQuota | null`이 늘었다. 훅은 새로 만들지 않았다(`useMyMapCatalog()`로 같은 상태). 패널은 내 레이어 / 공유받은 레이어 두 묶음으로 나눠 그린다
   (공유받은 항목이 있을 때만 묶음 제목이 나온다).
 - 어댑터: `restSources()`의 `myMap`이 위 메서드를 `/api/mymap/{quota, samples/{kind}, {id}/import-report(.xlsx)}`로 구현한다. 파일 응답은 봉투가 없고, 오류 본문의 `message`가 있으면 그 글을 `Error`로 던진다.
+
+### 나만의지도 스타일·라벨·팝업 (3단계)
+
+레이어마다 **기본 스타일**(면/점·채우기 색·투명도·선 색·두께·점 크기·색·테두리), **값별(범주)·구간별(숫자) 색 나누기**, **라벨**, **클릭 팝업**을 정한다. 서버는 `styleConfig`를 문자열(JSON 객체, 16KB 이하)로 저장하고
+저장 전에 아래 v1 스키마를 검사한다. 읽어서 그리는 쪽은 이 패키지다(`core/lib/mymapStyleConfig.ts`). 목록 항목의 `styleConfig`가 없거나 깨졌거나 `v`가 1이 아니면 **옛 고정 스타일 그대로**다(옛 서버·옛 소스 하위 호환).
+
+```jsonc
+{ "v": 1,
+  "display": "polygon | point",              // 면(필지 그대로) | 점(폴리곤 안쪽 대표점)
+  "fill": "#f26722", "fillOpacity": 0.2,      // 0~1
+  "stroke": "#f26722", "strokeWidth": 2,      // 0~20 (0이면 선 없음)
+  "pointRadius": 5,                           // 1~50
+  // 점 색·점 테두리: 기본값(점 색 = 선 색을 따름·흰색·1px)이면 JSON에 키를 넣지 않는다
+  "pointColor": "#ff00ff", "pointStroke": "#ffffff", "pointStrokeWidth": 1,   // 테두리 두께 0~10
+  "classify": null
+    | { "type": "categorical", "field": "구분", "classes": [{ "value": "청사", "color": "#2563eb" }], "otherColor": "#9ca3af" }   // 최대 12 + 기타
+    | { "type": "graduated", "field": "직원수", "method": "quantile | equal | manual", "breaks": [950, 1050, 1150, 1300],
+        "colors": ["#fee5d9", "#fcae91", "#fb6a4a", "#de2d26", "#a50f15"], "otherColor": "#9ca3af" },   // 3~7구간, breaks = colors.length - 1개
+  "label": null | { "field": "이름", "size": 12, "color": "#111827", "halo": "#ffffff", "minZoom": 15 },   // size 8~40, minZoom 0~28(정수)
+  "popup": null | { "fields": ["이름", "직원수"] } }   // null = 기본(앞 5개 컬럼), 1~30개 = 그 컬럼, [] = 이 레이어는 팝업 끔
+```
+
+- 짝 백엔드(`StyleConfigValidator`)가 저장 전에 같은 v1 스키마를 검사한다: **모르는 키는 거절**, 색은 `#rrggbb[aa]`(**구간 색은 알파 없는 `#rrggbb`만**), 범주 1~12개·구간 3~7개·팝업 0~30개(0개 = 끔), 컬럼 이름·범주 값은 200자 이하, 컬럼은 그 레이어에 있어야 하고 구간형은 숫자 컬럼이어야 한다(전체 16KB 이하).
+  **값 범위는 서버와 같다**(선 두께 0~20, 점 반지름 1~50, 점 테두리 두께 0~10, 라벨 크기 8~40, 줌 0~28 — `STYLE_*` 상수). 그래서 서버가 받은 값은 줄지 않고 그대로 그려지고, 대화상자를 다시 열어도 같다(선택지에 없는 글자 크기·줌도 선택지에 끼워 넣어 보여 준다). 범위를 넘는 값(서버는 거절하는 값)과 `fill`·`stroke`·범주 색의 알파(`#rrggbbaa` — 알파는 읽을 때 버린다, 투명도는 `fillOpacity`)만 읽을 때 달라진다.
+- 읽을 때 절대 throw하지 않는다: 못 읽는 부분은 기본값으로 채우고(색은 `#rrggbb`·`#rgb`, 서버가 허용하는 `#rrggbbaa`는 알파를 버리고 읽는다. 숫자는 범위로 자름), 못 읽는 `classify`·`label`은 null로, 설정 전체가 못 읽히면 옛 스타일. 위 키·범위는 `parseMyMapStyle`·`serializeMyMapStyle`(`@gtp/gis-map/core`)이 정한다.
+- **구간의 경계**는 안쪽 경계값이다: 값 < breaks[0] → 첫 색, breaks[i-1] ≤ 값 < breaks[i] → i번째 색, 값 ≥ 마지막 경계 → 마지막 색. 속성값은 서버에 문자열("1100", "1,100")이라 `readNumber`로 숫자로 읽고, 읽을 수 없으면 `otherColor`(값 없음).
+  분위(같은 개수)가 같은 값 때문에 겹치면 같은 간격으로 바꾼다. 숫자 판정은 **서버의 컬럼 통계(`NumericText`)와 같은 규칙**이다(`readNumber`): 앞뒤 공백(전각·NBSP)을 떼고 NFKC로 정리한 뒤 `12`·`-3.5`·`.5`·`5.`·`1.5E+3`과 올바르게 묶은 쉼표 숫자(`1,234`)만 숫자, 앞이 0인 코드(`007`)·16자리 이상 정수(PNU)·`12%`·`1,5`·**절댓값이 1e15 이상인 값(`1e15`·`9e15`·`1.5E+16`)** 은 아니다(서버가 숫자 판정과 구간 경계에 같은 "1e15 미만"을 쓰므로 분위·같은 간격 경계가 그 안에 든다. `readNumberDetail`은 못 읽은 이유를 `format`/`range`로 함께 준다).
+  한쪽만 고치는 일을 막으려고 서버 시험과 프론트 시험이 같은 표(GTProject `backend/src/test/resources/mymap/numeric-cases.json`, 138건 — `[입력, 기대 숫자|null]`)를 읽는다.
+  숫자 컬럼 = 값이 있는 칸의 90% 이상(올림)이 숫자. 서버는 구간형의 컬럼이 자기 통계로 숫자 컬럼일 때만 받으므로 둘이 어긋나면 저장이 거절된다.
+- **라벨**은 본 레이어와 **같은 `VectorSource`를 쓰는 별도 `VectorLayer`**(`declutter` 켬 — 겹치는 라벨은 자동으로 숨김, `minZoom` = 설정한 줌, zIndex = 본 레이어 + 0.1)다. 본 레이어의 점·선이 겹침 제거로 사라지지 않게 나눴다.
+  위치는 폴리곤 안쪽 대표점(오목한 모양도 도형 안), 점이거나 표시 방식이 "점"이면 점 위쪽. 한글 글꼴(맑은 고딕·Noto Sans KR·Apple SD Gothic Neo…)을 앞에 둔 글꼴 목록을 쓴다(웹폰트는 싣지 않는다).
+  **안전장치**: 피처가 많으면 설정한 줌이 낮아도 그 아래 확대에서는 라벨을 그리지 않는다(`labelFloorZoom`: 500개 초과 12 · 2,000 초과 14 · 5,000 초과 15 · 20,000 초과 16). 스타일 대화상자는 그 아래 줌 선택지를 막고 안내한다.
+- **클릭 팝업**은 React 위젯이 아니라 코어 DOM(`ol.Overlay` + `.gm-mymap-popup`, `styles/gis-map.css`)이라 MapShell·UMD(a)·붙이기(b) 어디서나 같다. 값은 `textContent`로만 넣고(HTML 해석 없음), 값이 200자를 넘으면 …로 자른다.
+  **도구(그리기·측정·반경)가 켜져 있으면 열지도 닫지도 않는다.** 첫 레이어를 켤 때 리스너·오버레이를 붙이고 `destroy()`에서 뗀다. `map.vector.setPopupEnabled(false)`로 끄고, `featureAt(pixel)`로 호스트가 직접 피처를 찾을 수 있다.
+- 엔진 API(`map.vector`, 전부 옵셔널 소스에 의존하지 않는다): `restyle(id, 스타일|JSON|null)`(저장된 값으로 지정 — GeoJSON을 다시 받지 않는다) · `previewStyle(id, 스타일)` / `endPreview(id)`(저장 전 미리보기) ·
+  `getStyle(id)` / `getSavedStyle(id)` / `defaultStyle(id?)` · `columns(id)` / `categories(id, field)` / `numbers(id, field)` / `featureCount(id)`(지도에 올라온 피처로 센 값) · `show(id, { color?, styleConfig? })`.
+  목록 객체(`openCatalog()`)는 `saveStyle(id, json | null)`을 갖는다: **등록자만**(공유받은 레이어면 서버를 부르지 않고 거절 — 서버도 403), `update`가 없는 소스면 거절, 성공하면 목록 항목·지도 레이어에 반영하고 `null`은 서버 값을 지운다(`styleConfig: ''`).
+  목록을 받을 때마다(`catalog.load()`) 각 항목의 `styleConfig`를 기억해 켜진 레이어에 반영한다(공유받은 레이어는 등록자가 바꾼 스타일을 다음 목록 갱신 때 본다). 미리보기 중인 레이어는 목록이 와도 덮지 않는다.
+- **스타일 대화상자**(`ui/mymap/MyMapStyleDialog`)는 패널의 소유 레이어(완료 상태) 항목에 **`update`가 있는 소스일 때만** 팔레트 단추로 열린다. 바꾸면 지도에 바로 반영(미리보기)하고, 닫기·Esc·패널 닫힘은 저장된 스타일로 되돌린다.
+  어두운 막을 깔지 않는 떠 있는 카드라 지도를 움직여 라벨이 켜지는 줌을 확인할 수 있다. 기본(옛 고정) 스타일과 같은 상태로 저장하면 서버 값을 지운다.
+  **저장 전에 서버가 거절할 값을 막는다**: 직접 입력한 구간 경계는 데이터와 같은 `readNumber` 규칙으로 읽고(`1,000`·`1e3` 허용, `0x10` 거절) 절댓값 1e15 이상이면 안내하며, 이름이 비었거나 200자를 넘는 컬럼은 라벨·색 나누기·팝업 선택지에서 빼고(안내 한 줄),
+  팝업 컬럼은 30개에서 더 못 고르게 막고, 저장 JSON이 16KB(UTF-8)를 넘으면 서버에 보내지 않고 바이트 수와 함께 안내한다. 값이 너무 커서(절댓값 1e15 이상) 숫자로 못 읽은 칸이 있는 컬럼은 "값 없음" 색으로 칠한다는 안내를, 범위가 너무 좁아 경계를 못 나누면(소수 20자리 안) 원인에 맞는 문구를 보인다.
+  다시 열면 저장된 구간 색에서 **색 띠를 되찾아**(저장 JSON에는 색 띠 id가 없다 — 서버가 모르는 키를 거절) 단계·방식을 바꿔도 같은 색 띠로 만든다. 저장 중에는 Esc·×·다른 레이어의 팔레트 단추를 무시하고(결과·오류를 볼 창이 사라지지 않게), 레이어를 바꿔 열면 창 상태가 새로 시작한다.
+  컬럼·값 개수는 레이어를 켠 뒤 불러온 피처에서 센다(꺼져 있으면 대화상자가 먼저 켠다) — 서버의 `/columns`는 쓰지 않는다.
+- 새 ol API는 없다(`style.Style/Fill/Stroke/Circle/Text`·`geom.Point`·`layer.Vector`·`Overlay`는 이미 `REQUIRED_OL_API`). 인스턴스 쪽 쓰임: `Polygon.getInteriorPoint`·`MultiPolygon.getInteriorPoints`·`LineString.getCoordinateAt`·`Text.setText/setOffsetY`·`layer.setMinZoom`·`declutter`·`Overlay autoPan`.
+  OL의 `minZoom`은 "이 줌 **초과**에서만 보임"이라 설정한 줌에서도 보이도록 `1e-6` 낮춰 넣는다.
+- 어댑터: `update`는 `PATCH /api/mymap/{id}`(JSON, 값이 있는 키만 — 서버는 빠진 키를 "그대로"로 본다). 오류는 봉투의 `message`를 `Error`로 던진다(403 "이 나만의지도에 대한 권한이 없습니다.", 400 "스타일 설정 형식이 올바르지 않습니다.").
 
 ### 바람지도 (선택)
 

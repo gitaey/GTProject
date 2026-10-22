@@ -2970,6 +2970,370 @@
     color: #d1d5db;
 }
 
+/* ── 나만의지도 3단계: 스타일 설정 카드(ui/mymap/MyMapStyleDialog) ──
+   지도를 움직여 가며 미리 볼 수 있게 어두운 막을 깔지 않는 떠 있는 카드(우상단). 머리줄은 gm-modal__header·gm-modal__title을 그대로 쓴다 ── */
+.gm-style-dialog {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    width: 380px;
+    max-width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
+    overflow: hidden;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, .25), 0 0 0 1px rgba(0, 0, 0, .06);
+    font-size: 12px;
+    color: #111827;
+}
+
+.gm-style-dialog__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gm-style-dialog__body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 0;
+    padding: 12px 14px;
+    overflow-y: auto;
+}
+
+.gm-style-dialog__section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.gm-style-dialog__heading {
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+}
+
+.gm-style-dialog__radios {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+}
+
+.gm-style-dialog__radio,
+.gm-style-dialog__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.gm-style-dialog__radio input,
+.gm-style-dialog__check input {
+    margin: 0;
+    accent-color: var(--gm-primary);
+}
+
+.gm-style-dialog__check span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gm-style-dialog__seg {
+    display: flex;
+    gap: 6px;
+}
+
+.gm-style-dialog__seg-btn {
+    flex: 1;
+    height: 30px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 11.5px;
+    color: #374151;
+}
+
+.gm-style-dialog__seg-btn.gm-is-active {
+    border-color: var(--gm-primary);
+    background: rgba(var(--gm-primary-rgb), 0.06);
+    color: var(--gm-primary);
+    font-weight: 600;
+}
+
+.gm-style-dialog__seg-btn:disabled {
+    opacity: .45;
+    cursor: default;
+}
+
+.gm-style-dialog__grid {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 6px 12px;
+}
+
+.gm-style-dialog__grid > .gm-style-dialog__color,
+.gm-style-dialog__grid > .gm-style-dialog__num {
+    justify-self: start;
+}
+
+.gm-style-dialog__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+}
+
+.gm-style-dialog__label {
+    flex: none;
+    font-size: 11px;
+    color: #475569;
+}
+
+.gm-style-dialog__inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.gm-style-dialog__color {
+    flex: none;
+    width: 32px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    background: none;
+    cursor: pointer;
+}
+
+.gm-style-dialog__num {
+    width: 64px;
+    height: 26px;
+    padding: 0 6px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 12px;
+}
+
+.gm-style-dialog__num--wide {
+    width: 78px;
+}
+
+.gm-style-dialog__select {
+    flex: 1;
+    min-width: 0;
+    height: 28px;
+    padding: 0 6px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 12px;
+}
+
+.gm-style-dialog__select--narrow {
+    flex: 0 0 auto;
+    width: 88px;
+}
+
+.gm-style-dialog__select:disabled {
+    background: #f9fafb;
+    color: #9ca3af;
+}
+
+.gm-style-dialog__slider {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.gm-style-dialog__range {
+    flex: 1;
+    min-width: 0;
+    accent-color: var(--gm-primary);
+}
+
+.gm-style-dialog__value {
+    flex: none;
+    width: 34px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: #475569;
+}
+
+.gm-style-dialog__classify {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.gm-style-dialog__classes {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 190px;
+    overflow-y: auto;
+}
+
+.gm-style-dialog__class {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border: 1px solid #f1f5f9;
+    border-radius: 6px;
+}
+
+.gm-style-dialog__class-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gm-style-dialog__count {
+    flex: none;
+    font-size: 10.5px;
+    color: #64748b;
+    font-variant-numeric: tabular-nums;
+}
+
+.gm-style-dialog__ramp {
+    display: flex;
+    height: 14px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.gm-style-dialog__ramp-cell {
+    flex: 1;
+}
+
+.gm-style-dialog__ticks {
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+    font-size: 10.5px;
+    color: #64748b;
+    font-variant-numeric: tabular-nums;
+}
+
+.gm-style-dialog__breaks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.gm-style-dialog__hint {
+    font-size: 10.5px;
+    line-height: 1.4;
+    color: #64748b;
+}
+
+.gm-style-dialog__hint--warn {
+    color: #b45309;
+}
+
+.gm-style-dialog__link {
+    margin-left: 6px;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 10.5px;
+    color: var(--gm-primary);
+    text-decoration: underline;
+}
+
+.gm-style-dialog__popup-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px 8px;
+}
+
+.gm-style-dialog__preview {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    width: 220px;
+    max-width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, .08);
+}
+
+.gm-style-dialog__preview-title {
+    font-size: 10.5px;
+    color: #64748b;
+}
+
+.gm-style-dialog__preview-row {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gm-style-dialog__footer {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 14px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.gm-style-dialog__footer-note {
+    font-size: 10.5px;
+    color: #64748b;
+}
+
+.gm-style-dialog__error {
+    font-size: 11px;
+    line-height: 1.4;
+    color: #ef4444;
+}
+
+.gm-style-dialog__actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.gm-style-dialog__reset {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: auto;
+}
+
+.gm-style-dialog__reset:disabled {
+    opacity: .5;
+    cursor: default;
+}
+
+@media (max-width: 47.99rem) {
+    .gm-style-dialog {
+        top: 8px;
+        right: 8px;
+        left: 8px;
+        width: auto;
+        max-width: none;
+        max-height: calc(100vh - 16px);
+    }
+}
+
 /* ── 반응형: md(48rem = 768px) 이상 ── */
 @media (min-width: 48rem) {
     .gm-header__actions,

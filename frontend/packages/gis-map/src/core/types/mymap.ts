@@ -175,3 +175,102 @@ export interface MyMapImportReport {
     /** 필터를 적용한 실패 행 전체 수(페이지 계산용) */
     totalRows: number
 }
+
+// ── 3단계: 스타일(styleConfig v1) ──────────────────────────────────────────────
+// 서버는 styleConfig를 문자열(JSON 객체, 16KB 이하)로만 저장한다 — 내용 해석은 이 패키지(core/lib/mymapStyleConfig.ts)가 한다.
+// 없거나 v1이 아니거나 깨졌으면 옛 고정 스타일 그대로(하위 호환).
+
+/** 표시 방식: 면(필지 그대로) | 점(폴리곤의 안쪽 대표점) */
+export type MyMapDisplay = 'polygon' | 'point'
+
+export interface MyMapStyleClass {
+    /** 속성값(문자열로 비교) */
+    value: string
+    color: string
+}
+
+/** 값별(범주) 색 나누기 — 최대 12개 + 기타 */
+export interface MyMapCategorizedStyle {
+    type: 'categorical'
+    field: string
+    classes: MyMapStyleClass[]
+    otherColor: string
+}
+
+export type MyMapBreakMethod = 'quantile' | 'equal' | 'manual'
+
+/**
+ * 구간별(숫자) 색 나누기 — 3~7구간. `breaks`는 안쪽 경계값(오름차순, colors.length - 1개):
+ * 값 < breaks[0] → colors[0], breaks[i-1] ≤ 값 < breaks[i] → colors[i], 값 ≥ 마지막 경계 → 마지막 색
+ */
+export interface MyMapGraduatedStyle {
+    type: 'graduated'
+    field: string
+    method: MyMapBreakMethod
+    breaks: number[]
+    colors: string[]
+    /** 숫자로 읽을 수 없는 값의 색("값 없음") */
+    otherColor: string
+}
+
+export type MyMapClassify = MyMapCategorizedStyle | MyMapGraduatedStyle
+
+export interface MyMapLabelStyle {
+    field: string
+    /** px */
+    size: number
+    color: string
+    /** 글자 바깥 후광(외곽선) 색 */
+    halo: string
+    /** 이 확대 단계 이상에서만 그린다(피처가 많으면 더 높게 올려 막는다) */
+    minZoom: number
+}
+
+export interface MyMapPopupStyle {
+    /** 클릭하면 보일 컬럼(0~30개). 빈 배열 = 이 레이어는 팝업 끔. popup 자체가 null이면 기본(앞 5개 컬럼) */
+    fields: string[]
+}
+
+export interface MyMapStyleConfig {
+    v: 1
+    display: MyMapDisplay
+    fill: string
+    /** 0~1 */
+    fillOpacity: number
+    stroke: string
+    /** 0이면 선 없음 */
+    strokeWidth: number
+    pointRadius: number
+    /** null = 선 색을 따른다(옛 모양, 저장 JSON에 키 없음) */
+    pointColor: string | null
+    /** 점 테두리 색·두께 — 기본값(흰색·1px)이면 저장 JSON에 넣지 않는다 */
+    pointStroke: string
+    pointStrokeWidth: number
+    classify: MyMapClassify | null
+    label: MyMapLabelStyle | null
+    popup: MyMapPopupStyle | null
+}
+
+/** 불러온 피처로 센 컬럼 요약(스타일 대화상자용) */
+export interface MyMapColumnInfo {
+    name: string
+    /** 값의 90% 이상이 숫자로 읽히면 number(앞이 0인 코드·15자리 넘는 숫자는 글자로 본다) */
+    kind: 'number' | 'text'
+    /** 값이 있는 피처 수 */
+    filled: number
+    /** 서로 다른 값 수(많으면 상한에서 멈춘다 — distinctCapped) */
+    distinct: number
+    distinctCapped: boolean
+    /** 숫자 모양이지만 크기가 ±1e15 이상이라 숫자로 안 읽은 값의 수(있을 때만) */
+    tooLarge?: number
+    sample: string[]
+    min?: number
+    max?: number
+}
+
+/** 나만의지도 부분 수정 입력(PATCH). 빠진 키는 그대로, styleConfig ''는 지움 */
+export interface MyMapUpdateInput {
+    name?: string
+    description?: string
+    styleConfig?: string
+}

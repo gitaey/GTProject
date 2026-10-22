@@ -3,8 +3,8 @@
 // 나만의지도 패널 — 스타일: gm-panel(TIFF·나만의지도 공용), gm-mymap-panel
 // 내 레이어 / 공유받은 레이어 두 묶음, 종류 배지, 처리 중 진행률 막대, 끝난 뒤 `매칭 N · 실패 M`(실패를 누르면 결과 보고서),
 // 상단 `내 레이어 n/20`(한도는 소스의 quota가 있을 때만). 항목 상태(켜짐·실패·처리 중)에 따라 바뀌는 값만 인라인 style로 남겼다
-import { useMemo, useState } from 'react'
-import { Trash2, Upload, Loader2, AlertCircle, Share2, Locate, Lock } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { Trash2, Upload, Loader2, AlertCircle, Share2, Locate, Lock, Palette } from 'lucide-react'
 import { EMPTY_MYMAP_CATALOG_STATE } from '../../core'
 import type { MyMapCatalogState, MyMapConfirmResult, UserMapListItem, VectorOverlayState } from '../../core'
 import { useGisMap, useMyMapCatalog, useStoreValue, useVectorOverlayState } from '../../react'
@@ -12,6 +12,7 @@ import { cx } from '../cx'
 import MyMapUploadModal from '../mymap/MyMapUploadModal'
 import MyMapShareDialog from '../mymap/MyMapShareDialog'
 import MyMapImportReportDialog from '../mymap/MyMapImportReport'
+import MyMapStyleDialog from '../mymap/MyMapStyleDialog'
 import { formatCount, kindLabel } from '../mymap/format'
 
 /** 종류 배지 색 클래스(sourceKind를 아는 새 서버일 때만) */
@@ -29,6 +30,8 @@ export default function MyMapPanel() {
     const map = useGisMap()
     const vector = map?.vector ?? null
     const reportAvailable = !!map?.sources.myMap?.importReport
+    // 스타일 저장(PATCH)을 할 수 있는 소스일 때만 스타일 단추를 보인다(없으면 옛 화면 그대로)
+    const styleAvailable = !!map?.sources.myMap?.update
     const catalog = useMyMapCatalog()
     const { items, loading, quota } = useStoreValue(catalog?.store, selectCatalog, EMPTY_MYMAP_CATALOG_STATE)
     const visibleIdList = useVectorOverlayState(selectVisibleIds)
@@ -36,6 +39,9 @@ export default function MyMapPanel() {
     const [showUpload, setShowUpload] = useState(false)
     const [shareTarget, setShareTarget] = useState<{ id: number; name: string } | null>(null)
     const [reportTarget, setReportTarget] = useState<{ id: number; name: string } | null>(null)
+    const [styleTarget, setStyleTarget] = useState<{ id: number; name: string } | null>(null)
+    // 스타일 저장 요청이 도는 동안 true — 그 사이 다른 레이어의 스타일 창을 열면 저장 결과·오류를 볼 창이 사라진다
+    const styleSavingRef = useRef(false)
     // 업로드 직후 확정 응답의 "예정" 기준월(처리 중인 동안만 쓴다 — 끝나면 목록·상태의 확정값). 패널이 닫히면 사라진다
     const [expectedVersions, setExpectedVersions] = useState<Readonly<Record<number, string>>>({})
 
@@ -171,6 +177,15 @@ export default function MyMapPanel() {
                     </button>
                 )}
 
+                {item.owner && styleAvailable && item.status === 'READY' && (
+                    <button onClick={() => { if (!styleSavingRef.current) setStyleTarget({ id: item.id, name: item.name }) }} title="스타일·라벨 설정"
+                        className="gm-panel__item-btn"
+                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--gm-primary)')}
+                        onMouseLeave={e => (e.currentTarget.style.color = '#9ca3af')}>
+                        <Palette size={12} />
+                    </button>
+                )}
+
                 {item.owner && (
                     <button onClick={() => setShareTarget({ id: item.id, name: item.name })} title="공유 설정"
                         className="gm-panel__item-btn"
@@ -234,6 +249,10 @@ export default function MyMapPanel() {
             {showUpload && <MyMapUploadModal quota={quota} onClose={() => setShowUpload(false)} onUploaded={fetchList} />}
             {shareTarget && <MyMapShareDialog id={shareTarget.id} name={shareTarget.name} onClose={() => setShareTarget(null)} />}
             {reportTarget && <MyMapImportReportDialog id={reportTarget.id} name={reportTarget.name} onClose={() => setReportTarget(null)} />}
+            {styleTarget && (
+                <MyMapStyleDialog key={styleTarget.id} id={styleTarget.id} name={styleTarget.name} catalog={catalog}
+                    onClose={() => setStyleTarget(null)} onSavingChange={saving => { styleSavingRef.current = saving }} />
+            )}
         </div>
     )
 }

@@ -7,7 +7,7 @@ import type { GeoTiffItem, GeoTiffStatus } from './types/geotiff'
 import type { LayerDef, LayerTree } from './types/layer'
 import type {
     ExcelConfirmInput, ExcelPreviewResponse, MyMapConfirmResult, MyMapImportReport, MyMapImportReportQuery, MyMapQuota, MyMapSampleKind,
-    ShpUploadInput, UserMapListItem, UserMapShare, UserMapStatus,
+    MyMapUpdateInput, ShpUploadInput, UserMapListItem, UserMapShare, UserMapStatus,
 } from './types/mymap'
 import type { AddressSearchItem, VWorldLegendItem } from './types/search'
 import type { WindField, WindFrameMeta, WindScalarField } from './types/wind'
@@ -49,6 +49,9 @@ export interface MyMapSource {
     importReport?(id: number, query?: MyMapImportReportQuery): Promise<MyMapImportReport>
     /** 실패 행 엑셀(원본 컬럼 + 실패 사유) */
     downloadImportFailures?(id: number): Promise<Blob>
+    // ── 3단계(스타일·라벨·팝업) ──
+    /** 부분 수정(PATCH, 등록자만 — 아니면 서버가 403으로 거절하고 message로 reject). 빠진 키는 그대로, styleConfig ''는 지움. 없으면 스타일 저장 단추가 안 나온다 */
+    update?(id: number, patch: MyMapUpdateInput): Promise<void>
 }
 
 export interface GeoTiffSource {
