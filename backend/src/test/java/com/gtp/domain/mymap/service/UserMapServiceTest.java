@@ -1,5 +1,6 @@
 package com.gtp.domain.mymap.service;
 
+import com.gtp.domain.mymap.FakeShareDirectory;
 import com.gtp.domain.mymap.dto.UserMapListItem;
 import com.gtp.domain.mymap.dto.UserMapStatusResponse;
 import com.gtp.domain.mymap.dto.UserMapUpdateRequest;
@@ -40,12 +41,15 @@ class UserMapServiceTest {
     JdbcTemplate jdbc;
 
     UserMapService service;
+    UserMapShareService shareService;
+    final FakeShareDirectory directory = FakeShareDirectory.standard();
     UserMap mine, shared, roleShared, hidden;
 
     @BeforeEach
     void setUp() {
         UserMapPermissionService perm = new UserMapPermissionService(userAccess, permAccess, em);
-        service = new UserMapService(repo, featureRepo, failureRepo, perm, new MyMapColumnService(repo, perm, jdbc), jdbc);
+        shareService = new UserMapShareService(repo, userAccess, permAccess, directory);
+        service = new UserMapService(repo, featureRepo, failureRepo, perm, new MyMapColumnService(repo, perm, jdbc), jdbc, shareService);
         mine = repo.saveAndFlush(UserMap.builder().name("내 것").description("설명").styleConfig("{\"v\":1}").ownerId("alice")
                 .sourceType("EXCEL").sourceKind("EXCEL_PNU").sourceSrid("EPSG:4326").parcelVersion("2026-10").build());
         shared = repo.saveAndFlush(UserMap.builder().name("공유받음").ownerId("bob").sourceType("SHP").sourceSrid("EPSG:5186").build());
@@ -199,7 +203,7 @@ class UserMapServiceTest {
     void 소유자만_수정_삭제한다_공유받은_사람은_403() {
         assertThat(caught(() -> service.update(shared.getId(), "alice", patch("x", null, null, null))).getErrorCode()).isEqualTo(GisErrorCode.USER_MAP_FORBIDDEN);
         assertThat(caught(() -> service.delete(shared.getId(), "alice")).getErrorCode()).isEqualTo(GisErrorCode.USER_MAP_FORBIDDEN);
-        assertThat(caught(() -> service.getShare(shared.getId(), "alice")).getErrorCode()).isEqualTo(GisErrorCode.USER_MAP_FORBIDDEN);
+        assertThat(caught(() -> shareService.get(shared.getId(), "alice")).getErrorCode()).isEqualTo(GisErrorCode.USER_MAP_FORBIDDEN);
         assertThat(repo.findById(shared.getId())).isPresent();
     }
 

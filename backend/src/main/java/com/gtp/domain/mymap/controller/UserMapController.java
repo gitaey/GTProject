@@ -38,6 +38,7 @@ public class UserMapController {
     private final MyMapColumnService columnService;
     private final SampleService sampleService;
     private final GisUserContext gisUserContext;
+    private final UserMapShareService shareService;
 
     @GetMapping
     public ApiResponse<List<UserMapListItem>> list() {
@@ -134,15 +135,29 @@ public class UserMapController {
         return ApiResponse.ok(null);
     }
 
+    /** 현재 공유(소유자만) — 옛 필드 userIds·roleCodes + 이름·상태 users·roles */
     @GetMapping("/{id}/share")
     public ApiResponse<UserMapShareResponse> getShare(@PathVariable Long id) {
-        return ApiResponse.ok(userMapService.getShare(id, currentUserId()));
+        return ApiResponse.ok(shareService.get(id, currentUserId()));
     }
 
+    /** 통째로 바꾸기(소유자만) — 중복 제거·본인 제외·새 대상만 존재 검사·100개 상한 */
     @PutMapping("/{id}/share")
     public ApiResponse<Void> share(@PathVariable Long id, @RequestBody UserMapShareRequest req) {
-        userMapService.share(id, currentUserId(), req);
+        shareService.replace(id, currentUserId(), req.getUserIds(), req.getRoleCodes());
         return ApiResponse.ok(null);
+    }
+
+    /** 여러 레이어의 현재 공유(ids=1,2,3, 최대 50). 없거나 내 것이 아닌 id는 결과에서 빠진다. */
+    @GetMapping("/shares")
+    public ApiResponse<List<ShareSnapshotResponse>> shares(@RequestParam(required = false) String ids) {
+        return ApiResponse.ok(shareService.snapshots(ids, currentUserId()));
+    }
+
+    /** 일괄 공유 더하기/빼기(mode = ADD | REMOVE) — 레이어별 소유자 검사, 한 트랜잭션 */
+    @PostMapping("/shares/bulk")
+    public ApiResponse<BulkShareResponse> bulkShare(@RequestBody BulkShareRequest req) {
+        return ApiResponse.ok(shareService.bulk(currentUserId(), req));
     }
 
     private static ResponseEntity<byte[]> xlsx(byte[] bytes, String filename, CacheControl cache) {
@@ -158,7 +173,8 @@ public class UserMapController {
         return gisUserContext.currentUserId();
     }
 
+    /** 공유 판정에 쓰는 그룹 코드 — 역할 + (있으면) "역할:세부권한" */
     private List<String> currentRoleCodes() {
-        return gisUserContext.currentRoleCodes();
+        return gisUserContext.currentShareGroupCodes();
     }
 }

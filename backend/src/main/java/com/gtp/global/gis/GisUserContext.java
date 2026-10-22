@@ -14,4 +14,12 @@ public interface GisUserContext {
 
     /** 로그인 사용자의 역할 코드 목록("ROLE_" 접두사 제거). 비로그인이면 빈 목록. */
     List<String> currentRoleCodes();
+
+    /**
+     * 공유(그룹 공유) 판정에 쓰는 그룹 코드 목록. 역할 코드("MAP_USER")와, 세부권한(부서)이 있으면 "역할:세부"("MAP_USER:DEPT_A").
+     * 세부권한 개념이 없는 호스트(전자정부 등)는 오버라이드하지 않아도 역할 코드만으로 동작한다.
+     */
+    default List<String> currentShareGroupCodes() {
+        return currentRoleCodes();
+    }
 }

@@ -17,6 +17,8 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -28,19 +30,37 @@ public class UserMapService {
     private final UserMapPermissionService permissionService;
     private final MyMapColumnService columnService;
     private final JdbcTemplate jdbcTemplate;
+    private final UserMapShareService shareService;
 
     private static final int STREAM_FETCH_SIZE = 500;
 
     /** 역할이 없는 사용자의 IN 목록 자리 값(빈 IN 목록을 피한다). 실제 역할 코드와 겹치지 않는다. */
     public static final String NO_ROLE = "__NO_ROLE__";
 
-    @Transactional(readOnly = true)
+    /**
+     * @param roleCodes 공유 판정에 쓰는 그룹 코드(역할 + "역할:세부권한")
+     *
+     * 일부러 @Transactional을 붙이지 않는다: 조회마다(리포지토리·shareCounts) 자기 읽기 전용 트랜잭션을 갖고,
+     * 마지막 보낸 사람 이름 조회(ownerNames)는 트랜잭션 밖에서 돈다. 이름 조회가 실패해 예외를 삼켜도
+     * (PostgreSQL은 SQL 오류 뒤 그 트랜잭션이 aborted가 된다) 목록 조회의 커밋에 영향이 없다.
+     * UserMap에는 지연 로딩 관계가 없어 트랜잭션 밖에서 읽어도 안전하다.
+     */
     public List<UserMapListItem> findVisibleTo(String userId, List<String> roleCodes) {
         // 소유 OR 공유(사용자·역할)를 SQL 한 번으로 가린다 — 전체 레이어를 읽어 자바에서 거르지 않는다
         List<String> roles = roleCodes == null || roleCodes.isEmpty() ? List.of(NO_ROLE) : roleCodes;
-        return userMapRepository.findVisibleTo(userId, roles).stream()
-                .map(m -> new UserMapListItem(m, m.isOwnedBy(userId)))
-                .toList();
+        List<UserMap> maps = userMapRepository.findVisibleTo(userId, roles);
+        // 내 항목의 공유 수(집계 쿼리 2번) → 마지막에 보낸 사람 이름(실패해도 목록은 나간다)
+        Map<Long, Integer> counts = shareService.shareCounts(
+                maps.stream().filter(m -> m.isOwnedBy(userId)).map(UserMap::getId).toList());
+        Map<String, String> names = shareService.ownerNames(
+                maps.stream().filter(m -> !m.isOwnedBy(userId)).map(UserMap::getOwnerId)
+                        .filter(Objects::nonNull).distinct().toList());
+        return maps.stream().map(m -> {
+            boolean own = m.isOwnedBy(userId);
+            return new UserMapListItem(m, own,
+                    own ? null : names.get(m.getOwnerId()),
+                    own ? counts.getOrDefault(m.getId(), 0) : null);
+        }).toList();
     }
 
     @Transactional(readOnly = true)
@@ -149,23 +169,6 @@ public class UserMapService {
         featureRepository.deleteByUserMap(map);
         failureRepository.deleteByUserMapId(map.getId());
         userMapRepository.delete(map);
-    }
-
-    @Transactional
-    public void share(Long id, String userId, UserMapShareRequest req) {
-        UserMap map = findById(id);
-        permissionService.assertOwner(map, userId);
-        permissionService.setShare(map, req.getUserIds(), req.getRoleCodes());
-    }
-
-    @Transactional(readOnly = true)
-    public UserMapShareResponse getShare(Long id, String userId) {
-        UserMap map = findById(id);
-        permissionService.assertOwner(map, userId);
-        return UserMapShareResponse.builder()
-                .userIds(permissionService.getSharedUserIds(map))
-                .roleCodes(permissionService.getSharedRoleCodes(map))
-                .build();
     }
 
     /** 관리자 전체 목록 (오너 여부 표시 없이 전체 조회) */

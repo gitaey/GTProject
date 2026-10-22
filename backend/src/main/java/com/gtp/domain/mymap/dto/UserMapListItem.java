@@ -32,7 +32,18 @@ public class UserMapListItem {
     /** FAILED 레이어의 이유(그 밖에는 null) — 새로고침 뒤에도 사유를 보여 주려고 목록에도 싣는다 */
     private final String errorMessage;
 
+    /** 공유받은 항목만 채움(내 항목은 null) — 보낸 사람 이름. 이름을 못 찾으면 null */
+    private final String ownerName;
+    /** 내 항목만: 사용자 + 그룹 공유 수. 공유받은 항목은 null */
+    private final Integer shareCount;
+
     public UserMapListItem(UserMap m, boolean owner) {
+        this(m, owner, null, null);
+    }
+
+    public UserMapListItem(UserMap m, boolean owner, String ownerName, Integer shareCount) {
+        this.ownerName = ownerName;
+        this.shareCount = shareCount;
         this.id = m.getId();
         this.name = m.getName();
         this.description = m.getDescription();

@@ -21,6 +21,20 @@ class GisErrorCodeTest {
     }
 
     @Test
+    void 공유_코드의_상태와_메시지() {
+        assertThat(GisErrorCode.UNAUTHORIZED.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(GisErrorCode.SHARE_QUERY_INVALID.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(GisErrorCode.SHARE_DIRECTORY_RATE_LIMITED.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(GisErrorCode.SHARE_TARGET_INVALID.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(GisErrorCode.SHARE_TARGET_LIMIT.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(GisErrorCode.SHARE_BULK_INVALID.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(GisErrorCode.SHARE_CONFLICT.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(GisErrorCode.SHARE_TARGET_INVALID.exception("kim99, DEPT_X").getMessage()).isEqualTo("찾을 수 없는 대상이 있습니다: kim99, DEPT_X");
+        assertThat(GisErrorCode.SHARE_TARGET_LIMIT.getMessage()).isEqualTo("공유 대상은 100개까지입니다.");
+        assertThat(GisErrorCode.SHARE_CONFLICT.getMessage()).isEqualTo("다른 변경과 겹쳤습니다. 다시 시도하세요.");
+    }
+
+    @Test
     void 추가한_코드_두_개는_400() {
         assertThat(GisErrorCode.MYMAP_MODE_UNSUPPORTED.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(GisErrorCode.MYMAP_SRID_UNSUPPORTED.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);

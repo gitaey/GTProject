@@ -38,7 +38,8 @@ class UserMapDynamicUpdateTest {
     @BeforeEach
     void setUp() {
         UserMapPermissionService perm = new UserMapPermissionService(userAccess, permAccess, em);
-        service = new UserMapService(repo, featureRepo, failureRepo, perm, new MyMapColumnService(repo, perm, jdbc), jdbc);
+        service = new UserMapService(repo, featureRepo, failureRepo, perm, new MyMapColumnService(repo, perm, jdbc), jdbc,
+                new UserMapShareService(repo, userAccess, permAccess, com.gtp.domain.mymap.FakeShareDirectory.standard()));
     }
 
     private UserMap layer(String status) {

@@ -27,9 +27,18 @@ public class JwtUtil {
 
     /* 토큰 생성 */
     public String generateToken(String userId, String role) {
-        return Jwts.builder()
+        return generateToken(userId, role, null);
+    }
+
+    /** 세부권한(permission)이 있으면 {@code perm} 클레임으로 넣는다(없으면 클레임 자체를 생략 — 옛 토큰과 같은 모양). */
+    public String generateToken(String userId, String role, String permission) {
+        var builder = Jwts.builder()
                 .setSubject(userId)
-                .claim("role", role)
+                .claim("role", role);
+        if (permission != null && !permission.isBlank()) {
+            builder.claim("perm", permission);
+        }
+        return builder
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getKey(), SignatureAlgorithm.HS256)

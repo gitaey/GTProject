@@ -44,7 +44,7 @@ public class AuthService {
 
         user.updateLastLogin(LocalDateTime.now());
 
-        String token = jwtUtil.generateToken(user.getUserId(), user.getRoleCode());
+        String token = jwtUtil.generateToken(user.getUserId(), user.getRoleCode(), user.getPermissionCode());
         return toResponse(token, user);
     }
 
@@ -54,7 +54,7 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        String token = jwtUtil.generateToken(user.getUserId(), user.getRoleCode());
+        String token = jwtUtil.generateToken(user.getUserId(), user.getRoleCode(), user.getPermissionCode());
         return toResponse(token, user);
     }
 

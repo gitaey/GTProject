@@ -1,8 +1,6 @@
 package com.gtp.domain.mymap.service;
 
 import com.gtp.domain.mymap.entity.UserMap;
-import com.gtp.domain.mymap.entity.UserMapPermissionAccess;
-import com.gtp.domain.mymap.entity.UserMapUserAccess;
 import com.gtp.domain.mymap.repository.UserMapPermissionAccessRepository;
 import com.gtp.domain.mymap.repository.UserMapUserAccessRepository;
 import com.gtp.global.exception.CustomException;
@@ -59,35 +57,6 @@ public class UserMapPermissionService {
         List<Long> byRole = permissionAccessRepository.findAllByRoleCodeIn(roleCodes).stream()
                 .map(a -> a.getUserMap().getId()).toList();
         return java.util.stream.Stream.concat(byUser.stream(), byRole.stream()).distinct().toList();
-    }
-
-    @Transactional
-    public void setShare(UserMap map, List<String> userIds, List<String> roleCodes) {
-        userAccessRepository.deleteByUserMap(map);
-        permissionAccessRepository.deleteByUserMap(map);
-        entityManager.flush();
-        if (userIds != null) {
-            for (String uid : userIds) {
-                if (uid == null || uid.isBlank()) continue;
-                userAccessRepository.save(UserMapUserAccess.builder().userId(uid).userMap(map).build());
-            }
-        }
-        if (roleCodes != null) {
-            for (String role : roleCodes) {
-                if (role == null || role.isBlank()) continue;
-                permissionAccessRepository.save(UserMapPermissionAccess.builder().roleCode(role).userMap(map).build());
-            }
-        }
-    }
-
-    @Transactional(readOnly = true)
-    public List<String> getSharedUserIds(UserMap map) {
-        return userAccessRepository.findAllByUserMap(map).stream().map(UserMapUserAccess::getUserId).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<String> getSharedRoleCodes(UserMap map) {
-        return permissionAccessRepository.findAllByUserMap(map).stream().map(UserMapPermissionAccess::getRoleCode).toList();
     }
 
     @Transactional

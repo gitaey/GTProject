@@ -20,6 +20,7 @@ public enum ErrorCode implements BaseErrorCode {
     INVALID_ROLE(HttpStatus.BAD_REQUEST, "유효하지 않은 역할입니다."),
     INVALID_STATUS(HttpStatus.BAD_REQUEST, "유효하지 않은 상태입니다."),
     INVALID_PERMISSION(HttpStatus.BAD_REQUEST, "해당 역할에 유효하지 않은 세부 권한입니다."),
+    INVALID_PERMISSION_CODE(HttpStatus.BAD_REQUEST, "세부 권한 코드에는 ':'를 쓸 수 없습니다."),
     PERMISSION_REQUIRED(HttpStatus.BAD_REQUEST, "해당 역할은 세부 권한이 필요합니다."),
 
     // 포스트 관련

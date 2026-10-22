@@ -68,6 +68,40 @@ class SecurityContractTest {
         }
     }
 
+    @Test
+    void 공유_엔드포인트가_계약대로_있고_gis_경로는_permitAll보다_앞에서_authenticated() throws Exception {
+        Map<String, String> expected = Map.of(
+                "GET /{id}/share", "getShare",
+                "PUT /{id}/share", "share",
+                "GET /shares", "shares",
+                "POST /shares/bulk", "bulkShare");
+        for (Map.Entry<String, String> e : expected.entrySet()) {
+            String[] parts = e.getKey().split(" ", 2);
+            boolean found = false;
+            for (Method m : UserMapController.class.getDeclaredMethods()) {
+                if (!m.getName().equals(e.getValue())) continue;
+                found = pathsOf(m).contains(parts[1]) && verbOf(m).equals(parts[0]);
+                if (found) break;
+            }
+            assertThat(found).as(e.getKey()).isTrue();
+        }
+
+        // /api/gis/** 는 anyRequest().permitAll() 앞에서 authenticated() — 새 디렉터리 경로가 로그인 없이 열리지 않는다
+        List<String> lines = Files.readAllLines(SECURITY);
+        int gis = -1, any = -1;
+        for (int i = 0; i < lines.size(); i++) {
+            String l = lines.get(i);
+            if (l.contains("\"/api/gis/**\"") && l.contains(".authenticated()") && !l.contains("HttpMethod")) gis = i;
+            if (l.contains("anyRequest().permitAll()")) any = i;
+        }
+        assertThat(gis).as("/api/gis/** authenticated 규칙").isGreaterThanOrEqualTo(0);
+        assertThat(gis).isLessThan(any);
+        assertThat(lines).noneMatch(l -> l.contains("/api/gis") && l.contains("permitAll"));
+        // 컨트롤러는 /api/gis/ 아래에만 있다
+        assertThat(com.gtp.global.gis.share.GisShareDirectoryController.class.getAnnotation(RequestMapping.class).value())
+                .containsExactly("/api/gis/share-directory");
+    }
+
     private static List<String> pathsOf(Method m) {
         if (m.isAnnotationPresent(GetMapping.class)) return List.of(m.getAnnotation(GetMapping.class).value());
         if (m.isAnnotationPresent(PostMapping.class)) return List.of(m.getAnnotation(PostMapping.class).value());

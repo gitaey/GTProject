@@ -36,7 +36,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/posts", "/api/posts/{slug}").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/categories").permitAll()
                 .requestMatchers("/api/categories/**").authenticated()
-                .requestMatchers("/api/users/**").authenticated()
+                .requestMatchers("/api/users/**").hasAnyRole("SUPER_ADMIN", "ADMIN", "MAP_ADMIN") // 지도사용자(MAP_USER)는 사용자 관리·조회 불가(공유 상대 검색은 /api/gis/share-directory/** 사용)
                 .requestMatchers("/api/auth/me").authenticated()
                 .requestMatchers("/api/posts/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/geoserver/sld/**").permitAll()
@@ -55,6 +55,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/menu-visibility").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/roles", "/api/roles/**").authenticated()
                 .requestMatchers("/api/roles/**").hasRole("SUPER_ADMIN")
+                .requestMatchers("/api/gis/**").authenticated() // 지도 공통(공유 상대 검색 등) — 로그인 필요
                 .anyRequest().permitAll()
             )
             .addFilterBefore(new JwtFilter(jwtUtil), UsernamePasswordAuthenticationFilter.class);

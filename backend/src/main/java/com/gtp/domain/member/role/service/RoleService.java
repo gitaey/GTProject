@@ -76,6 +76,10 @@ public class RoleService {
     @Transactional
     public PermissionResponse createPermission(String roleCode, PermissionCreateRequest req) {
         findByCode(roleCode);
+        // 공유 그룹 코드가 "역할:세부권한" 형식이라 ':'가 들어가면 역할 코드와 구분되지 않는다
+        if (req.getCode() != null && req.getCode().contains(":")) {
+            throw new CustomException(ErrorCode.INVALID_PERMISSION_CODE);
+        }
         if (permissionRepository.existsById(req.getCode())) {
             throw new CustomException(ErrorCode.DUPLICATE_PERMISSION_CODE);
         }
@@ -113,7 +117,9 @@ public class RoleService {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null) return false;
         return auth.getAuthorities().stream()
-                .map(a -> a.getAuthority().replaceFirst("^ROLE_", ""))
+                .map(a -> a.getAuthority())
+                .filter(a -> a.startsWith("ROLE_"))   // PERM_ 같은 세부권한은 역할 표를 조회할 필요가 없다
+                .map(a -> a.substring("ROLE_".length()))
                 .anyMatch(this::isSuperRole);
     }
 

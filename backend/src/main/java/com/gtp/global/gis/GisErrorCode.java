@@ -44,7 +44,16 @@ public enum GisErrorCode implements BaseErrorCode {
     MYMAP_SAMPLE_NOT_FOUND(HttpStatus.NOT_FOUND, "샘플을 찾을 수 없습니다."),
     MYMAP_STYLE_INVALID(HttpStatus.BAD_REQUEST, "스타일 설정 형식이 올바르지 않습니다."),
     MYMAP_MODE_UNSUPPORTED(HttpStatus.BAD_REQUEST, "지원하지 않는 업로드 방식입니다."),
-    MYMAP_SRID_UNSUPPORTED(HttpStatus.BAD_REQUEST, "지원하지 않는 좌표계입니다: {0}");
+    MYMAP_SRID_UNSUPPORTED(HttpStatus.BAD_REQUEST, "지원하지 않는 좌표계입니다: {0}"),
+
+    // 공유(공유 상대 검색·공유 저장) — 전역 ErrorCode를 쓰지 않는다
+    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."),
+    SHARE_QUERY_INVALID(HttpStatus.BAD_REQUEST, "검색어는 2~50자로 입력하세요."),
+    SHARE_DIRECTORY_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "잠시 후 다시 검색하세요."),
+    SHARE_TARGET_INVALID(HttpStatus.BAD_REQUEST, "찾을 수 없는 대상이 있습니다: {0}"),
+    SHARE_TARGET_LIMIT(HttpStatus.BAD_REQUEST, "공유 대상은 100개까지입니다."),
+    SHARE_BULK_INVALID(HttpStatus.BAD_REQUEST, "일괄 공유 요청이 올바르지 않습니다(레이어 1~50개, 대상 1~100개, 방식 ADD/REMOVE)."),
+    SHARE_CONFLICT(HttpStatus.CONFLICT, "다른 변경과 겹쳤습니다. 다시 시도하세요.");
 
     private final HttpStatus status;
     private final String message;
