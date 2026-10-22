@@ -190,7 +190,7 @@ GTProject 저장소의 `.claude/skills/map-module-export/references/`에 있다.
 | 조각 | 계약 | 없으면 |
 |---|---|---|
 | `sources.shareDirectory` (`ShareDirectorySource`) | `searchUsers(query, {limit?})` → `{userId, name, groupLabel?}[]`(2글자 이상일 때만 부름) · `listGroups()` → `{code, label, parentCode?}[]`(역할은 `code`, 세부권한은 `역할:세부` 코드 + `parentCode`) | 아이디·역할 코드를 직접 입력(칩으로 쌓음). 두 메서드가 `GisHttpError` 404·405를 던져도(경로가 없는 서버) 해당 입력만 자동으로 직접 입력으로 바뀐다 |
-| `myMap.shareTarget` (`ShareTargetSource`) | `get(id)` → `{users:[{userId,name,state}], roles:[{code,label,state}]}`(`state`: `ACTIVE`·`INACTIVE`·`MISSING`) · `set(id, {userIds, roleCodes})`(통째로 바꾸기) · `getMany?(ids)` · `bulk?(ids, 'ADD'|'REMOVE', change)` → `{succeededIds, failed:[{id, reason:'NOT_AVAILABLE'|'LIMIT_EXCEEDED'}]}` | 옛 `getShare/setShare`를 `legacyShareTarget`이 감싸 단일 공유만(이름 없음). `bulk`가 없으면 패널의 "선택" 단추가 없다. `getMany`가 없으면 "대상 빼기"도 검색·체크로 뺄 대상을 고른다 |
+| `myMap.shareTarget` (`ShareTargetSource`) | `get(id)` → `{users:[{userId,name,state}], roles:[{code,label,state}]}`(`state`: `ACTIVE`·`INACTIVE`·`MISSING`) · `set(id, {userIds, roleCodes})`(통째로 바꾸기) · `getMany?(ids)` · `bulk?(ids, 'ADD'|'REMOVE', change)` → `{succeededIds, failed:[{id, reason:'NOT_AVAILABLE'|'LIMIT_EXCEEDED'}]}` | 옛 `getShare/setShare`를 `legacyShareTarget`이 감싸 단일 공유만(이름 없음). `bulk`가 없으면 패널의 "공유" 단추가 없다. `getMany`가 없으면 "대상 빼기"도 검색·체크로 뺄 대상을 고른다 |
 
 - 단일 공유(`ui/share/ShareDialog`, 레이어 하나): 열면 현재 공유가 이름 칩·역할 체크로 보이고, 저장 = `set`(통째로 바꾸기). **서버 오류는 창을 닫지 않고 하단에 `message`로 보인다**(옛 화면은 무시하고 닫았다 — 의도된 변경).
   현재 공유를 못 받으면 저장 단추가 없다(빈 칸에서 저장하면 기존 공유가 지워진다). 비활성·없는 사용자는 회색 칩("비활성"·"없는 사용자")으로 남아 지울 수 있고, 저장은 그대로 보낸다(서버는 새로 추가되는 대상만 존재 검사).
@@ -198,7 +198,7 @@ GTProject 저장소의 `.claude/skills/map-module-export/references/`에 있다.
 - 역할 체크 목록: 역할 아래 세부권한(부서)을 들여쓴다 — **체크는 서로 독립**(역할 전체 ≠ 세부권한). 8개를 넘으면 걸러보기. 목록에 없는 저장값은 "목록에 없는 역할" 칩. 코드는 회색 작은 글씨.
 - 일괄 공유(레이어 2개 이상, `shareTarget.bulk` 필요): **[대상 추가 | 대상 빼기]만 있다(덮어쓰기 없음)**. 빼기는 `getMany`로 모은 현재 공유 대상(`2/3개 레이어`)에서 눌러 고른다. 저장 → 결과 화면 `성공 n · 실패 m`(실패 레이어 이름·사유).
   한 번에 레이어 50개·대상(사용자+그룹) 100개까지(화면이 먼저 막고 서버도 검사). `shareTarget.getMany`·`bulk`는 50개 단위 한도를 어댑터·화면이 지킨다.
-- 나만의지도 패널: 내 레이어 2개 이상 + `shareTarget.bulk`가 있으면 머리줄에 "선택" 단추 → 선택 모드(내 레이어 줄 전체가 선택 대상, 줄 단추 숨김, 공유받은 레이어는 흐리게, 하단 `n개 선택 · 전체 선택 · 공유 · 취소`).
+- 나만의지도 패널: 내 레이어 2개 이상 + `shareTarget.bulk`가 있으면 머리줄에 "공유" 단추(업로드 옆) → 선택 모드(내 레이어 줄 전체가 선택 대상, 줄 단추 숨김, 공유받은 레이어는 흐리게, 하단 `n개 선택 · 전체 선택 · 공유하기 · 취소`).
   공유가 끝나면 선택 모드를 닫고 목록을 다시 받는다(`shareCount` 갱신). 공유받은 쪽 화면에는 다음 목록 조회(패널 열기) 때 반영된다.
 - React 호스트가 자기 자원에 쓰려면 `@gtp/gis-map/ui`의 `ShareDialog`(`target`·`directory`·`items`·`resourceNoun`·`note`·`selfUserId`·`onClose`·`onDone`)와 `legacyShareTarget`을 쓴다. UMD에는 없다(React 위젯).
 - 어댑터: `restSources()`가 `shareDirectory`(`/api/gis/share-directory/{users,groups}`)를 더하고 `myMap.shareTarget`을 `/api/mymap/{id}/share`·`/api/mymap/shares?ids=`·`/api/mymap/shares/bulk`로 구현한다.
@@ -232,6 +232,7 @@ GTProject 저장소의 `.claude/skills/map-module-export/references/`에 있다.
   분위(같은 개수)가 같은 값 때문에 겹치면 같은 간격으로 바꾼다. 숫자 판정은 **서버의 컬럼 통계(`NumericText`)와 같은 규칙**이다(`readNumber`): 앞뒤 공백(전각·NBSP)을 떼고 NFKC로 정리한 뒤 `12`·`-3.5`·`.5`·`5.`·`1.5E+3`과 올바르게 묶은 쉼표 숫자(`1,234`)만 숫자, 앞이 0인 코드(`007`)·16자리 이상 정수(PNU)·`12%`·`1,5`·**절댓값이 1e15 이상인 값(`1e15`·`9e15`·`1.5E+16`)** 은 아니다(서버가 숫자 판정과 구간 경계에 같은 "1e15 미만"을 쓰므로 분위·같은 간격 경계가 그 안에 든다. `readNumberDetail`은 못 읽은 이유를 `format`/`range`로 함께 준다).
   한쪽만 고치는 일을 막으려고 서버 시험과 프론트 시험이 같은 표(GTProject `backend/src/test/resources/mymap/numeric-cases.json`, 138건 — `[입력, 기대 숫자|null]`)를 읽는다.
   숫자 컬럼 = 값이 있는 칸의 90% 이상(올림)이 숫자. 서버는 구간형의 컬럼이 자기 통계로 숫자 컬럼일 때만 받으므로 둘이 어긋나면 저장이 거절된다.
+- **작은 면은 점 기호로**: 면(Polygon·MultiPolygon)의 화면 크기(범위 긴 변 ÷ resolution)가 6px 미만이면 그 도형 대신 중심점에 점 기호(반지름 5 이상·점 색·테두리 설정을 따름, 설정 없는 옛 스타일은 같은 색·흰 테두리)를 그린다. 확대해서 6px 이상이 되면 원래 면으로 돌아온다(전국 줌에서 작은 필지가 안 보이는 문제). 점·선과 표시 방식 "점" 레이어는 그대로, 라벨·클릭 팝업도 그대로다.
 - **라벨**은 본 레이어와 **같은 `VectorSource`를 쓰는 별도 `VectorLayer`**(`declutter` 켬 — 겹치는 라벨은 자동으로 숨김, `minZoom` = 설정한 줌, zIndex = 본 레이어 + 0.1)다. 본 레이어의 점·선이 겹침 제거로 사라지지 않게 나눴다.
   위치는 폴리곤 안쪽 대표점(오목한 모양도 도형 안), 점이거나 표시 방식이 "점"이면 점 위쪽. 한글 글꼴(맑은 고딕·Noto Sans KR·Apple SD Gothic Neo…)을 앞에 둔 글꼴 목록을 쓴다(웹폰트는 싣지 않는다).
   **안전장치**: 피처가 많으면 설정한 줌이 낮아도 그 아래 확대에서는 라벨을 그리지 않는다(`labelFloorZoom`: 500개 초과 12 · 2,000 초과 14 · 5,000 초과 15 · 20,000 초과 16). 스타일 대화상자는 그 아래 줌 선택지를 막고 안내한다.

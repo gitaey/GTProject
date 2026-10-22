@@ -28,6 +28,8 @@ const HALO_WIDTH = 3
 /** 피처의 대표점을 한 번만 계산해 두는 캐시. 점·폴리곤 안쪽점·선 가운데 */
 export interface MyMapAnchors {
     of(feature: FeatureLike): Point | null
+    /** 범위(extent) 한가운데 점 — 작은 도형을 점 기호로 그릴 때 쓴다(폴리곤 안쪽점 계산 없이 값싸게, 피처마다 한 번만) */
+    centerOf(feature: FeatureLike): Point | null
 }
 
 function extentCenterPoint(g: Geometry): Point | null {
@@ -73,7 +75,17 @@ function computeAnchor(g: Geometry): Point | null {
 /** 컨트롤러 인스턴스마다 하나씩 만든다(WeakMap이라 피처가 사라지면 같이 사라진다) */
 export function createMyMapAnchors(): MyMapAnchors {
     const cache = new WeakMap<object, Point | null>()
+    const centers = new WeakMap<object, Point | null>()
     return {
+        centerOf(feature: FeatureLike): Point | null {
+            const key = feature as object
+            const hit = centers.get(key)
+            if (hit !== undefined) return hit
+            const g = feature.getGeometry()
+            const p = g ? extentCenterPoint(g as Geometry) : null
+            centers.set(key, p)
+            return p
+        },
         of(feature: FeatureLike): Point | null {
             const key = feature as object
             const hit = cache.get(key)
@@ -101,9 +113,49 @@ function isPointType(type: string): boolean {
     return type === 'Point' || type === 'MultiPoint'
 }
 
+/** 면 도형의 화면 크기(extent 긴 변 ÷ resolution)가 이 값(px) 미만이면 면 대신 점 기호로 그린다 */
+export const MYMAP_MIN_SHAPE_PX = 6
+/** 작은 도형을 대신하는 점 기호의 최소 반지름(px) */
+export const MYMAP_TINY_DOT_RADIUS = 5
+
+/**
+ * 면(Polygon·MultiPolygon)이 resolution에서 MYMAP_MIN_SHAPE_PX 미만으로 보이는지. 점·선·그 밖의 도형은 항상 false.
+ * 지오메트리가 캐시한 extent를 읽어 뺄셈·나눗셈·비교만 한다(좌표를 훑지 않음 — 렌더마다 피처 수만큼 불려도 가볍다)
+ */
+export function isTinyArea(g: Geometry, resolution: number): boolean {
+    if (!(resolution > 0) || !Number.isFinite(resolution)) return false
+    const type = g.getType()
+    if (type !== 'Polygon' && type !== 'MultiPolygon') return false
+    const e = g.getExtent()
+    const span = Math.max(e[2] - e[0], e[3] - e[1])
+    return Number.isFinite(span) && span / resolution < MYMAP_MIN_SHAPE_PX
+}
+
+function tinyDotStyle(anchors: MyMapAnchors, color: string, radius: number, stroke: Stroke | null): Style {
+    return new Style({
+        geometry: f => anchors.centerOf(f) ?? undefined,
+        image: new CircleStyle({ radius: Math.max(radius, MYMAP_TINY_DOT_RADIUS), fill: new Fill({ color }), ...(stroke ? { stroke } : {}) }),
+    })
+}
+
+/**
+ * 스타일 설정이 없는 레이어(옛 고정 스타일)용 함수. 보통은 base(옛 Style) 그대로, 면이 6px 미만이면 같은 색의 점 기호(반지름 5·흰 테두리 1px)
+ */
+export function createLegacyMyMapStyle(base: Style, color: string, anchors: MyMapAnchors): StyleFunction {
+    let tiny: Style | null = null
+    return (feature: FeatureLike, resolution: number): Style | undefined => {
+        const g = feature.getGeometry()
+        if (!g) return undefined
+        if (!isTinyArea(g as Geometry, resolution)) return base
+        if (!tiny) tiny = tinyDotStyle(anchors, color, MYMAP_TINY_DOT_RADIUS, new Stroke({ color: '#fff', width: 1 }))
+        return tiny
+    }
+}
+
 /**
  * 본 레이어 스타일 함수. 색 하나(단색이면 설정의 fill/stroke/pointColor, 범주·구간이면 값에서 나온 색)마다 Style을 하나만 만든다.
- * 채우기는 투명도 0이어도 Fill을 둔다(OL 클릭 판정은 채우기가 있는 도형만 잡는다)
+ * 채우기는 투명도 0이어도 Fill을 둔다(OL 클릭 판정은 채우기가 있는 도형만 잡는다).
+ * 면이 화면에서 MYMAP_MIN_SHAPE_PX 미만이면 그 도형 대신 중심점에 점 기호(점 색·테두리 설정을 따름)를 그린다 — 전국 줌에서 작은 필지가 안 보이는 문제
  */
 export function createMyMapStyle(cfg: MyMapStyleConfig, anchors: MyMapAnchors): StyleFunction {
     const classColor = cfg.classify ? makeClassColorFn(cfg.classify) : null
@@ -119,7 +171,11 @@ export function createMyMapStyle(cfg: MyMapStyleConfig, anchors: MyMapAnchors): 
 
     // 점 색: 값별·구간 색이 있으면 그 색, 아니면 설정한 점 색, 없으면 선 색(옛 모양)
     const dot = (color: string | null): string => color ?? cfg.pointColor ?? cfg.stroke
-    const build = (color: string | null, asPoint: boolean): Style => {
+    const build = (color: string | null, asPoint: boolean, tiny: boolean): Style => {
+        if (tiny) {
+            const stroke = cfg.pointStrokeWidth > 0 ? new Stroke({ color: cfg.pointStroke, width: cfg.pointStrokeWidth }) : null
+            return tinyDotStyle(anchors, dot(color), cfg.pointRadius, stroke)
+        }
         if (asPoint) {
             return new Style({
                 geometry: f => anchors.of(f) ?? undefined,
@@ -135,15 +191,16 @@ export function createMyMapStyle(cfg: MyMapStyleConfig, anchors: MyMapAnchors): 
         })
     }
 
-    return (feature: FeatureLike): Style | undefined => {
+    return (feature: FeatureLike, resolution: number): Style | undefined => {
         const g = feature.getGeometry()
         if (!g) return undefined
         const asPoint = cfg.display === 'point' && isAreaType((g as Geometry).getType())
+        const tiny = !asPoint && isTinyArea(g as Geometry, resolution)
         const color = classColor && field ? classColor(feature.get(field)) : null
-        const key = (asPoint ? 'p|' : 'g|') + (color ?? '')
+        const key = (asPoint ? 'p|' : tiny ? 't|' : 'g|') + (color ?? '')
         let style = cache.get(key)
         if (!style) {
-            style = build(color, asPoint)
+            style = build(color, asPoint, tiny)
             cache.set(key, style)
         }
         return style

@@ -19,7 +19,7 @@ import type { ReadableStore, WritableStore } from '../store'
 import type { MapResources } from '../tracker'
 import type { ToolManager } from '../tools/ToolManager'
 import type { MyMapColumnInfo, MyMapQuota, MyMapStyleConfig, MyMapUpdateInput, UserMapListItem, UserMapStatus } from '../types/mymap'
-import { createMyMapAnchors, createMyMapLabelStyle, createMyMapStyle } from '../lib/mymapStyle'
+import { createLegacyMyMapStyle, createMyMapAnchors, createMyMapLabelStyle, createMyMapStyle } from '../lib/mymapStyle'
 import type { MyMapAnchors } from '../lib/mymapStyle'
 import {
     categoryCounts, defaultMyMapStyle, displayText, effectiveLabelMinZoom, numericValues, parseMyMapStyle, popupFieldsFor,
@@ -459,7 +459,7 @@ export class VectorOverlayControllerImpl implements VectorOverlayController {
         const cfg = this.previews.get(id) ?? parseMyMapStyle(this.saved.get(id) ?? null, e.baseColor)
         if (!cfg) {
             // 설정이 없거나 못 읽는다 → 옛 고정 스타일 그대로
-            e.layer.setStyle(myMapStyle(e.baseColor))
+            e.layer.setStyle(createLegacyMyMapStyle(myMapStyle(e.baseColor), e.baseColor, e.anchors))
             this.dropLabelLayer(e)
             return
         }

@@ -4,7 +4,7 @@
 // 내 레이어 / 공유받은 레이어 두 묶음, 종류 배지, 처리 중 진행률 막대, 끝난 뒤 `매칭 N · 실패 M`(실패를 누르면 결과 보고서),
 // 상단 `내 레이어 n/20`(한도는 소스의 quota가 있을 때만). 항목 상태(켜짐·실패·처리 중)에 따라 바뀌는 값만 인라인 style로 남겼다
 import { useMemo, useRef, useState } from 'react'
-import { Trash2, Upload, Loader2, AlertCircle, Share2, Locate, Lock, Palette, ListChecks, Users } from 'lucide-react'
+import { Trash2, Upload, Loader2, AlertCircle, Share2, Locate, Lock, Palette, Users } from 'lucide-react'
 import { EMPTY_MYMAP_CATALOG_STATE } from '../../core'
 import type { MyMapCatalogState, MyMapConfirmResult, UserMapListItem, VectorOverlayState } from '../../core'
 import { useGisMap, useMyMapCatalog, useStoreValue, useVectorOverlayState } from '../../react'
@@ -255,9 +255,9 @@ export default function MyMapPanel() {
                 <div className="gm-mymap-panel__header-actions">
                     {bulkAvailable && owned.length >= 2 && (
                         <button onClick={() => (selecting ? exitSelect() : setSelectMode(true))} aria-pressed={selecting}
-                            title="여러 레이어를 골라 한 번에 공유"
+                            title="여러 레이어를 골라 한 번에 공유" aria-label="공유"
                             className={cx('gm-mymap-panel__upload', selecting && 'gm-is-on')}>
-                            <ListChecks size={13} /> 선택
+                            <Share2 size={13} /> 공유
                         </button>
                     )}
                     <button onClick={() => setShowUpload(true)} disabled={layerFull}
@@ -267,7 +267,7 @@ export default function MyMapPanel() {
                     </button>
                 </div>
             </div>
-            {selecting && <div className="gm-mymap-panel__select-banner">선택 모드 — 공유할 내 레이어를 고르세요</div>}
+            {selecting && <div className="gm-mymap-panel__select-banner">공유할 내 레이어를 고르세요 (여러 개 선택 가능)</div>}
             {maxLayers !== null && (
                 <div className={cx('gm-mymap-panel__quota', layerFull && 'gm-is-full')}>
                     내 레이어 {formatCount(owned.length)}/{formatCount(maxLayers)}
@@ -303,7 +303,7 @@ export default function MyMapPanel() {
                     <button type="button" onClick={toggleAllSelected} className="gm-mymap-panel__select-link">{allPicked ? '선택 해제' : '전체 선택'}</button>
                     <button type="button" disabled={pickedIds.length === 0}
                         onClick={() => { setShareFromSelection(true); setShareItems(owned.filter(i => selectedIds.has(i.id)).map(i => ({ id: i.id, name: i.name }))) }}
-                        className="gm-mymap-panel__select-share"><Share2 size={12} /> 공유</button>
+                        className="gm-mymap-panel__select-share"><Share2 size={12} /> 공유하기</button>
                     <button type="button" onClick={exitSelect} className="gm-mymap-panel__select-link">취소</button>
                 </div>
             )}
