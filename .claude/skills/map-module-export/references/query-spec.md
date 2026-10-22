@@ -98,7 +98,12 @@ GTProject 구현은 JWT principal 문자열을 읽는다(`SecurityContextGisUser
 | U7 | POST `/api/mymap/upload/excel/confirm` | 로그인 | A | 선택: 업로드 |
 | U8 | GET `/api/mymap/{id}/share` | 로그인 | A | 선택: 공유 |
 | U9 | PUT `/api/mymap/{id}/share` | 로그인 | A | 선택: 공유 |
-| U10 | PATCH `/api/mymap/{id}` | 로그인 | - | 미사용 |
+| U10 | PATCH `/api/mymap/{id}` | 소유자만 | A | 선택: 스타일·이름·표시 수정 |
+| U14 | GET `/api/mymap/quota` | 로그인 | A | 선택: 업로드 한도·적재 범위 |
+| U15 | GET `/api/mymap/samples/{kind}` | 로그인 | A | 선택: 샘플 엑셀 |
+| U16 | GET `/api/mymap/{id}/import-report` | 소유자만 | A | 선택: 업로드 결과 보고서 |
+| U17 | GET `/api/mymap/{id}/import-report.xlsx` | 소유자만 | A | 선택: 실패 행 엑셀 |
+| U18 | GET `/api/mymap/{id}/columns` | 볼 수 있는 사람 | A | 선택: 스타일 컬럼 통계 |
 | U11 | GET `/api/mymap/srid-options` | 로그인 | - | 미사용(프론트는 자체 목록 `ui/mymap/sridOptions.ts`) |
 | U12 | GET `/api/admin/mymap` | SUPER_ADMIN | M | 관리 |
 | U13 | DELETE `/api/admin/mymap/{id}` | SUPER_ADMIN | M | 관리 |
@@ -376,12 +381,47 @@ DELETE FROM tbl_user_map                   WHERE id = #{id};
 
 `userIds`/`roleCodes`가 `null`이면 그 종류는 "전부 해제"와 같다. 같은 값이 두 번 들어오면 UNIQUE 위반으로 500(추론). 사용자·역할이 실제로 있는지는 검사하지 않는다(도메인 독립).
 
-### U10·U11·U12 (프론트 지도 화면 미사용)
+### U10. PATCH `/api/mymap/{id}` — 부분 수정(스타일 저장에 쓴다)
 
-- U10 PATCH `/{id}`: `{ name, description, styleConfig, visible }` → 소유자 확인 → `UPDATE tbl_user_map SET name, description, style_config, visible, updated_at = now() WHERE id`.
-  네 필드를 모두 덮어쓴다(`name` 누락 시 NOT NULL 위반 500).
+- 요청 `{ name?, description?, styleConfig?, visible? }` — **보낸 필드만 바꾼다**(안 보낸 값·`null`은 그대로). 공백 `name`은 무시, `name` 100자·`description` 300자는 잘라 저장, `styleConfig`가 `""`이면 비워서 기본 스타일로 돌린다. `styleConfig`는 **JSON 문자열**이다.
+- **소유자만**(공유받은 사용자·타인·비소유 SUPER_ADMIN은 403 `이 나만의지도에 대한 권한이 없습니다.`). 소유자 확인이 스키마 검사보다 먼저다. 위반은 400 `스타일 설정이 올바르지 않습니다: <항목 경로> — <이유>`.
+- 엔티티는 `@DynamicUpdate`(바뀐 칸만 UPDATE) — 이식할 때도 전체 칸을 덮어쓰면 통계(`column_schema`)·진행률이 옛 값으로 되돌아간다(실제 결함이었다).
+
+#### styleConfig 스키마 v1 (서버가 저장 전에 검사, 모르는 키는 거절, 전체 16KB 이하)
+
+| 키 | 형식·범위 |
+|---|---|
+| `v` | 필수, 정수 1 |
+| `display` | `"polygon"` | `"point"` |
+| `fill`·`stroke`·`pointColor`·`pointStroke` | 색 `#rrggbb[aa]`만. `pointColor` 없으면 `stroke`를 따르고 `pointStroke` 없으면 흰색 |
+| `fillOpacity` 0~1 · `strokeWidth` 0~20 · `pointRadius` 1~50 · `pointStrokeWidth` 0~10 | 숫자 |
+| `classify` | `null` 또는 범주형 `{type:"categorical", field, classes:[{value,color}] 1~12개, otherColor?}` 또는 구간형 `{type:"graduated", field(숫자 컬럼), method:"quantile"|"equal"|"manual", breaks(색 개수−1개, 오름차순, 각 절댓값 < 1e15), colors 3~7개(알파 없는 #rrggbb)}` |
+| `label` | `null` 또는 `{field, size 8~40, color, halo, minZoom 정수 0~28}` |
+| `popup` | `null`/없음 = 기본(앞 5개 컬럼), `{fields:[…]}` 0~30개, `fields: []` = 팝업 끔 |
+
+`field`·`label.field`·`popup.fields`는 그 레이어의 컬럼 이름이어야 한다(레이어가 처리 중이라 컬럼을 모르면 이름 검사만 건너뜀).
+
+### U14. GET `/api/mymap/quota` — 한도와 적재 범위
+
+레이어 수·행 수 한도(PNU·주소·좌표 각 5,000행, 레이어 20개, shp 10만 피처/300MB)와 `coverage`(연속지적도 적재 시도 `sidoCodes`·`nationwide`·`loaded[{sido,version}]`, `ref.load_meta` 기준)를 준다. 적재가 없으면 비어 있고 PNU 모드는 503.
+
+### U15. GET `/api/mymap/samples/{kind}` — 샘플 엑셀(`pnu`·`address`·`coord`, 봉투 없는 xlsx, `Content-Disposition: attachment`)
+
+### U16·U17. GET `/api/mymap/{id}/import-report`(`?page&size&reason`) · `/import-report.xlsx` — 업로드 결과 보고서와 실패 행 엑셀(소유자만)
+
+응답: 전체·매칭·실패 건수, 사유별 건수, `duplicatePnuCount`, 실패 행 `{rowNo, inputValue, reason, candidates}` 쪽 넘김. 실패 사유 코드 13종(PNU_FORMAT·PNU_NOT_FOUND·EMPTY·…). 실패 행 원본은 30일 뒤 삭제(개인 주소 보호). 실패 행 엑셀은 셀이 `=` `+` `-` `@`로 시작하면 수식으로 실행되지 않게 글자 칸으로 저장한다.
+
+### U18. GET `/api/mymap/{id}/columns` — 컬럼 통계(스타일 대화상자용)
+
+`{v, rowCount, truncated, columns:[{name, kind:"number"|"text", filled, numericCount, distinct, distinctCapped, min?, max?, quantiles?(21개), top[{value,count}] 20개}]}`. 볼 수 있는 사람만, 처리 중·실패 레이어는 409. 업로드가 끝날 때 `column_schema`에 기록한다.
+**숫자 판정 규칙**(서버 `NumericText`와 프론트 `readNumber`가 같아야 함): NFKC·JS `trim` 공백 정리 뒤 `^[+-]?(d+(.d*)?|.d+)([eE][+-]?d+)?$` 또는 올바르게 묶은 천 단위 쉼표만 숫자. 앞자리 0 코드(`007`)·`12%`·`NaN`·**절댓값 1e15 이상**은 숫자가 아니다. 컬럼은 값 있는 칸의 90% 이상이 숫자면 `number`. 공유 시험 표 `backend/src/test/resources/mymap/numeric-cases.json`(138건).
+
+### U19 이후(아직 없음) · U11·U12
+
 - U11 GET `/srid-options`: 상수 `["EPSG:5186","EPSG:4326","EPSG:5179","EPSG:3857"]`, DB 없음.
 - U12 GET `/api/admin/mymap`: `SELECT * FROM tbl_user_map ORDER BY created_at DESC`, 모든 항목 `owner = false`.
+
+업로드 흐름(U6·U7 변경): 미리보기는 xlsx를 SAX 스트리밍으로 읽어 값 있는 행이 5,000을 넘으면 즉시 400(`MYMAP_ROW_LIMIT`), 같은 사용자 동시 1건·서버 전체 4건(429). 확정은 비동기 처리(PNU는 `ref.parcel`에서 폴리곤을 찾아 **그 순간의 모양을 복사 저장**, 주소 모드는 아직 `MYMAP_MODE_UNSUPPORTED`). 같은 사용자의 가져오기(엑셀·shp)는 동시에 1건. PNU 조회는 `PnuParcelProvider` 인터페이스 뒤에 있고 기본 구현이 `ref.parcel`(시도별 파티션)을 읽는다.
 
 ---
 
