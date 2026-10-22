@@ -3,8 +3,9 @@
 // fetch 호출을 여기로 모았다. 업로드는 FormData라 Content-Type을 직접 넣지 않는다(브라우저가 boundary를 붙임).
 // 1단계: quota·samples·import-report(.xlsx), 엑셀 확인의 mode·pnuColumn·addressColumn.
 import type {
-    ExcelConfirmInput, ExcelPreviewResponse, GeoJsonObject, MyMapConfirmResult, MyMapImportReport, MyMapImportReportQuery, MyMapQuota,
-    MyMapSampleKind, MyMapSource, MyMapUpdateInput, ShpUploadInput, SourceContext, UserMapListItem, UserMapShare, UserMapStatus,
+    BulkShareMode, BulkShareResult, ExcelConfirmInput, ExcelPreviewResponse, GeoJsonObject, MyMapConfirmResult, MyMapImportReport,
+    MyMapImportReportQuery, MyMapQuota, MyMapSampleKind, MyMapSource, MyMapUpdateInput, ShareChange, ShareEntryState, ShareSnapshot,
+    ShareTargetSource, ShpUploadInput, SourceContext, UserMapListItem, UserMapShare, UserMapStatus,
 } from '../../core'
 import { apiUrl, readBlob, readEnvelope } from './envelope'
 
@@ -26,10 +27,70 @@ function confirmBody(input: ExcelConfirmInput): string {
     return JSON.stringify(body)
 }
 
+/** 공유 응답 한 건(A3·A5). 옛 서버는 userIds·roleCodes만 준다 → 이름·상태 없이 ACTIVE로 채운다 */
+interface ShareWire {
+    userIds?: string[]
+    roleCodes?: string[]
+    users?: Array<{ userId: string; name?: string | null; state?: string }>
+    roles?: Array<{ code: string; label?: string | null; state?: string }>
+}
+
+/** 한 번에 물을 수 있는 레이어 수(서버 한도) */
+const SHARES_CHUNK = 50
+
+function entryState(s: string | undefined): ShareEntryState {
+    return s === 'INACTIVE' || s === 'MISSING' ? s : 'ACTIVE'
+}
+
+function toSnapshot(wire: ShareWire | null | undefined): ShareSnapshot {
+    const w = wire ?? {}
+    const users = Array.isArray(w.users)
+        ? w.users.map(u => ({ userId: u.userId, name: u.name ?? null, state: entryState(u.state) }))
+        : (w.userIds ?? []).map(userId => ({ userId, name: null, state: 'ACTIVE' as const }))
+    const roles = Array.isArray(w.roles)
+        ? w.roles.map(r => ({ code: r.code, label: r.label ?? null, state: entryState(r.state) }))
+        : (w.roleCodes ?? []).map(code => ({ code, label: null, state: 'ACTIVE' as const }))
+    return { users, roles }
+}
+
 export function restMyMap(ctx: SourceContext): MyMapSource {
     const url = (path: string) => apiUrl(ctx.host(), '/api/mymap' + path)
 
+    const shareTarget: ShareTargetSource = {
+        async get(id: number): Promise<ShareSnapshot> {
+            return toSnapshot(await readEnvelope<ShareWire | null>(await ctx.http.fetch(url(`/${id}/share`))))
+        },
+
+        async set(id: number, change: ShareChange): Promise<void> {
+            const body = JSON.stringify({ userIds: change.userIds, roleCodes: change.roleCodes })
+            await readEnvelope<unknown>(await ctx.http.fetch(url(`/${id}/share`), { method: 'PUT', headers: JSON_HEADERS, body }))
+        },
+
+        /** 소유하지 않았거나 없는 id는 서버가 결과에서 뺀다 */
+        async getMany(ids: number[]): Promise<Array<ShareSnapshot & { id: number }>> {
+            const out: Array<ShareSnapshot & { id: number }> = []
+            for (let i = 0; i < ids.length; i += SHARES_CHUNK) {
+                const part = ids.slice(i, i + SHARES_CHUNK)
+                const data = await readEnvelope<Array<ShareWire & { id: number }> | null>(
+                    await ctx.http.fetch(url(`/shares?ids=${part.join(',')}`)),
+                )
+                for (const row of data ?? []) out.push({ id: row.id, ...toSnapshot(row) })
+            }
+            return out
+        },
+
+        async bulk(ids: number[], mode: BulkShareMode, change: ShareChange): Promise<BulkShareResult> {
+            const body = JSON.stringify({ ids, mode, userIds: change.userIds, roleCodes: change.roleCodes })
+            const data = await readEnvelope<Partial<BulkShareResult> | null>(
+                await ctx.http.fetch(url('/shares/bulk'), { method: 'POST', headers: JSON_HEADERS, body }),
+            )
+            return { succeededIds: data?.succeededIds ?? [], failed: data?.failed ?? [] }
+        },
+    }
+
     return {
+        shareTarget,
+
         async list(): Promise<UserMapListItem[]> {
             const data = await readEnvelope<UserMapListItem[] | null>(await ctx.http.fetch(url('')))
             return data ?? []

@@ -79,6 +79,8 @@ export type {
     GisMapSources, GisMapSourcesInput, GisMapSourcesFactory, SourceContext,
     LayerTreeSource, LayerUserSelectionSource, MyMapSource, GeoTiffSource, WindSource,
     AddressSearchSource, ParcelSource, RegionNameSource, LegendSource, WfsSource,
+    ShareUser, ShareGroup, ShareDirectorySource, ShareEntryState, ShareSnapshot, ShareChange, BulkShareMode, BulkShareResult,
+    ShareTargetSource,
 } from './sources'
 
 // 상태 저장소 / 이벤트

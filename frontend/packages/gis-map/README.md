@@ -142,7 +142,8 @@ React에서는 `<GisMapProvider host={…}>`가 바뀔 때마다 `map.setHost`�
 | 소스 | 하는 일 | 기본 구현 |
 |---|---|---|
 | `layerTree` (+ `userSelection`) | 그릴 레이어 트리 / 개인 레이어 선택 저장 | `restSources()` |
-| `myMap` · `geoTiff` · `wind` | 나만의지도(목록·업로드·결과 보고서·샘플·스타일 저장) · GeoTIFF 타일 · 바람장 | `restSources()` |
+| `myMap` · `geoTiff` · `wind` | 나만의지도(목록·업로드·결과 보고서·샘플·스타일 저장·공유) · GeoTIFF 타일 · 바람장 | `restSources()` |
+| `shareDirectory` | 공유 상대 검색(사용자)·공유 가능한 그룹(역할·세부권한) 목록 — 자원 공통 | `restSources()` |
 | `addressSearch` · `parcel` · `regionName` · `legend` · `wfs` | 주소 검색 · 필지 폴리곤 · 지역명 · 범례 · WFS URL | `proxySources()` |
 
 짝 백엔드 응답 형식이 다르면 해당 소스만 직접 구현해 배열 뒤쪽에 넣는다. 백엔드(Spring·MyBatis)로 옮길 때의 테이블 DDL·쿼리 명세는
@@ -155,7 +156,8 @@ GTProject 저장소의 `.claude/skills/map-module-export/references/`에 있다.
 |---|---|---|
 | `list()` · `status(id)` · `geojson(id)` · `remove(id)` | 목록 · 처리 상태 폴링 · GeoJSON(EPSG:4326) · 삭제 | 나만의지도 기능 없음 |
 | `uploadShp?` · `previewExcel?` · `confirmExcel?` | SHP·엑셀 업로드 | 해당 업로드가 안 됨 |
-| `getShare?` · `setShare?` | 공유 설정 | 공유 칸이 비어 있음 |
+| `shareTarget?` | 공유 저장소(이름·상태가 붙은 현재 공유 · 일괄 더하기/빼기) — 아래 "공유" 절 | `getShare`·`setShare`로 단일 공유만(일괄 단추 없음) |
+| `getShare?` · `setShare?` | 옛 공유 입출력(아이디·코드 배열). `shareTarget`이 없을 때만 쓴다 | 공유 칸이 비어 있음 |
 | `quota?()` | `{ownedLayers, maxLayers, maxRows:{pnu,address,coord}, maxShpFeatures, maxExcelMb, maxShpMb, coverage}` — `coverage`는 아래 | 패널의 `내 레이어 n/20`과 한도·지적도 기준월 문구가 빠진다(패널을 열 때 1번만 받는다) |
 | `downloadSample?(kind)` | `'pnu' \| 'coord'`(`'address'`는 2단계) 샘플 xlsx **바이트(Blob)**. 저장은 위젯이 `<a download>`로 한다 | 업로드 창의 "샘플 받기"가 없다 |
 | `importReport?(id, {page, size, reason})` | 소유자 전용 결과 보고서 `{total, matched, failed, byReason, rows:[{rowNo, reason, message, input, candidates}], page, size, totalRows}` | `실패 N 보기`가 링크 대신 글자 |
@@ -166,7 +168,7 @@ GTProject 저장소의 `.claude/skills/map-module-export/references/`에 있다.
   없으면 좌표(`latColumn`·`lonColumn`·`sourceSrid`)다. 주소 모드는 2단계에서 켜지므로 업로드 창은 PNU·좌표만 보여 준다.
 - `previewExcel`의 응답에 `suggestions`가 있으면 모드·컬럼을 미리 고르고, **없으면 옛 서버로 보고 좌표(위도·경도) 하나뿐인 옛 흐름**으로 동작한다. `totalRows`·`limits`·`warnings`
   (`NUMERIC_PNU_CELLS`·`DUPLICATE_FILE`·`OVER_LIMIT`)가 있으면 경고 배너와 행 한도 검사(모드별 `limits`, 없으면 `quota.maxRows`)를 한다. 모르는 경고 코드도 `message`를 그대로 보여 준다.
-- 목록 항목의 새 필드(전부 선택): `ownerId`(공유받은 항목의 "보낸 사람")·`sourceKind`(`SHP|EXCEL_COORD|EXCEL_PNU|EXCEL_ADDRESS` — 있으면 종류 배지)·`progressTotal`/`progressDone`(처리 중 막대)·
+- 목록 항목의 새 필드(전부 선택): `ownerId`·`ownerName`(공유받은 항목의 "보낸 사람" — 이름이 있으면 `이름(아이디)`)·`shareCount`(내 항목의 공유 대상 수 — 0보다 크면 `공유 n`)·`sourceKind`(`SHP|EXCEL_COORD|EXCEL_PNU|EXCEL_ADDRESS` — 있으면 종류 배지)·`progressTotal`/`progressDone`(처리 중 막대)·
   `matchedCount`/`failedCount`(`매칭 N · 실패 M`)·`parcelVersion`·`errorMessage`. `status(id)` 응답에도 같은 진행률·건수 필드를 실을 수 있고, 있으면 처리 중에도 목록에 반영한다(없으면 옛 동작 — 끝났을 때만).
 - `quota().coverage`(= `MyMapCoverage`): `{ sidoCodes, parcelVersion, loaded?, nationwide?, restrictedSidoCodes? }`. **`nationwide`가 있는 새 서버**에서는 `sidoCodes` = 실제 적재된 시도(지역 제한이 있으면 그 교집합), `parcelVersion` = 그 중 가장 이른 기준월,
   `loaded` = 시도별 기준월, `nationwide` = 전국 기준 시도(서버 설정, 기본 현행 16개)가 전부 적재되고 제한이 없을 때만 true, `restrictedSidoCodes` = 지역 제한 설정값. **빈 `sidoCodes`는 전국이 아니다.** 업로드 창 문구:
@@ -180,6 +182,27 @@ GTProject 저장소의 `.claude/skills/map-module-export/references/`에 있다.
 - 엔진: `map.vector.openCatalog()`의 상태(`MyMapCatalogState`)에 `quota: MyMapQuota | null`이 늘었다. 훅은 새로 만들지 않았다(`useMyMapCatalog()`로 같은 상태). 패널은 내 레이어 / 공유받은 레이어 두 묶음으로 나눠 그린다
   (공유받은 항목이 있을 때만 묶음 제목이 나온다).
 - 어댑터: `restSources()`의 `myMap`이 위 메서드를 `/api/mymap/{quota, samples/{kind}, {id}/import-report(.xlsx)}`로 구현한다. 파일 응답은 봉투가 없고, 오류 본문의 `message`가 있으면 그 글을 `Error`로 던진다.
+
+### 공유 (`MyMapSource.shareTarget` · `GisMapSources.shareDirectory`)
+
+공유는 "자원 무관 화면 + 공유 상대 디렉터리 + 자원별 저장소" 세 조각이다. 공유받은 쪽은 **보기만** 한다(권한 등급 없음). 전부 선택 — 없는 조각의 기능은 조용히 줄어든다.
+
+| 조각 | 계약 | 없으면 |
+|---|---|---|
+| `sources.shareDirectory` (`ShareDirectorySource`) | `searchUsers(query, {limit?})` → `{userId, name, groupLabel?}[]`(2글자 이상일 때만 부름) · `listGroups()` → `{code, label, parentCode?}[]`(역할은 `code`, 세부권한은 `역할:세부` 코드 + `parentCode`) | 아이디·역할 코드를 직접 입력(칩으로 쌓음). 두 메서드가 `GisHttpError` 404·405를 던져도(경로가 없는 서버) 해당 입력만 자동으로 직접 입력으로 바뀐다 |
+| `myMap.shareTarget` (`ShareTargetSource`) | `get(id)` → `{users:[{userId,name,state}], roles:[{code,label,state}]}`(`state`: `ACTIVE`·`INACTIVE`·`MISSING`) · `set(id, {userIds, roleCodes})`(통째로 바꾸기) · `getMany?(ids)` · `bulk?(ids, 'ADD'|'REMOVE', change)` → `{succeededIds, failed:[{id, reason:'NOT_AVAILABLE'|'LIMIT_EXCEEDED'}]}` | 옛 `getShare/setShare`를 `legacyShareTarget`이 감싸 단일 공유만(이름 없음). `bulk`가 없으면 패널의 "선택" 단추가 없다. `getMany`가 없으면 "대상 빼기"도 검색·체크로 뺄 대상을 고른다 |
+
+- 단일 공유(`ui/share/ShareDialog`, 레이어 하나): 열면 현재 공유가 이름 칩·역할 체크로 보이고, 저장 = `set`(통째로 바꾸기). **서버 오류는 창을 닫지 않고 하단에 `message`로 보인다**(옛 화면은 무시하고 닫았다 — 의도된 변경).
+  현재 공유를 못 받으면 저장 단추가 없다(빈 칸에서 저장하면 기존 공유가 지워진다). 비활성·없는 사용자는 회색 칩("비활성"·"없는 사용자")으로 남아 지울 수 있고, 저장은 그대로 보낸다(서버는 새로 추가되는 대상만 존재 검사).
+- 사용자 검색: 250ms 디바운스·요청 순번으로 늦게 온 옛 결과 버림·↑↓ Enter Esc(Esc는 목록만 닫음)·한글 조합 중 Enter는 글자 확정. 본인(`host.getCurrentUser().userId`)은 결과·직접 입력에서 빠진다. 빈 결과·서버 오류(서버 `message` + 다시 시도)를 보여 준다.
+- 역할 체크 목록: 역할 아래 세부권한(부서)을 들여쓴다 — **체크는 서로 독립**(역할 전체 ≠ 세부권한). 8개를 넘으면 걸러보기. 목록에 없는 저장값은 "목록에 없는 역할" 칩. 코드는 회색 작은 글씨.
+- 일괄 공유(레이어 2개 이상, `shareTarget.bulk` 필요): **[대상 추가 | 대상 빼기]만 있다(덮어쓰기 없음)**. 빼기는 `getMany`로 모은 현재 공유 대상(`2/3개 레이어`)에서 눌러 고른다. 저장 → 결과 화면 `성공 n · 실패 m`(실패 레이어 이름·사유).
+  한 번에 레이어 50개·대상(사용자+그룹) 100개까지(화면이 먼저 막고 서버도 검사). `shareTarget.getMany`·`bulk`는 50개 단위 한도를 어댑터·화면이 지킨다.
+- 나만의지도 패널: 내 레이어 2개 이상 + `shareTarget.bulk`가 있으면 머리줄에 "선택" 단추 → 선택 모드(내 레이어 줄 전체가 선택 대상, 줄 단추 숨김, 공유받은 레이어는 흐리게, 하단 `n개 선택 · 전체 선택 · 공유 · 취소`).
+  공유가 끝나면 선택 모드를 닫고 목록을 다시 받는다(`shareCount` 갱신). 공유받은 쪽 화면에는 다음 목록 조회(패널 열기) 때 반영된다.
+- React 호스트가 자기 자원에 쓰려면 `@gtp/gis-map/ui`의 `ShareDialog`(`target`·`directory`·`items`·`resourceNoun`·`note`·`selfUserId`·`onClose`·`onDone`)와 `legacyShareTarget`을 쓴다. UMD에는 없다(React 위젯).
+- 어댑터: `restSources()`가 `shareDirectory`(`/api/gis/share-directory/{users,groups}`)를 더하고 `myMap.shareTarget`을 `/api/mymap/{id}/share`·`/api/mymap/shares?ids=`·`/api/mymap/shares/bulk`로 구현한다.
+  `get` 응답에 `users`·`roles`가 없는 옛 서버는 `userIds`·`roleCodes`로 채운다(이름 null·ACTIVE).
 
 ### 나만의지도 스타일·라벨·팝업 (3단계)
 

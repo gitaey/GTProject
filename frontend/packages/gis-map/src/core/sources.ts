@@ -28,6 +28,59 @@ export interface LayerTreeSource {
     userSelection?: LayerUserSelectionSource
 }
 
+// ── 공유(자원 공통): 공유 상대 디렉터리 + 자원별 공유 저장소. 공유받은 쪽은 보기만 한다(권한 등급 없음) ──
+export interface ShareUser {
+    userId: string
+    name: string | null
+    /** 소속 표시(예: 세부권한 이름). 없으면 null */
+    groupLabel?: string | null
+}
+
+/** 공유할 수 있는 그룹. 역할은 `code`만, 세부권한은 `역할:세부` 코드에 `parentCode`(소속 역할)가 붙는다 */
+export interface ShareGroup {
+    code: string
+    label: string
+    parentCode?: string | null
+}
+
+/** 공유 상대 디렉터리(자원 공통). 없으면 공유 화면은 아이디·코드 직접 입력으로 열린다 */
+export interface ShareDirectorySource {
+    /** 이름·아이디로 사용자 찾기(2글자 이상만 부른다). 404·405 상태의 `GisHttpError`를 던지면 화면이 직접 입력으로 바꾼다 */
+    searchUsers(query: string, opts?: { limit?: number }): Promise<ShareUser[]>
+    listGroups(): Promise<ShareGroup[]>
+}
+
+export type ShareEntryState = 'ACTIVE' | 'INACTIVE' | 'MISSING'
+
+export interface ShareSnapshot {
+    users: Array<{ userId: string; name: string | null; state: ShareEntryState }>
+    roles: Array<{ code: string; label: string | null; state: ShareEntryState }>
+}
+
+export interface ShareChange {
+    userIds: string[]
+    roleCodes: string[]
+}
+
+/** 일괄 공유는 더하기/빼기만 있다(덮어쓰기 없음) */
+export type BulkShareMode = 'ADD' | 'REMOVE'
+
+export interface BulkShareResult {
+    succeededIds: number[]
+    failed: Array<{ id: number; reason: 'NOT_AVAILABLE' | 'LIMIT_EXCEEDED' }>
+}
+
+/** 자원 한 종류(나만의지도, 이후 TIFF 등)의 공유 저장소 */
+export interface ShareTargetSource {
+    get(id: number): Promise<ShareSnapshot>
+    /** 통째로 바꾸기 */
+    set(id: number, change: ShareChange): Promise<void>
+    /** 여러 개의 현재 공유(일괄 빼기 화면용). 없으면 빼기 화면이 직접 입력으로 열린다 */
+    getMany?(ids: number[]): Promise<Array<ShareSnapshot & { id: number }>>
+    /** 일괄 더하기/빼기. 없으면 일괄 공유 단추가 나오지 않는다 */
+    bulk?(ids: number[], mode: BulkShareMode, change: ShareChange): Promise<BulkShareResult>
+}
+
 export interface MyMapSource {
     list(): Promise<UserMapListItem[]>
     status(id: number): Promise<UserMapStatus>
@@ -38,8 +91,11 @@ export interface MyMapSource {
     previewExcel?(file: File): Promise<ExcelPreviewResponse>
     /** 새 서버는 { id, parcelVersion? }을 돌려준다(처리는 비동기 — 목록 폴링으로 진행률). 옛 서버·옛 소스는 아무것도 안 돌려줘도 된다 */
     confirmExcel?(input: ExcelConfirmInput): Promise<void | MyMapConfirmResult>
+    /** 옛 공유 입출력(아이디·코드만). `shareTarget`이 없을 때만 쓴다 — 공유 화면이 `legacyShareTarget`으로 감싸 단일 모드로 연다 */
     getShare?(id: number): Promise<UserMapShare>
     setShare?(id: number, share: UserMapShare): Promise<void>
+    /** 공유 저장소(이름·상태가 붙은 현재 공유, 일괄 더하기/빼기). 있으면 `getShare/setShare`보다 먼저 쓴다 */
+    shareTarget?: ShareTargetSource
     // ── 1단계(PNU 엑셀·보고서·샘플). 전부 옵셔널 — 없으면 그 화면 요소가 조용히 빠진다 ──
     /** 내 레이어 수·한도·행 한도·지적도 기준월. 없으면 "내 레이어 n/20"과 한도 안내가 안 나온다 */
     quota?(): Promise<MyMapQuota>
@@ -109,6 +165,8 @@ export interface GisMapSources {
     regionName?: RegionNameSource
     legend?: LegendSource
     wfs?: WfsSource
+    /** 공유 상대 검색·그룹 목록(자원 공통). 없으면 공유 화면이 아이디·코드 직접 입력 */
+    shareDirectory?: ShareDirectorySource
 }
 
 /** 소스 팩토리가 받는 문맥. host()는 호출 시점의 호스트를 돌려주므로 주소·헤더를 소스에 따로 넘기지 않는다 */

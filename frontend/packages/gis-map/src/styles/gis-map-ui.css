@@ -1889,7 +1889,16 @@
 }
 
 .gm-share-dialog {
-    width: 340px;
+    display: flex;
+    flex-direction: column;
+    width: 440px;
+    max-width: calc(100vw - 24px);
+    max-height: 85vh;
+    overflow: hidden;
+}
+
+.gm-share-dialog .gm-modal__body {
+    overflow-y: auto;
 }
 
 .gm-upload-modal {
@@ -3362,4 +3371,439 @@
         flex-shrink: 0;
         box-shadow: 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0);
     }
+}
+
+/* ── 공유 대화상자(ui/share — 자원 공통) · 나만의지도 패널 선택 모드(일괄 공유) ── */
+.gm-share__body {
+    gap: 8px;
+}
+
+.gm-share__picker {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.gm-share__search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.gm-share__search-icon {
+    position: absolute;
+    left: 8px;
+    color: #9ca3af;
+    pointer-events: none;
+}
+
+.gm-share__search-input {
+    flex: 1;
+    min-width: 0;
+    padding-left: 26px;
+}
+
+.gm-share__add,
+.gm-share__btn {
+    flex: none;
+    padding: 6px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #fff;
+    color: #374151;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.gm-share__add:disabled,
+.gm-share__btn:disabled {
+    color: #d1d5db;
+    cursor: default;
+}
+
+.gm-share__actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.gm-share__hint {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+.gm-share__hint--error,
+.gm-share__hint-warn {
+    color: #ef4444;
+}
+
+.gm-share__link {
+    border: none;
+    background: none;
+    padding: 0 2px;
+    color: var(--gm-primary);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.gm-share__results {
+    list-style: none;
+    margin: 0;
+    padding: 2px;
+    max-height: 176px;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    background: #fff;
+}
+
+.gm-share__result {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.gm-share__result.gm-is-active {
+    background: #f3f4f6;
+}
+
+.gm-share__result.gm-is-picked {
+    background: rgba(var(--gm-primary-rgb), .08);
+}
+
+.gm-share__result-check {
+    flex: none;
+    width: 14px;
+    color: var(--gm-primary);
+    display: flex;
+}
+
+.gm-share__result-name {
+    color: #111827;
+    font-weight: 500;
+}
+
+.gm-share__result-id {
+    color: #9ca3af;
+    font-size: 11px;
+}
+
+.gm-share__result-group {
+    margin-left: auto;
+    padding: 0 6px;
+    border-radius: 4px;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 10.5px;
+    white-space: nowrap;
+}
+
+.gm-share__chips {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.gm-share__empty {
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+.gm-share__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    padding: 2px 4px 2px 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #f9fafb;
+    font-size: 11.5px;
+    color: #111827;
+}
+
+.gm-share__chip--muted {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.gm-share__chip--toggle {
+    padding-right: 8px;
+    cursor: pointer;
+}
+
+.gm-share__chip--toggle.gm-is-picked {
+    border-color: var(--gm-primary);
+    background: rgba(var(--gm-primary-rgb), .1);
+    text-decoration: line-through;
+}
+
+.gm-share__chip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gm-share__chip-sub {
+    color: #9ca3af;
+    font-size: 10.5px;
+}
+
+.gm-share__badge {
+    padding: 0 5px;
+    border-radius: 4px;
+    background: #e5e7eb;
+    color: #6b7280;
+    font-size: 10px;
+}
+
+.gm-share__count {
+    color: #64748b;
+    font-size: 10.5px;
+}
+
+.gm-share__chip-x {
+    flex: none;
+    display: flex;
+    padding: 2px;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    color: #9ca3af;
+    cursor: pointer;
+}
+
+.gm-share__groups {
+    max-height: 168px;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 4px 6px;
+}
+
+.gm-share__group-block + .gm-share__group-block {
+    margin-top: 2px;
+}
+
+.gm-share__group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    font-size: 12px;
+    color: #111827;
+    cursor: pointer;
+}
+
+.gm-share__group--child {
+    padding-left: 20px;
+    color: #374151;
+}
+
+.gm-share__group-code {
+    color: #9ca3af;
+    font-size: 10px;
+}
+
+.gm-share__sub-title {
+    margin-bottom: 4px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.gm-share__targets-toggle {
+    border: none;
+    background: none;
+    padding: 0;
+    color: #374151;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.gm-share__names {
+    margin: 4px 0 0;
+    padding: 4px 8px 4px 22px;
+    max-height: 96px;
+    overflow-y: auto;
+    border-radius: 6px;
+    background: #f9fafb;
+    font-size: 11.5px;
+    color: #374151;
+}
+
+.gm-share__seg {
+    display: flex;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.gm-share__seg-btn {
+    flex: 1;
+    padding: 6px 0;
+    border: none;
+    background: #fff;
+    color: #6b7280;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.gm-share__seg-btn.gm-is-active {
+    background: var(--gm-primary);
+    color: #fff;
+    font-weight: 700;
+}
+
+.gm-share__result-summary {
+    font-size: 15px;
+    font-weight: 700;
+    color: #15803d;
+}
+
+.gm-share__result-summary.gm-has-fail {
+    color: #b45309;
+}
+
+.gm-share__fails {
+    margin: 0;
+    padding: 6px 8px 6px 22px;
+    max-height: 160px;
+    overflow-y: auto;
+    border-radius: 6px;
+    background: #fef2f2;
+    font-size: 11.5px;
+    color: #7f1d1d;
+}
+
+/* 나만의지도 패널: 머리줄 단추 묶음 · 선택 모드 */
+.gm-mymap-panel__header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.gm-mymap-panel__upload.gm-is-on {
+    color: var(--gm-primary-deep);
+    text-decoration: underline;
+}
+
+.gm-mymap-panel__select-banner {
+    flex-shrink: 0;
+    padding: 4px 12px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--gm-primary);
+    background: rgba(var(--gm-primary-rgb), .08);
+    border-bottom: 1px solid rgba(var(--gm-primary-rgb), .25);
+}
+
+.gm-panel__item--select {
+    cursor: pointer;
+}
+
+.gm-panel__item--select.gm-is-picked {
+    background: rgba(var(--gm-primary-rgb), .1);
+    box-shadow: inset 3px 0 0 var(--gm-primary);
+}
+
+.gm-panel__item.gm-is-dim {
+    opacity: .45;
+}
+
+.gm-panel__item-check--select {
+    cursor: pointer;
+}
+
+.gm-mymap-panel__select-bar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-top: 1px solid #e5e7eb;
+    background: #fff;
+    font-size: 11.5px;
+}
+
+.gm-mymap-panel__select-count {
+    margin-right: auto;
+    font-weight: 700;
+    color: #111827;
+}
+
+.gm-mymap-panel__select-link {
+    border: none;
+    background: none;
+    padding: 0;
+    color: #64748b;
+    font-size: 11.5px;
+    cursor: pointer;
+}
+
+.gm-mymap-panel__select-share {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border: none;
+    border-radius: 6px;
+    background: var(--gm-primary);
+    color: #fff;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.gm-mymap-panel__select-share:disabled {
+    background: #e5e7eb;
+    color: #9ca3af;
+    cursor: default;
+}
+
+.gm-mymap-panel__share-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+/* 공유 대화상자 보강: 일괄 대상 머리 · 역할 이름 · 목록에 없는 역할 묶음 · 단일 공유 안내 */
+.gm-share__targets {
+    display: flex;
+    flex-direction: column;
+}
+
+.gm-share__group-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gm-share__unlisted {
+    margin-top: 2px;
+}
+
+.gm-share__intro {
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: rgba(var(--gm-primary-rgb), .08);
+    color: #374151;
+    font-size: 11px;
 }

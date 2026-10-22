@@ -4,7 +4,7 @@
 // 내 레이어 / 공유받은 레이어 두 묶음, 종류 배지, 처리 중 진행률 막대, 끝난 뒤 `매칭 N · 실패 M`(실패를 누르면 결과 보고서),
 // 상단 `내 레이어 n/20`(한도는 소스의 quota가 있을 때만). 항목 상태(켜짐·실패·처리 중)에 따라 바뀌는 값만 인라인 style로 남겼다
 import { useMemo, useRef, useState } from 'react'
-import { Trash2, Upload, Loader2, AlertCircle, Share2, Locate, Lock, Palette } from 'lucide-react'
+import { Trash2, Upload, Loader2, AlertCircle, Share2, Locate, Lock, Palette, ListChecks, Users } from 'lucide-react'
 import { EMPTY_MYMAP_CATALOG_STATE } from '../../core'
 import type { MyMapCatalogState, MyMapConfirmResult, UserMapListItem, VectorOverlayState } from '../../core'
 import { useGisMap, useMyMapCatalog, useStoreValue, useVectorOverlayState } from '../../react'
@@ -14,6 +14,7 @@ import MyMapShareDialog from '../mymap/MyMapShareDialog'
 import MyMapImportReportDialog from '../mymap/MyMapImportReport'
 import MyMapStyleDialog from '../mymap/MyMapStyleDialog'
 import { formatCount, kindLabel } from '../mymap/format'
+import { SHARE_MAX_ITEMS } from '../share/shareModel'
 
 /** 종류 배지 색 클래스(sourceKind를 아는 새 서버일 때만) */
 const KIND_CLASS: Readonly<Record<string, string>> = Object.freeze({
@@ -37,7 +38,13 @@ export default function MyMapPanel() {
     const visibleIdList = useVectorOverlayState(selectVisibleIds)
     const visibleIds = useMemo(() => new Set(visibleIdList), [visibleIdList])
     const [showUpload, setShowUpload] = useState(false)
-    const [shareTarget, setShareTarget] = useState<{ id: number; name: string } | null>(null)
+    // 공유 대화상자에 넘길 레이어(하나면 단일, 둘 이상이면 일괄)
+    const [shareItems, setShareItems] = useState<Array<{ id: number; name: string }> | null>(null)
+    // 선택 모드의 공유 단추로 열었는지(1개만 골랐을 때 안내 한 줄)
+    const [shareFromSelection, setShareFromSelection] = useState(false)
+    // 다중 선택 모드(일괄 공유) — 표시 체크와 따로 고르는 선택 집합
+    const [selectMode, setSelectMode] = useState(false)
+    const [selectedIds, setSelectedIds] = useState<ReadonlySet<number>>(() => new Set<number>())
     const [reportTarget, setReportTarget] = useState<{ id: number; name: string } | null>(null)
     const [styleTarget, setStyleTarget] = useState<{ id: number; name: string } | null>(null)
     // 스타일 저장 요청이 도는 동안 true — 그 사이 다른 레이어의 스타일 창을 열면 저장 결과·오류를 볼 창이 사라진다
@@ -48,6 +55,11 @@ export default function MyMapPanel() {
     const owned = useMemo(() => items.filter(i => i.owner), [items])
     const shared = useMemo(() => items.filter(i => !i.owner), [items])
     // 한도: 서버가 준 maxLayers에 지금 목록의 내 레이어 수(업로드·삭제 직후에도 맞는 값)
+    // 일괄 공유 단추: 소스가 bulk를 갖고 내 레이어가 2개 이상일 때만(없으면 옛 화면 그대로)
+    const bulkAvailable = !!map?.sources.myMap?.shareTarget?.bulk
+    const selecting = selectMode && bulkAvailable && owned.length >= 2
+    // 목록이 바뀌어 사라진 레이어는 선택에서 뺀다
+    const pickedIds = useMemo(() => owned.filter(i => selectedIds.has(i.id)).map(i => i.id), [owned, selectedIds])
     const maxLayers = quota?.maxLayers ?? null
     const layerFull = maxLayers !== null && owned.length >= maxLayers
 
@@ -59,6 +71,16 @@ export default function MyMapPanel() {
         }
         void catalog?.load()
     }
+
+    const exitSelect = () => { setSelectMode(false); setSelectedIds(new Set<number>()) }
+    const toggleSelected = (id: number) => setSelectedIds(cur => {
+        const next = new Set(cur)
+        if (next.has(id)) next.delete(id)
+        else if (next.size < SHARE_MAX_ITEMS) next.add(id)
+        return next
+    })
+    const allPicked = owned.length > 0 && pickedIds.length === Math.min(owned.length, SHARE_MAX_ITEMS)
+    const toggleAllSelected = () => setSelectedIds(allPicked ? new Set<number>() : new Set(owned.slice(0, SHARE_MAX_ITEMS).map(i => i.id)))
 
     // 옛 동작: 서버 응답과 관계없이 지도·목록에서 뺀다(네트워크 오류만 드러남)
     const handleDelete = (id: number) => catalog?.remove(id)
@@ -90,14 +112,26 @@ export default function MyMapPanel() {
         const hasResult = !isProcessing && matched + failedRows > 0
         // 보고서는 소유자만(서버가 403) — 소스가 importReport를 안 가졌으면 글자로만
         const canOpenReport = reportAvailable && item.owner && failedRows > 0
+        // 선택 모드: 내 레이어는 줄 전체가 선택 대상(왼쪽 체크 = 선택 체크), 공유받은 레이어는 흐리게·선택 불가
+        const pickable = selecting && item.owner
+        const dim = selecting && !item.owner
+        const picked = pickable && selectedIds.has(item.id)
         return (
-            <div key={item.id} className="gm-panel__item" style={{
-                background: active ? 'rgba(var(--gm-primary-rgb), 0.04)' : 'transparent',
-            }}>
-                <input type="checkbox" checked={active} disabled={isProcessing || isFailed}
-                    onChange={() => toggleVisibility(item)}
-                    className="gm-panel__item-check"
-                    style={{ cursor: isProcessing || isFailed ? 'default' : 'pointer' }} />
+            <div key={item.id} className={cx('gm-panel__item', pickable && 'gm-panel__item--select', picked && 'gm-is-picked', dim && 'gm-is-dim')}
+                style={selecting ? undefined : { background: active ? 'rgba(var(--gm-primary-rgb), 0.04)' : 'transparent' }}
+                onClick={pickable ? e => {
+                    // 체크 상자를 직접 누른 클릭은 onChange가 처리한다(두 번 바뀌지 않게)
+                    if ((e?.target as { tagName?: string } | null | undefined)?.tagName !== 'INPUT') toggleSelected(item.id)
+                } : undefined}>
+                {pickable ? (
+                    <input type="checkbox" checked={picked} onChange={() => toggleSelected(item.id)}
+                        aria-label={`${item.name} 선택`} className="gm-panel__item-check gm-panel__item-check--select" />
+                ) : (
+                    <input type="checkbox" checked={active} disabled={isProcessing || isFailed || dim}
+                        onChange={() => toggleVisibility(item)}
+                        className="gm-panel__item-check"
+                        style={{ cursor: isProcessing || isFailed || dim ? 'default' : 'pointer' }} />
+                )}
 
                 <div className="gm-panel__item-body">
                     <div className="gm-panel__item-name" style={{
@@ -112,13 +146,20 @@ export default function MyMapPanel() {
                         )}
                     </div>
                     {!item.owner && item.ownerId && (
-                        <div className="gm-mymap-panel__sender" title={`보낸 사람 ${item.ownerId}`}>보낸 사람 {item.ownerId}</div>
+                        <div className="gm-mymap-panel__sender" title={`보낸 사람 ${item.ownerName ? `${item.ownerName}(${item.ownerId})` : item.ownerId}`}>
+                            보낸 사람 {item.ownerName ? `${item.ownerName}(${item.ownerId})` : item.ownerId}
+                        </div>
                     )}
                     <div className="gm-panel__item-meta gm-mymap-panel__meta">
                         <span>
                             <span className={cx('gm-mymap-panel__kind', item.sourceKind && 'gm-mymap-panel__kind--badge', item.sourceKind && KIND_CLASS[item.sourceKind])}>{kindLabel(item)}</span>
                             {' · '}{formatCount(item.featureCount)}개
                         </span>
+                        {item.owner && (item.shareCount ?? 0) > 0 && (
+                            <span className="gm-mymap-panel__share-count" title={`공유 대상 ${item.shareCount}`}>
+                                · <Users size={9} /> 공유 {formatCount(item.shareCount ?? 0)}
+                            </span>
+                        )}
                         {isProcessing && !hasProgress && (
                             <span className="gm-panel__item-status gm-panel__item-status--busy">
                                 <Loader2 size={9} className="gm-loader" /> 처리 중
@@ -168,7 +209,7 @@ export default function MyMapPanel() {
                     )}
                 </div>
 
-                {item.status === 'READY' && (
+                {!selecting && item.status === 'READY' && (
                     <button onClick={() => handleLocate(item)} title="레이어 위치로 이동"
                         className="gm-panel__item-btn"
                         onMouseEnter={e => (e.currentTarget.style.color = 'var(--gm-primary)')}
@@ -177,7 +218,7 @@ export default function MyMapPanel() {
                     </button>
                 )}
 
-                {item.owner && styleAvailable && item.status === 'READY' && (
+                {!selecting && item.owner && styleAvailable && item.status === 'READY' && (
                     <button onClick={() => { if (!styleSavingRef.current) setStyleTarget({ id: item.id, name: item.name }) }} title="스타일·라벨 설정"
                         className="gm-panel__item-btn"
                         onMouseEnter={e => (e.currentTarget.style.color = 'var(--gm-primary)')}
@@ -186,8 +227,8 @@ export default function MyMapPanel() {
                     </button>
                 )}
 
-                {item.owner && (
-                    <button onClick={() => setShareTarget({ id: item.id, name: item.name })} title="공유 설정"
+                {!selecting && item.owner && (
+                    <button onClick={() => { setShareFromSelection(false); setShareItems([{ id: item.id, name: item.name }]) }} title="공유 설정"
                         className="gm-panel__item-btn"
                         onMouseEnter={e => (e.currentTarget.style.color = 'var(--gm-primary)')}
                         onMouseLeave={e => (e.currentTarget.style.color = '#9ca3af')}>
@@ -195,7 +236,7 @@ export default function MyMapPanel() {
                     </button>
                 )}
 
-                {item.owner && (
+                {!selecting && item.owner && (
                     <button onClick={() => handleDelete(item.id)} title="삭제"
                         className="gm-panel__item-btn gm-panel__item-btn--delete"
                         onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
@@ -211,12 +252,22 @@ export default function MyMapPanel() {
         <div className="gm-panel">
             <div className="gm-panel__header">
                 <span className="gm-panel__title">나만의지도</span>
-                <button onClick={() => setShowUpload(true)} disabled={layerFull}
-                    title={layerFull ? `나만의지도는 최대 ${maxLayers}개까지 만들 수 있습니다` : undefined}
-                    className="gm-mymap-panel__upload">
-                    <Upload size={13} /> 업로드
-                </button>
+                <div className="gm-mymap-panel__header-actions">
+                    {bulkAvailable && owned.length >= 2 && (
+                        <button onClick={() => (selecting ? exitSelect() : setSelectMode(true))} aria-pressed={selecting}
+                            title="여러 레이어를 골라 한 번에 공유"
+                            className={cx('gm-mymap-panel__upload', selecting && 'gm-is-on')}>
+                            <ListChecks size={13} /> 선택
+                        </button>
+                    )}
+                    <button onClick={() => setShowUpload(true)} disabled={layerFull}
+                        title={layerFull ? `나만의지도는 최대 ${maxLayers}개까지 만들 수 있습니다` : undefined}
+                        className="gm-mymap-panel__upload">
+                        <Upload size={13} /> 업로드
+                    </button>
+                </div>
             </div>
+            {selecting && <div className="gm-mymap-panel__select-banner">선택 모드 — 공유할 내 레이어를 고르세요</div>}
             {maxLayers !== null && (
                 <div className={cx('gm-mymap-panel__quota', layerFull && 'gm-is-full')}>
                     내 레이어 {formatCount(owned.length)}/{formatCount(maxLayers)}
@@ -246,8 +297,26 @@ export default function MyMapPanel() {
                 )}
             </div>
 
+            {selecting && (
+                <div className="gm-mymap-panel__select-bar">
+                    <span className="gm-mymap-panel__select-count">{formatCount(pickedIds.length)}개 선택</span>
+                    <button type="button" onClick={toggleAllSelected} className="gm-mymap-panel__select-link">{allPicked ? '선택 해제' : '전체 선택'}</button>
+                    <button type="button" disabled={pickedIds.length === 0}
+                        onClick={() => { setShareFromSelection(true); setShareItems(owned.filter(i => selectedIds.has(i.id)).map(i => ({ id: i.id, name: i.name }))) }}
+                        className="gm-mymap-panel__select-share"><Share2 size={12} /> 공유</button>
+                    <button type="button" onClick={exitSelect} className="gm-mymap-panel__select-link">취소</button>
+                </div>
+            )}
+
             {showUpload && <MyMapUploadModal quota={quota} onClose={() => setShowUpload(false)} onUploaded={fetchList} />}
-            {shareTarget && <MyMapShareDialog id={shareTarget.id} name={shareTarget.name} onClose={() => setShareTarget(null)} />}
+            {shareItems && (
+                <MyMapShareDialog items={shareItems} fromSelection={shareFromSelection} onClose={() => setShareItems(null)}
+                    onDone={() => {
+                        // 공유 수(shareCount) 갱신을 위해 목록을 다시 받고, 일괄 공유였다면 선택 모드를 끝낸다(결과 화면은 닫기 전까지 그대로)
+                        if (shareItems.length > 1) exitSelect()
+                        void catalog?.load()
+                    }} />
+            )}
             {reportTarget && <MyMapImportReportDialog id={reportTarget.id} name={reportTarget.name} onClose={() => setReportTarget(null)} />}
             {styleTarget && (
                 <MyMapStyleDialog key={styleTarget.id} id={styleTarget.id} name={styleTarget.name} catalog={catalog}

@@ -6,6 +6,7 @@ import type { RestLayerTreeOptions } from './layerTree'
 import { restGeoTiff } from './geoTiff'
 import { restMyMap } from './myMap'
 import { restWind } from './wind'
+import { restShareDirectory } from './shareDirectory'
 
 export type RestSourcesOptions = RestLayerTreeOptions
 
@@ -15,6 +16,7 @@ export function restSources(opts: RestSourcesOptions = {}): GisMapSourcesFactory
         myMap: restMyMap(ctx),
         geoTiff: restGeoTiff(ctx),
         wind: restWind(ctx),
+        shareDirectory: restShareDirectory(ctx),
     })
 }
 
@@ -23,5 +25,6 @@ export type { RestLayerTreeOptions } from './layerTree'
 export { restGeoTiff } from './geoTiff'
 export { restMyMap } from './myMap'
 export { restWind } from './wind'
+export { restShareDirectory } from './shareDirectory'
 export { readEnvelope, apiUrl } from './envelope'
 export type { ApiEnvelope } from './envelope'

@@ -1,93 +1,37 @@
 'use client'
 
-// 나만의지도 공유 설정 — 특정 사용자 ID / role 코드에게 공유 (콤마로 구분 입력).
-// 요청은 엔진의 나만의지도 소스(map.sources.myMap — 짝 백엔드면 adapters/rest)가 보낸다.
-// 스타일: gm-modal(업로드 모달과 공용), gm-share-dialog (FE-5b-2)
-import { useEffect, useState } from 'react'
-import { X, Loader2 } from 'lucide-react'
-import { ignoreServerFailure, isNetworkError } from '../../core'
-import { useGisMap } from '../../react'
+// 나만의지도 공유 — 범용 ShareDialog(ui/share)에 나만의지도 소스를 연결하는 얇은 래퍼.
+//   · 저장소: map.sources.myMap.shareTarget, 없으면 옛 getShare/setShare를 legacyShareTarget으로 감싼다(단일 모드만)
+//   · 상대 찾기: map.sources.shareDirectory(없으면 아이디·코드 직접 입력)
+//   · 본인 아이디: host.getCurrentUser()
+// 스타일: gm-modal · gm-share-* (styles/gis-map-ui.css)
+import { useMemo } from 'react'
+import type { BulkShareResult } from '../../core'
+import { useGisHost, useGisMap } from '../../react'
+import ShareDialog from '../share/ShareDialog'
+import { legacyShareTarget } from '../share/legacyShareTarget'
 
 interface MyMapShareDialogProps {
-    id: number
-    name: string
+    /** 하나면 단일 공유, 둘 이상이면 일괄 공유(소스에 bulk가 있을 때) */
+    items: ReadonlyArray<{ id: number; name: string }>
+    /** 선택 모드에서 하나만 골라 연 경우 — 일괄이 아니라 현재 공유 목록을 편집한다는 안내를 붙인다 */
+    fromSelection?: boolean
     onClose: () => void
+    onDone?: (result?: BulkShareResult) => void
 }
 
-export default function MyMapShareDialog({ id, name, onClose }: MyMapShareDialogProps) {
-    // 소스 객체는 엔진마다 하나(참조 고정) → 아래 effect가 다시 돌지 않는다
-    const myMap = useGisMap()?.sources.myMap
-    const [userIds, setUserIds] = useState('')
-    const [roleCodes, setRoleCodes] = useState('')
-    const [loading, setLoading] = useState(true)
-    const [saving, setSaving] = useState(false)
-
-    useEffect(() => {
-        (async () => {
-            try {
-                if (!myMap?.getShare) return
-                const share = await myMap.getShare(id)
-                setUserIds((share.userIds ?? []).join(', '))
-                setRoleCodes((share.roleCodes ?? []).join(', '))
-            } catch (err) {
-                // 옛 코드: success:false면 빈 칸 그대로(네트워크 오류만 드러남)
-                if (isNetworkError(err)) throw err
-            } finally {
-                setLoading(false)
-            }
-        })()
-    }, [id, myMap])
-
-    const handleSave = async () => {
-        setSaving(true)
-        try {
-            // 옛 코드: 응답을 보지 않고 닫는다(네트워크 오류면 닫지 않음)
-            if (myMap?.setShare) {
-                await ignoreServerFailure(myMap.setShare(id, {
-                    userIds: userIds.split(',').map(s => s.trim()).filter(Boolean),
-                    roleCodes: roleCodes.split(',').map(s => s.trim()).filter(Boolean),
-                }))
-            }
-            onClose()
-        } finally {
-            setSaving(false)
-        }
-    }
+export default function MyMapShareDialog({ items, fromSelection, onClose, onDone }: MyMapShareDialogProps) {
+    // 소스 객체는 엔진마다 하나(참조 고정) → 대상·effect가 다시 돌지 않는다
+    const map = useGisMap()
+    const myMap = map?.sources.myMap
+    const directory = map?.sources.shareDirectory
+    const host = useGisHost()
+    const target = useMemo(() => myMap?.shareTarget ?? legacyShareTarget(myMap), [myMap])
+    const selfUserId = host.getCurrentUser()?.userId ?? null
 
     return (
-        <div className="gm-modal"
-            onClick={onClose}>
-            <div onClick={e => e.stopPropagation()}
-                className="gm-modal__dialog gm-share-dialog">
-                <div className="gm-modal__header">
-                    <span className="gm-modal__title">공유 설정 — {name}</span>
-                    <button onClick={onClose} className="gm-modal__close"><X size={16} /></button>
-                </div>
-
-                {loading ? (
-                    <div className="gm-modal__loading">
-                        <Loader2 size={18} className="gm-loader gm-loader--primary" />
-                    </div>
-                ) : (
-                    <div className="gm-modal__body">
-                        <label className="gm-modal__label">공유할 사용자 ID (콤마로 구분)</label>
-                        <input value={userIds} onChange={e => setUserIds(e.target.value)} placeholder="예: hong123, kim456"
-                            className="gm-modal__field" />
-
-                        <label className="gm-modal__label">공유할 역할(role) 코드 (콤마로 구분)</label>
-                        <input value={roleCodes} onChange={e => setRoleCodes(e.target.value)} placeholder="예: VIEWER, DEPT_A"
-                            className="gm-modal__field" />
-
-                        <div className="gm-modal__note">공유받은 사용자도 조회만 가능하며, 편집은 소유자만 할 수 있습니다.</div>
-
-                        <button onClick={handleSave} disabled={saving}
-                            className="gm-modal__submit">
-                            {saving && <Loader2 size={13} className="gm-loader" />}
-                            저장
-                        </button>
-                    </div>
-                )}
-            </div>
-        </div>
+        <ShareDialog target={target} directory={directory} items={items} resourceNoun="레이어"
+            selfUserId={selfUserId}
+            intro={fromSelection && items.length === 1 ? '레이어 1개 — 현재 공유 목록을 편집합니다' : undefined} onClose={onClose} onDone={onDone} />
     )
 }

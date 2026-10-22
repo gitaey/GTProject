@@ -37,3 +37,8 @@ export type { MapStatusBarProps } from './statusbar/MapStatusBar'
 export { default as RegionBadge } from './overlay/RegionBadge'
 export { default as WindLegend } from './overlay/WindLegend'
 export { default as MobileLayerButton } from './mobile/MobileLayerButton'
+
+// 공유(자원 공통) — React 호스트가 자기 자원(ShareTargetSource)에 재사용한다. UMD 비대상
+export { default as ShareDialog } from './share/ShareDialog'
+export type { ShareDialogProps, ShareDialogItem } from './share/ShareDialog'
+export { legacyShareTarget } from './share/legacyShareTarget'

@@ -24,6 +24,10 @@ export interface UserMapListItem {
     createdAt: string
     /** 소유자 id(공유받은 레이어의 "보낸 사람" 표시용) */
     ownerId?: string | null
+    /** 공유받은 항목의 보낸 사람 이름(내 항목은 null). 옛 서버는 필드 없음 → 아이디만 표시 */
+    ownerName?: string | null
+    /** 내 항목의 공유 대상 수(사용자+그룹). 공유받은 항목·옛 서버는 null/없음 */
+    shareCount?: number | null
     sourceKind?: MyMapSourceKind | null
     /** 처리 중 진행률(행 단위) */
     progressTotal?: number
