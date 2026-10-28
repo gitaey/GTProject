@@ -170,6 +170,9 @@ class AddressNormalizerTest {
         fails("37.5663", ImportFailureReason.PARSE_FAILED);
         fails("서울특별시 중구 세종대로", ImportFailureReason.BUILDING_NO_NOT_FOUND);
         fails("서울특별시 중구 태평로1가", ImportFailureReason.JIBUN_MISSING);
+        fails("서울특별시 종로구 청운동", ImportFailureReason.JIBUN_MISSING);      // 동 이름뿐 — 번지가 없다
+        fails("아무데나 어딘가", ImportFailureReason.PARSE_FAILED);                // 그냥 "가"로 끝나는 말은 지번 이름이 아니다
+        fails("서울 어딘가", ImportFailureReason.PARSE_FAILED);
         fails("서울 강남구 역삼동 12345", ImportFailureReason.PARSE_FAILED);        // 지번 본번은 4자리까지
         fails("서울 강남구 역삼동 12-12345", ImportFailureReason.PARSE_FAILED);
         fails("서울 강남구 역삼동 0", ImportFailureReason.PARSE_FAILED);

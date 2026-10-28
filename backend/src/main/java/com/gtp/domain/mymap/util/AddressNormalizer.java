@@ -170,6 +170,8 @@ public final class AddressNormalizer {
         if (j < 0) {
             String last = tokens.get(tokens.size() - 1);
             Kind lk = tokens.size() > start ? nameKind(last) : Kind.FAILED;
+            // "어딘가"처럼 그냥 "가"로 끝나는 말은 지번 이름이 아니다("종로1가"처럼 숫자 뒤의 가만 지번 이름) — 번지 없음이 아니라 형식 불명
+            if (lk == Kind.JIBUN && last.endsWith("가") && !Character.isDigit(last.charAt(last.length() - 2))) lk = Kind.FAILED;
             ImportFailureReason r = lk == Kind.ROAD ? ImportFailureReason.BUILDING_NO_NOT_FOUND
                     : lk == Kind.JIBUN ? ImportFailureReason.JIBUN_MISSING : ImportFailureReason.PARSE_FAILED;
             return Parsed.failed(r, String.join(" ", tokens));
