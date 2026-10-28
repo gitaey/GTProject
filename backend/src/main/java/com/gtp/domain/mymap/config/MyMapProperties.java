@@ -50,8 +50,7 @@ public class MyMapProperties {
         private List<String> expectedSidoCodes = new ArrayList<>(List.of(
                 "11", "12", "26", "27", "28", "30", "31", "36", "41", "43", "44", "47", "48", "50", "51", "52"));
         private Parcel parcel = new Parcel();
-        private Table legalDong = new Table("ref.legal_dong");
-        private Table roadAddress = new Table("ref.road_address");
+        private Address address = new Address();
         /** 적재 기록 표(데이터셋·시도별 기준월·교체 중 여부) */
         private String loadMetaTable = "ref.load_meta";
         private Datasource datasource = new Datasource();
@@ -71,17 +70,19 @@ public class MyMapProperties {
         private int srid = 4326;
     }
 
+    /**
+     * 주소 엑셀(도로명·지번 → PNU)이 읽는 도로명주소 건물DB 표(행정안전부 주소기반산업지원서비스). 열 이름은 원본 레이아웃 그대로라 설정에 없다.
+     * 적재 기록(load_meta)의 dataset 값은 표 이름에서 스키마를 뺀 것(ti_spbd_buld·ti_sprd_stret)과 같다.
+     */
     @Getter
     @Setter
-    public static class Table {
-        private String table;
-
-        public Table() {
-        }
-
-        public Table(String table) {
-            this.table = table;
-        }
+    public static class Address {
+        /** 건물정보(건물 1건 = 1행): 법정동 사전(distinct)과 도로명주소 → 지번(PNU 재료)의 원천 */
+        private String buildingTable = "ref.ti_spbd_buld";
+        /** 도로명코드(도로명 1건 = 1행): 도로명 → road_cd 후보 */
+        private String roadCodeTable = "ref.ti_sprd_stret";
+        /** AMBIGUOUS 때 보고서에 남기는 후보 최대 개수 */
+        private int maxCandidates = 5;
     }
 
     /** 비우면 서비스 DataSource를 읽기 전용으로 쓴다. 값은 환경 변수(MYMAP_REF_DB_*)로만 */

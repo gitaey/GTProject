@@ -6,7 +6,7 @@ import com.gtp.domain.mymap.port.AddressResolver;
 
 import java.util.List;
 
-/** 1단계 자리표시 구현: 주소 모드를 아직 지원하지 않는다. 2단계에서 TableAddressResolver로 바뀐다. */
+/** 주소 모드를 쓰지 않는 호스트용 구현(주소 자료 없이 PNU·좌표만 쓸 때). GTProject는 {@link TableAddressResolver}를 쓴다. */
 public class UnsupportedAddressResolver implements AddressResolver {
 
     @Override

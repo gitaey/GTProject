@@ -266,6 +266,7 @@ public class UserMapUploadService {
         String srid = "EPSG:4326";
         switch (mode) {
             case PNU -> requireColumn(pending, req.getPnuColumn(), mode);
+            case ADDRESS -> requireColumn(pending, req.getAddressColumn(), mode);
             case COORD -> {
                 if (!pending.headers().contains(req.getLatColumn()) || !pending.headers().contains(req.getLonColumn())) {
                     throw new CustomException(GisErrorCode.INVALID_COORDINATE_COLUMN);
@@ -277,12 +278,13 @@ public class UserMapUploadService {
                     throw GisErrorCode.MYMAP_SRID_UNSUPPORTED.exception(srid);
                 }
             }
-            default -> throw new CustomException(GisErrorCode.MYMAP_MODE_UNSUPPORTED);
         }
         String expectedVersion = null;
-        if (mode == ImportMode.PNU) {
+        if (mode == ImportMode.PNU || mode == ImportMode.ADDRESS) {
             Coverage coverage = parcelProvider.coverage();
             if (!coverage.available()) throw new CustomException(GisErrorCode.MYMAP_REF_UNAVAILABLE);
+            // 주소 자료(건물DB 적재 기록)도 읽을 수 있어야 한다 — 없으면 처리를 시작하지 않고 503
+            if (mode == ImportMode.ADDRESS && !addressResolver.available()) throw new CustomException(GisErrorCode.MYMAP_REF_UNAVAILABLE);
             expectedVersion = coverage.parcelVersion();
         }
 
@@ -306,7 +308,7 @@ public class UserMapUploadService {
                     .build());
 
             importJob.submit(new UserMapImportJob.Request(saved.getId(), ownerId, mode, pending.file(), pending.totalRows(),
-                    req.getPnuColumn(), req.getLatColumn(), req.getLonColumn(), srid));
+                    req.getPnuColumn(), req.getLatColumn(), req.getLonColumn(), srid, req.getAddressColumn()));
             submitted = true;
             pendingUploads.forget(pending.uploadId());
             return UserMapUploadResponse.builder().id(saved.getId()).name(saved.getName()).status(saved.getStatus())

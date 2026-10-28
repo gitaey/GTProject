@@ -38,6 +38,10 @@
 | `Stream.toList()` (16) | 16회 / 7파일: `map/service/LayerGroupService.java:24`, `map/service/LayerService.java:34, 80, 188, 208`, `mymap/service/UserMapPermissionService.java:57, 60, 61, 85, 90`, `mymap/service/UserMapService.java:36, 158`, `wind/controller/WindController.java:38`, `geoserver/service/GeoServerService.java:154, 158`, `global/gis/SecurityContextGisUserContext.java:33` | `.collect(Collectors.toList())`. 결과 리스트를 수정하는 코드는 없어 의미 차이(불변/가변) 영향 없음(코드 확인: 위 호출처) |
 | `instanceof` 패턴, `var`, `sealed`/`permits`, `String.formatted`, `strip`, `repeat` | 0건 | - |
 
+
+**주소 엑셀(2단계) 추가분** — 새·수정 파일 4곳이 Java 16 `record`를 쓴다(대체는 위 `record` 행과 같다: `final class` + final 필드 + 생성자 + getter):
+`mymap/util/AddressNormalizer.java`(`Parsed` — 필드 11개), `mymap/infra/AddressRefReader.java`(`LegalDong`·`RoadCode`·`BuildingKey`·`Building` — `BuildingKey`는 `Map` 키라 `equals`·`hashCode`를 직접 써야 한다), `mymap/service/UserMapImportJob.java`(`PnuRow`, `Request`의 보조 생성자 — 이미 있던 `record`에 필드 1개 추가), `mymap/port/AddressMatch.java`(옛 record 유지). 화살표 `switch`는 `UserMapImportJob.resolveAddresses`의 `switch (m.status())` 하나가 늘었다. 새 코드에 `Stream.toList()`·텍스트 블록·`instanceof` 패턴·`var`는 없다(`List.copyOf`·`String.strip`·`toArray(String[]::new)`는 JDK 11에서 된다). `AddressNormalizer`는 한글 식별자가 없지만 `InMemoryAddressRefReader.samples()`에는 한글 지역 변수 이름이 있다(시험·fake 전용, 이식 불필요).
+
 설계문서 B3 표의 "`toList()` 11회/4파일"은 일부 파일(`UserMapService`, `GeoServerService`, `global/gis`)을 빠뜨린 수치였다.
 감사 스크립트 14번이 세는 16회(geotiff 1회 포함)와도 다르다 — geotiff의 1회는 `Collectors.toList()`라서 Java 16 API가 아니다(`GeoTiffService.java:98`).
 

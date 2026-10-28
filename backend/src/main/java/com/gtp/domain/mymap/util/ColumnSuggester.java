@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
 
 /**
  * 미리보기용 업로드 방식·컬럼 추천. 머리글 이름과 앞쪽 몇십 행의 값 모양으로 판단하는 순수 함수다.
- * 추천일 뿐이라 틀려도 사용자가 화면에서 고친다. 주소 추천은 2단계.
+ * 추천일 뿐이라 틀려도 사용자가 화면에서 고친다. 순서는 PNU → 좌표 → 주소(좌표가 있으면 그것이 더 정확해서 주소보다 앞선다).
  */
 public final class ColumnSuggester {
 
@@ -43,13 +43,14 @@ public final class ColumnSuggester {
     public static Result suggest(List<String> headers, List<List<CellData>> rows) {
         int cols = headers.size();
         double[] pnuShare = new double[cols];
+        double[] addressShare = new double[cols];
         double[] min = new double[cols];
         double[] max = new double[cols];
         boolean[] numericColumn = new boolean[cols];
         boolean numericPnu = false;
 
         for (int c = 0; c < cols; c++) {
-            int nonBlank = 0, pnuLike = 0, numbers = 0;
+            int nonBlank = 0, pnuLike = 0, numbers = 0, addressLike = 0;
             min[c] = Double.POSITIVE_INFINITY;
             max[c] = Double.NEGATIVE_INFINITY;
             for (List<CellData> row : rows) {
@@ -69,9 +70,12 @@ public final class ColumnSuggester {
                     }
                 } else if (PnuNormalizer.looksLikePnu(d.text())) {
                     pnuLike++;
+                } else if (AddressNormalizer.looksLikeAddress(d.text())) {
+                    addressLike++;
                 }
             }
             pnuShare[c] = nonBlank == 0 ? 0 : (double) pnuLike / nonBlank;
+            addressShare[c] = nonBlank == 0 ? 0 : (double) addressLike / nonBlank;
             numericColumn[c] = nonBlank > 0 && numbers >= Math.ceil(nonBlank * 0.9);
         }
 
@@ -99,6 +103,18 @@ public final class ColumnSuggester {
                 return new Result(ExcelPreviewResponse.Suggestions.builder().mode("COORD")
                         .lonColumn(headers.get(pair[0])).latColumn(headers.get(pair[1])).sourceSrid(sys.srid()).build(), numericPnu);
             }
+        }
+
+        // 주소: 값의 60% 이상이 도로명·지번 주소 모양이거나, 머리글이 주소 같고 하나라도 주소 모양인 컬럼(비율이 높은 것 우선)
+        int addressCol = -1;
+        for (int c = 0; c < cols; c++) {
+            boolean hint = headerHasAny(headers.get(c), "주소", "address", "소재지", "지번", "도로명", "addr");
+            boolean ok = addressShare[c] >= 0.6 || (hint && addressShare[c] > 0);
+            if (!ok) continue;
+            if (addressCol < 0 || addressShare[c] > addressShare[addressCol]) addressCol = c;
+        }
+        if (addressCol >= 0) {
+            return new Result(ExcelPreviewResponse.Suggestions.builder().mode("ADDRESS").addressColumn(headers.get(addressCol)).build(), numericPnu);
         }
         return new Result(ExcelPreviewResponse.Suggestions.builder().build(), numericPnu);
     }

@@ -1,7 +1,7 @@
 'use client'
 
 // 나만의지도 업로드 — 한 화면 마법사: ① 종류(SHP / 엑셀 카드) → ② 파일·미리보기·모드·컬럼 → ③ 이름 → 업로드.
-// 엑셀은 PNU 매칭(필지 폴리곤)과 좌표(점) 두 모드다. 주소 모드는 2단계에서 켜지므로 선택지·샘플 모두 숨긴다.
+// 엑셀은 PNU·주소(도로명/지번 → PNU, 둘 다 필지 폴리곤)와 좌표(점) 세 모드다.
 // 서버가 미리보기에 suggestions를 안 주는 옛 서버면 좌표 모드 하나뿐인 옛 흐름(위도·경도 컬럼)으로 동작한다.
 // 요청은 엔진의 나만의지도 소스(map.sources.myMap — 짝 백엔드면 adapters/rest)가 보낸다.
 // 스타일: gm-modal(공유·보고서와 공용), gm-upload-modal, gm-wizard(마법사 조각). 선택 상태에 따라 바뀌는 값은 gm-is-* 클래스
@@ -27,13 +27,14 @@ type Kind = 'shp' | 'excel'
 
 const STEP_LABELS: readonly string[] = Object.freeze(['종류', '파일·컬럼', '이름'])
 const PREVIEW_ROWS = 10
-/** 화면에서 고르게 하는 엑셀 모드(주소는 2단계) */
-const MODES: readonly MyMapUploadMode[] = Object.freeze(['PNU', 'COORD'] as MyMapUploadMode[])
+/** 화면에서 고르게 하는 엑셀 모드 */
+const MODES: readonly MyMapUploadMode[] = Object.freeze(['PNU', 'ADDRESS', 'COORD'] as MyMapUploadMode[])
 const LEGACY_MODES: readonly MyMapUploadMode[] = Object.freeze(['COORD'] as MyMapUploadMode[])
-const MODE_LABELS: Readonly<Record<string, string>> = Object.freeze({ PNU: 'PNU (필지 폴리곤)', COORD: '좌표 (위도·경도)' })
-/** 화면에서 받게 하는 샘플(주소는 2단계) */
+const MODE_LABELS: Readonly<Record<string, string>> = Object.freeze({ PNU: 'PNU (필지 폴리곤)', ADDRESS: '주소 (도로명·지번 → 필지 폴리곤)', COORD: '좌표 (위도·경도)' })
+/** 화면에서 받게 하는 샘플 */
 const SAMPLE_BUTTONS: readonly { kind: MyMapSampleKind; label: string }[] = Object.freeze([
     Object.freeze({ kind: 'pnu' as MyMapSampleKind, label: 'PNU' }),
+    Object.freeze({ kind: 'address' as MyMapSampleKind, label: '주소' }),
     Object.freeze({ kind: 'coord' as MyMapSampleKind, label: '좌표' }),
 ])
 
@@ -139,21 +140,21 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
     const [pnuColumn, setPnuColumn] = useState('')
     const [latColumn, setLatColumn] = useState('')
     const [lonColumn, setLonColumn] = useState('')
-    const [addressDetected, setAddressDetected] = useState(false)
+    const [addressColumn, setAddressColumn] = useState('')
 
     /** 서버가 모드·추천을 모르는 옛 서버(suggestions 없음) → 좌표 하나뿐인 옛 흐름 */
     const legacy = preview !== null && preview.suggestions === undefined
     const modes = legacy ? LEGACY_MODES : MODES
 
     const limits = preview?.limits ?? quota?.maxRows ?? null
-    const limit = limits ? (mode === 'PNU' ? limits.pnu : limits.coord) : null
+    const limit = limits ? (mode === 'PNU' ? limits.pnu : mode === 'ADDRESS' ? limits.address : limits.coord) : null
     const totalRows = preview?.totalRows
     const overLimit = limit !== null && totalRows !== undefined && totalRows > limit
     // 한도를 계산할 수 없는데 서버가 한도 초과라고 알린 경우만 서버 경고를 따른다
     const overLimitWarning = (preview?.warnings ?? []).find(w => w.code === 'OVER_LIMIT')
     const serverOverLimit = limit === null && !!overLimitWarning
 
-    const columnsReady = mode === 'PNU' ? !!pnuColumn : !!latColumn && !!lonColumn
+    const columnsReady = mode === 'PNU' ? !!pnuColumn : mode === 'ADDRESS' ? !!addressColumn : !!latColumn && !!lonColumn
     const excelReady = preview !== null && columnsReady && !overLimit && !serverOverLimit
     const fileReady = kind === 'shp' ? shpFiles.length > 0 : excelReady
     /** 지금 단계(머리줄 표시용): 1 종류 · 2 파일·컬럼 · 3 이름 */
@@ -191,13 +192,15 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
             const res = await myMap.previewExcel(file)
             const sg = res.suggestions
             const pnu = header(res, sg?.pnuColumn)
+            const addr = header(res, sg?.addressColumn)
             const lat = header(res, sg?.latColumn)
             const lon = header(res, sg?.lonColumn)
             let next: MyMapUploadMode = 'COORD'
             if (sg) {
-                if (sg.mode === 'PNU' || sg.mode === 'COORD') next = sg.mode
+                if (sg.mode === 'PNU' || sg.mode === 'COORD' || (sg.mode === 'ADDRESS' && addr)) next = sg.mode
                 else if (pnu) next = 'PNU'
                 else if (lat && lon) next = 'COORD'
+                else if (addr) next = 'ADDRESS'
                 else next = 'PNU'
             }
             setPreview(res)
@@ -206,7 +209,7 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
             setPnuColumn(pnu)
             setLatColumn(lat)
             setLonColumn(lon)
-            setAddressDetected(sg?.mode === 'ADDRESS' && !pnu)
+            setAddressColumn(addr)
             if (sg?.sourceSrid && SRID_OPTIONS.some(o => o.value === sg.sourceSrid)) setSourceSrid(sg.sourceSrid)
             if (!name.trim()) setName(file.name.replace(/[.]xlsx$/i, ''))
         } catch (e) {
@@ -240,7 +243,7 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
 
     const handleExcelConfirm = async () => {
         if (!preview || !columnsReady || !name.trim()) {
-            setError(mode === 'PNU' ? '이름과 PNU 컬럼을 선택해주세요' : '이름과 위도/경도 컬럼을 선택해주세요')
+            setError(mode === 'PNU' ? '이름과 PNU 컬럼을 선택해주세요' : mode === 'ADDRESS' ? '이름과 주소 컬럼을 선택해주세요' : '이름과 위도/경도 컬럼을 선택해주세요')
             return
         }
         if (overLimit || serverOverLimit) {
@@ -257,6 +260,8 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
                 result = await myMap.confirmExcel({ uploadId: preview.uploadId, name, latColumn, lonColumn, sourceSrid })
             } else if (mode === 'PNU') {
                 result = await myMap.confirmExcel({ uploadId: preview.uploadId, name, mode: 'PNU', pnuColumn })
+            } else if (mode === 'ADDRESS') {
+                result = await myMap.confirmExcel({ uploadId: preview.uploadId, name, mode: 'ADDRESS', addressColumn })
             } else {
                 result = await myMap.confirmExcel({ uploadId: preview.uploadId, name, mode: 'COORD', latColumn, lonColumn, sourceSrid })
             }
@@ -269,7 +274,8 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
         }
     }
 
-    const selectedColumns = mode === 'PNU' ? [pnuColumn] : [latColumn, lonColumn]
+    const selectedColumns = mode === 'PNU' ? [pnuColumn] : mode === 'ADDRESS' ? [addressColumn] : [latColumn, lonColumn]
+    const usesParcel = mode === 'PNU' || mode === 'ADDRESS'
     const coverageNote = describeCoverage(quota?.coverage)
     const parcelNote = coverageNote.text
     const parcelMissing = coverageNote.missing
@@ -288,8 +294,8 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
         ? `.shp·.shx·.dbf·.prj 함께 선택 · 최대 ${formatCount(quota.maxShpFeatures)}개·${formatCount(quota.maxShpMb)}MB`
         : '.shp·.shx·.dbf·.prj 함께 선택'
     const excelDesc = quota
-        ? `PNU · 좌표 컬럼 중 하나 · 최대 ${formatCount(quota.maxRows.pnu)}행`
-        : 'PNU · 좌표 컬럼 중 하나'
+        ? `PNU · 주소 · 좌표 컬럼 중 하나 · 최대 ${formatCount(quota.maxRows.pnu)}행`
+        : 'PNU · 주소 · 좌표 컬럼 중 하나'
 
     return (
         <div className="gm-modal" onClick={onClose}>
@@ -386,7 +392,7 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
                                 <button type="button" className="gm-wizard__link"
                                     onClick={() => { setPreview(null); setError(null) }}>다른 파일</button>
                             </div>
-                            {parcelNote && mode === 'PNU' && (
+                            {parcelNote && usesParcel && (
                                 <div className="gm-modal__note" title={coverageNote.title ?? undefined}>{parcelNote}</div>
                             )}
 
@@ -408,6 +414,13 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
 
                             {mode === 'PNU' ? (
                                 columnSelect('PNU 컬럼', pnuColumn, setPnuColumn)
+                            ) : mode === 'ADDRESS' ? (
+                                <>
+                                    {columnSelect('주소 컬럼', addressColumn, setAddressColumn)}
+                                    <div className="gm-modal__note">
+                                        도로명주소와 지번주소가 한 컬럼에 섞여 있어도 됩니다. 시도·시군구까지 적을수록 정확하고, 시도만 적어도 대부분 찾지만, 같은 이름이 여러 곳이면 "정하지 못했습니다"로 실패하며 결과 보고서에서 후보를 볼 수 있습니다. 도로명 또는 법정동(행정동 아님) 기준입니다.
+                                    </div>
+                                </>
                             ) : (
                                 <>
                                     {columnSelect('위도(Y) 컬럼', latColumn, setLatColumn)}
@@ -421,11 +434,11 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
                                 </>
                             )}
 
-                            {mode === 'PNU' && coverageNote.partial && (
-                                <Banner tone="info">적재된 시도 밖의 PNU는 "이 지역 지적도는 아직 제공하지 않습니다"로 실패합니다.</Banner>
+                            {usesParcel && coverageNote.partial && (
+                                <Banner tone="info">{`적재된 시도 밖의 ${mode === 'ADDRESS' ? '주소' : 'PNU'}는 "이 지역 지적도는 아직 제공하지 않습니다"로 실패합니다.`}</Banner>
                             )}
-                            {mode === 'PNU' && parcelMissing && (
-                                <Banner tone="warn">지적도 자료 준비 중입니다. 준비가 끝나기 전에는 PNU로 올릴 수 없습니다(좌표 엑셀·SHP는 가능).</Banner>
+                            {usesParcel && parcelMissing && (
+                                <Banner tone="warn">{`지적도 자료 준비 중입니다. 준비가 끝나기 전에는 ${mode === 'ADDRESS' ? '주소' : 'PNU'}로 올릴 수 없습니다(좌표 엑셀·SHP는 가능).`}</Banner>
                             )}
                             {(preview.warnings ?? []).filter(w => w.code !== 'OVER_LIMIT' && (w.code !== 'NUMERIC_PNU_CELLS' || mode === 'PNU')).map(w => (
                                 <Banner key={w.code} tone={w.code === 'NUMERIC_PNU_CELLS' ? 'warn' : 'info'}>{w.message}</Banner>
@@ -436,10 +449,7 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
                                 </Banner>
                             )}
                             {serverOverLimit && overLimitWarning && <Banner tone="error">{overLimitWarning.message}</Banner>}
-                            {addressDetected && (
-                                <Banner tone="info">주소 컬럼이 보이지만 주소로 찾기는 아직 지원하지 않습니다. PNU 또는 좌표 컬럼을 지정해 주세요.</Banner>
-                            )}
-
+                
                             <PreviewTable preview={preview} selected={selectedColumns} />
                             <div className="gm-modal__note">
                                 미리보기 {Math.min(preview.sampleRows.length, PREVIEW_ROWS)}행

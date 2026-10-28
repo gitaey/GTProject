@@ -6,6 +6,8 @@ import com.gtp.domain.mymap.config.MyMapImportExecutor;
 import com.gtp.domain.mymap.config.MyMapProperties;
 import com.gtp.domain.mymap.model.ImportFailureReason;
 import com.gtp.domain.mymap.model.ImportMode;
+import com.gtp.domain.mymap.port.AddressMatch;
+import com.gtp.domain.mymap.port.AddressResolver;
 import com.gtp.domain.mymap.port.Coverage;
 import com.gtp.domain.mymap.port.ParcelShape;
 import com.gtp.domain.mymap.port.PnuParcelProvider;
@@ -48,10 +50,17 @@ public class UserMapImportJob {
 
     /** @param totalRows 미리보기에서 센, 값이 있는 데이터 행 수(진행률 분모) */
     public record Request(long userMapId, String ownerId, ImportMode mode, Path file, int totalRows,
-                          String pnuColumn, String latColumn, String lonColumn, String sourceSrid) {
+                          String pnuColumn, String latColumn, String lonColumn, String sourceSrid, String addressColumn) {
+
+        /** 주소 컬럼 없이(PNU·좌표 모드) 만드는 요청 */
+        public Request(long userMapId, String ownerId, ImportMode mode, Path file, int totalRows,
+                       String pnuColumn, String latColumn, String lonColumn, String sourceSrid) {
+            this(userMapId, ownerId, mode, file, totalRows, pnuColumn, latColumn, lonColumn, sourceSrid, null);
+        }
     }
 
     private final PnuParcelProvider provider;
+    private final AddressResolver addressResolver;
     private final UserMapImportStore store;
     private final JdbcTemplate jdbc;
     private final MyMapProperties props;
@@ -62,9 +71,10 @@ public class UserMapImportJob {
     private final GeometryFactory geometryFactory = new GeometryFactory();
     private final GeometryJSON geometryJSON = new GeometryJSON(9);
 
-    public UserMapImportJob(PnuParcelProvider provider, UserMapImportStore store, JdbcTemplate jdbc,
+    public UserMapImportJob(PnuParcelProvider provider, AddressResolver addressResolver, UserMapImportStore store, JdbcTemplate jdbc,
                             MyMapProperties props, MyMapImportExecutor executor, ImportGuard guard) {
         this.provider = provider;
+        this.addressResolver = addressResolver;
         this.store = store;
         this.jdbc = jdbc;
         this.props = props;
@@ -165,8 +175,8 @@ public class UserMapImportJob {
         void run() {
             switch (req.mode()) {
                 case PNU -> runPnu();
+                case ADDRESS -> runAddress();
                 case COORD -> runCoord();
-                default -> throw new CustomException(GisErrorCode.MYMAP_MODE_UNSUPPORTED);
             }
         }
 
@@ -198,7 +208,7 @@ public class UserMapImportJob {
                         if ((!allowed.isEmpty() && !allowed.contains(sido)) || !coverage.isLoaded(sido)) {
                             fail(row, ImportFailureReason.OUT_OF_COVERAGE, r.pnu());
                         } else {
-                            batch.add(new PnuRow(row, r.pnu(), propertiesOf(row)));
+                            batch.add(new PnuRow(row, r.pnu(), propertiesOf(row), r.pnu()));
                         }
                     }
                     if (processed % BATCH == 0) {
@@ -211,6 +221,81 @@ public class UserMapImportJob {
                 inserter.flush();
                 finish(coverage.versionFor(usedSidos));
             }
+        }
+
+        // ---------- 주소 ----------
+
+        /** 주소 컬럼 → PNU(AddressResolver) → 이후는 PNU 모드와 같다. 500행씩 묶어 풀고, 같은 주소는 한 번만 푼다. */
+        void runAddress() {
+            if (!addressResolver.supported()) throw new CustomException(GisErrorCode.MYMAP_MODE_UNSUPPORTED);
+            if (!addressResolver.available()) throw new CustomException(GisErrorCode.MYMAP_REF_UNAVAILABLE);
+            Coverage coverage = provider.coverage();
+            if (!coverage.available()) throw new CustomException(GisErrorCode.MYMAP_REF_UNAVAILABLE);
+            Set<String> allowed = new HashSet<>(props.getRef().getAllowedSidoCodes());
+            int[] keyIdx = {-1};
+            List<ExcelSheet.Row> pending = new ArrayList<>();
+            Map<String, AddressMatch> solved = new HashMap<>();   // 이번 작업에서 이미 푼 주소(원문 → 결과), 한도 5,000행이라 작다
+
+            try (FeatureBatchInserter inserter = new FeatureBatchInserter(jdbc, id)) {
+                ExcelSheet.read(req.file(), h -> {
+                    headers = h;
+                    stats = new ColumnStatsCollector(h);
+                    keyIdx[0] = columnIndex(req.addressColumn(), GisErrorCode.MYMAP_COLUMN_REQUIRED.exception(ImportMode.ADDRESS.label()));
+                }, row -> {
+                    if (processed >= maxRows) {
+                        rowLimit(row);
+                        return false;
+                    }
+                    processed++;
+                    CellData cell = row.cells().get(keyIdx[0]);
+                    if (cell.blank()) fail(row, ImportFailureReason.EMPTY, cell.text());
+                    else pending.add(row);
+                    if (processed % BATCH == 0) {
+                        resolveAddresses(pending, keyIdx[0], solved, coverage, allowed);
+                        flushPnuBatch(inserter);
+                        checkpoint(inserter);
+                    }
+                    return true;
+                });
+                resolveAddresses(pending, keyIdx[0], solved, coverage, allowed);
+                flushPnuBatch(inserter);
+                inserter.flush();
+                finish(coverage.versionFor(usedSidos));
+            }
+        }
+
+        /** 모아 둔 행의 주소를 풀어 PNU가 나온 행은 batch로, 아닌 행은 사유와 함께 실패로 보낸다. */
+        void resolveAddresses(List<ExcelSheet.Row> pending, int keyIdx, Map<String, AddressMatch> solved,
+                              Coverage coverage, Set<String> allowed) {
+            if (pending.isEmpty()) return;
+            List<String> toSolve = new ArrayList<>();
+            Set<String> seen = new HashSet<>();
+            for (ExcelSheet.Row row : pending) {
+                String text = row.cells().get(keyIdx).text();
+                if (!solved.containsKey(text) && seen.add(text)) toSolve.add(text);
+            }
+            if (!toSolve.isEmpty()) {
+                List<AddressMatch> results = addressResolver.resolve(toSolve);
+                if (results.size() != toSolve.size()) throw new IllegalStateException("주소 해석 결과 수가 입력과 다릅니다");
+                for (int i = 0; i < toSolve.size(); i++) solved.put(toSolve.get(i), results.get(i));
+            }
+            for (ExcelSheet.Row row : pending) {
+                String text = row.cells().get(keyIdx).text();
+                AddressMatch m = solved.get(text);
+                switch (m.status()) {
+                    case MATCHED -> {
+                        String sido = m.pnu().substring(0, 2);
+                        if ((!allowed.isEmpty() && !allowed.contains(sido)) || !coverage.isLoaded(sido)) {
+                            fail(row, ImportFailureReason.OUT_OF_COVERAGE, text);
+                        } else {
+                            batch.add(new PnuRow(row, m.pnu(), propertiesOf(row), text));
+                        }
+                    }
+                    case AMBIGUOUS -> failWithCandidates(row, ImportFailureReason.AMBIGUOUS, text, m.candidates());
+                    default -> fail(row, m.reason() != null ? m.reason() : ImportFailureReason.PARSE_FAILED, text);
+                }
+            }
+            pending.clear();
         }
 
         void flushPnuBatch(FeatureBatchInserter inserter) {
@@ -226,7 +311,7 @@ public class UserMapImportJob {
             for (PnuRow pr : batch) {
                 ParcelShape shape = found.get(pr.pnu());
                 if (shape == null) {
-                    fail(pr.row(), ImportFailureReason.PARCEL_NOT_FOUND, pr.pnu());
+                    fail(pr.row(), ImportFailureReason.PARCEL_NOT_FOUND, pr.input());
                     continue;
                 }
                 inserter.add(shape.geometryJson(), pr.properties(), pr.pnu(), pr.row().rowNo());
@@ -324,6 +409,20 @@ public class UserMapImportJob {
             failureBuf.add(new FailureRow(row.rowNo(), reason.name(), input, null, rowJsonOf(row)));
         }
 
+        /** AMBIGUOUS: 후보 문장을 JSON 배열로 함께 저장한다(보고서·실패 행 엑셀에 보인다). */
+        void failWithCandidates(ExcelSheet.Row row, ImportFailureReason reason, String input, List<String> candidates) {
+            failed++;
+            String json = null;
+            if (candidates != null && !candidates.isEmpty()) {
+                try {
+                    json = om.writeValueAsString(candidates);
+                } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                    throw new IllegalStateException(e);
+                }
+            }
+            failureBuf.add(new FailureRow(row.rowNo(), reason.name(), input, json, rowJsonOf(row)));
+        }
+
         /** 진행률·실패 행을 저장한다. 레이어가 지워졌으면 LayerGone. */
         void checkpoint(FeatureBatchInserter inserter) {
             inserter.flush();
@@ -362,7 +461,8 @@ public class UserMapImportJob {
         }
     }
 
-    private record PnuRow(ExcelSheet.Row row, String pnu, String properties) {
+    /** @param input 실패 보고서에 보일 입력값(PNU 모드는 PNU, 주소 모드는 주소 원문) */
+    private record PnuRow(ExcelSheet.Row row, String pnu, String properties, String input) {
     }
 
     static boolean inKorea(double lon, double lat) {

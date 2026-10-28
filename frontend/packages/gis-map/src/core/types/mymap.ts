@@ -4,7 +4,7 @@
 /** 업로드 종류(옛 서버는 sourceType만 준다) */
 export type MyMapSourceKind = 'SHP' | 'EXCEL_COORD' | 'EXCEL_PNU' | 'EXCEL_ADDRESS'
 
-/** 엑셀 매칭 방식. ADDRESS는 2단계에서 켜진다(화면은 PNU·COORD만 고르게 한다) */
+/** 엑셀 매칭 방식. ADDRESS = 도로명·지번 주소 → PNU → 필지 폴리곤 */
 export type MyMapUploadMode = 'PNU' | 'ADDRESS' | 'COORD'
 
 /** 샘플 파일 종류 */

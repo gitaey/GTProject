@@ -144,11 +144,26 @@ class ColumnSuggesterTest {
     }
 
     @Test
-    void 주소는_1단계에서_추천하지_않는다() {
-        List<List<CellData>> rows = List.of(row(s("서울특별시 중구 세종대로 110")), row(s("세종특별자치시 한누리대로 2130")));
-        Suggestions s = ColumnSuggester.suggest(List.of("주소"), rows).suggestions();
-        assertThat(s.getMode()).isNull();
-        assertThat(s.getAddressColumn()).isNull();
+    void 도로명_지번_주소_컬럼은_ADDRESS로_추천된다() {
+        List<List<CellData>> rows = List.of(row(s("서울특별시 중구 세종대로 110"), s("청사")), row(s("대구광역시 중구 동인동1가 2-1"), s("청사")),
+                row(s("세종특별자치시 한누리대로 2130 (어진동)"), s("청사")));
+        Suggestions s = ColumnSuggester.suggest(List.of("소재지", "구분"), rows).suggestions();
+        assertThat(s.getMode()).isEqualTo("ADDRESS");
+        assertThat(s.getAddressColumn()).isEqualTo("소재지");
+        assertThat(s.getPnuColumn()).isNull();
+    }
+
+    @Test
+    void 주소처럼_생기지_않은_글자_컬럼은_추천하지_않는다() {
+        List<List<CellData>> rows = List.of(row(s("본청사"), s("12")), row(s("별관"), s("3-4")), row(s("서울"), s("5")));
+        assertThat(ColumnSuggester.suggest(List.of("이름", "층"), rows).suggestions().getMode()).isNull();
+    }
+
+    @Test
+    void 좌표_컬럼이_함께_있으면_주소보다_좌표가_먼저() {
+        List<List<CellData>> rows = List.of(row(s("서울특별시 중구 세종대로 110"), n(37.5663), n(126.9779)));
+        Suggestions s = ColumnSuggester.suggest(List.of("주소", "위도", "경도"), rows).suggestions();
+        assertThat(s.getMode()).isEqualTo("COORD");
     }
 
     @Test

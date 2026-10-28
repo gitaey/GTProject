@@ -12,7 +12,7 @@ public class ExcelConfirmRequest {
     private String uploadId;
     private String name;
     private String description;
-    /** PNU | ADDRESS | COORD (ADDRESS는 2단계라 지금은 거절) */
+    /** PNU | ADDRESS | COORD */
     private String mode;
     private String pnuColumn;
     private String addressColumn;

@@ -376,6 +376,56 @@ DELETE FROM tbl_user_map                   WHERE id = #{id};
   5. `UPDATE tbl_user_map SET status='READY', geom_type='POINT', feature_count=<건수> …`
   6. 그 밖의 예외는 잡아서 `status='FAILED'`로 **커밋하고 200 성공 응답**(이미 넣은 피처도 커밋, 추론). 임시 파일·메모리 항목은 항상 삭제.
 
+### U7a. 주소 모드(`mode=ADDRESS`, `addressColumn`) — 도로명·지번 주소 → PNU 매칭 규칙·쿼리 (구현: `mymap/util/AddressNormalizer` + `mymap/infra/TableAddressResolver` + `JdbcAddressRefReader`)
+
+확정 요청 `{uploadId, name, mode:"ADDRESS", addressColumn}` — 검사·한도(5,000행)·비동기 처리·보고서는 PNU 모드와 같고, 행의 키(PNU)를 **주소로 만드는 단계**만 다르다. 주소 자료(`ti_spbd_buld`·`ti_sprd_stret`)의 적재 기록(`ref.load_meta`)이 `READY`가 아니면 확정은 503 `MYMAP_REF_UNAVAILABLE`(처리를 시작하지 않음), 주소 컬럼이 없으면 400 `MYMAP_COLUMN_REQUIRED`("주소에 쓸 컬럼을 선택하세요."). 레이어 `source_kind='EXCEL_ADDRESS'`. 미리보기 `suggestions.mode`는 PNU → 좌표 → **주소** 순으로 먼저 맞는 것(주소 컬럼 = 값의 60% 이상이 도로명/지번 모양, 또는 머리글에 주소·소재지·지번·도로명·address가 있고 하나라도 주소 모양).
+
+**1) 정규화·분류(순수 함수, DB 없음)** — 한 칸에 도로명/지번이 섞여도 이름 토큰의 끝 글자로 가른다.
+
+| 처리 | 규칙 |
+|---|---|
+| 정리 | NFKC(전각→반각), `(…)`·`[…]` 제거, 쉼표→공백, 대시 변형→`-`, `12 - 3`→`12-3`, `12번지 3호`→`12-3`, `12번지`→`12`, 앞 5자리 우편번호 제거 |
+| 붙여 쓴 토큰 | `산12-3`→`산 12-3`, `지하110`→`지하 110`, `세종대로110`→`세종대로 110`(이름이 로·길·동·읍·면·리·가로 끝날 때) |
+| 떨어져 쓴 이름 조각 | `중앙로 1길`·`보수대로 289번길`→`중앙로1길`·`보수대로289번길`(길 조각), `종로 1가`→`종로1가`(가 조각) — 건물DB의 도로명엔 공백이 없다 |
+| 시도 | 첫 토큰이 약칭이면 현행·옛 정식명 후보로 확장(서울→서울특별시, 경기→경기도, 강원→강원특별자치도·강원도, 전북→전북특별자치도·전라북도, 전남→전라남도·전남광주통합특별시, 광주→광주광역시·전남광주통합특별시 등). `광주`는 다음 토큰이 `…구`일 때만 시도(`광주시`는 경기도의 시). 시도처럼 생겼는데 모르는 이름(…특별시/광역시/특별자치시/특별자치도, 3자 이상 …도)이면 `SIDO_UNKNOWN` |
+| 번호 | 시도 뒤 첫 순수 숫자 토큰(`본번[-부번]`). 그 앞 토큰이 `지하`면 지하, `산`이면 산. 번호 뒤는 전부 버림(건물명·동·호·층·`외 N필지`). 지번 본번·부번 ≤ 9999(PNU 4자리), 도로 건물본번 ≤ 99999, 본번 ≥ 1, 아니면 `PARSE_FAILED` |
+| 분류 | 번호 앞 이름 토큰이 `로`·`길`로 끝나면 **도로명**, `동`·`읍`·`면`·`리`·`가`로 끝나면 **지번**, 아니면 `PARSE_FAILED`. 번호가 없으면: 이름이 로·길 → `BUILDING_NO_NOT_FOUND`, 동·읍·면·리·가 → `JIBUN_MISSING`, 그 외 `PARSE_FAILED` |
+| 같은 주소 | 정리한 문장이 같으면 한 번만 푼다(호출 안에서, 그리고 가져오기 작업 안에서) |
+
+**2) 지번 주소 — 메모리 사전(DB 조회 없음)**: 사전은 건물정보의 distinct 행정구역을 한 번 읽어 만든다(약 1.9만 건, 기준월=`load_meta`의 `ti_spbd_buld` version이 바뀌면 다시 만든다). 새 표·인덱스 없음.
+```sql
+SELECT DISTINCT adm_cd, ctp_kor_nm, sig_kor_nm, emd_kor_nm, li_kor_nm FROM ref.ti_spbd_buld;   -- 전국 약 3초
+```
+사전 키 = 리가 있으면 리 이름, 없으면 읍면동 이름. 입력 이름 토큰으로 후보를 모은 뒤 ① 시도(확장된 정식명 중 하나) ② 읍면동 토큰(리가 있는 법정동이면 앞 토큰이 그 읍면동일 때 먹음) ③ 남은 토큰은 전부 그 법정동의 시군구(`수원시 장안구`의 각 토큰, `수원`처럼 시·군·구를 뺀 약칭 허용)에 맞아야 한다. 법정동코드 중복 없이 1개 → PNU, 여럿 → `AMBIGUOUS`(후보 문장 `시도 시군구 읍면동 [리] [산] 번지`, 최대 5개), 0개 → `LEGAL_DONG_NOT_FOUND`(행정동 `상계1동`·옛 이름·리 없이 쓴 면 포함).
+
+**3) 도로명 주소 — 쿼리 2번(묶음)**
+```sql
+-- (a) 도로명 → road_cd 후보. 호출 한 번에 서로 다른 도로명 500개씩. 사용 중(use_yn='0')이고 말소일자가 없는 것이 active
+SELECT road_cd, ctp_kor_nm, sig_kor_nm, rn,
+       bool_or(coalesce(use_yn,'0') = '0' AND coalesce(ersr_de,'') = '') AS active
+FROM ref.ti_sprd_stret WHERE rn = ANY(?::varchar[]) GROUP BY road_cd, ctp_kor_nm, sig_kor_nm, rn;
+
+-- (b) 건물번호 → 대표 지번. 키 500개씩(지하여부 0/1 + 건물본번·부번), (road_cd, udgd_yn, buld_mnnm, buld_slno) 인덱스를 탄다. 폐지 제외
+SELECT b.road_cd, b.udgd_yn, b.buld_mnnm, b.buld_slno, b.adm_cd, b.mntn_yn, b.lnbr_mnnm, b.lnbr_slno,
+       b.ctp_kor_nm, b.sig_kor_nm, b.emd_kor_nm, b.li_kor_nm, b.rn
+FROM unnest(?::varchar[], ?::varchar[], ?::int[], ?::int[]) AS k(road_cd, udgd_yn, buld_mnnm, buld_slno)
+JOIN ref.ti_spbd_buld b ON b.road_cd = k.road_cd AND b.udgd_yn = k.udgd_yn AND b.buld_mnnm = k.buld_mnnm AND b.buld_slno = k.buld_slno
+WHERE coalesce(b.mv_rs_cd,'') NOT IN ('63','72');
+```
+- (a) 후보를 시도·시군구 토큰(`…시`·`…군`·`…구`로 끝나는 지역 토큰, 읍면동 토큰은 쓰지 않음)으로 좁힌다. 좁힌 뒤 `active`가 하나라도 있으면 active만. 시군구가 없는 도로(세종)는 시군구 토큰 검사를 건너뛴다. 0개면 **지번으로 한 번 더**(세종로처럼 `로`로 끝나는 법정동) 풀어 보고 안 되면 `ROAD_NOT_FOUND`.
+- (b) 좁힌 `road_cd`마다 건물번호 키를 만들어 조회. 같은 도로명주소에 건물이 여럿(건물군)이어도 PNU가 다른 경우는 전체 약 10건뿐 — **PNU가 가장 작은 것**을 대표로 쓴다(실행마다 같은 결과).
+- 판정: 건물이 한 곳에도 없음 → `BUILDING_NO_NOT_FOUND`. 건물이 있는 도로가 **하나뿐**이고 **시도를 적었거나** 후보 도로가 한 시도·시군구에만 있으면 → 확정(시도를 적었으면 도로명이 그 시도의 여러 구에 걸쳐도 해당 번호 건물이 한 곳이면 확정). **시도도 없고** 후보 도로가 둘 이상의 시도·시군구에 걸쳤으면(건물이 한 곳뿐이어도 — 오타 하나로 다른 도에 찍히는 위험), 또는 **같은 범위에 같은 번호 건물이 둘 이상**이면 → **고르지 않고 `AMBIGUOUS`**(건물이 있는 후보만, `시도 시군구 도로명 [지하] 번호 (법정동)`, 최대 5개, 정렬; 후보가 1개일 수도 있다).
+- 번호 뒤에 숫자만 남은 꼬리(`226 12`·`422 5`)는 부번인지 알 수 없어 `PARSE_FAILED`. `422번지 5`·`422번지 5호`는 `422-5`, `12번지 3호`는 `12-3`. 상세주소(`101동 202호`·`3층`·괄호)는 번호 뒤라서 버린다. 주소 한 칸이 300자를 넘으면 읽지 않고 `PARSE_FAILED`(정규식 처리 시간 상한).
+- 사유 문구(백엔드 `ImportFailureReason`·프론트 `ui/mymap/format.ts`·이 문서가 같아야 한다): `AMBIGUOUS` = "같은 이름이 여러 곳에 있어 정하지 못했습니다(시도·시군구를 붙여 주세요)"(후보가 1개여도 맞는 문장), `LEGAL_DONG_NOT_FOUND` = "법정동을 찾지 못했습니다(행정동·옛 이름이면 법정동 이름으로 바꿔 주세요)".
+
+**4) PNU 공식**: `adm_cd(10) || (산이면 '2' 아니면 '1') || lpad(본번,4,'0') || lpad(부번,4,'0')` (건물DB: `adm_cd || (mntn_yn::int + 1) || lpad(lnbr_mnnm,4,'0') || lpad(lnbr_slno,4,'0')`). 그 뒤는 PNU 모드와 같다: 허용 시도 검사 → `PnuParcelProvider.findByPnus`(500개씩, 시도 파티션) → 없으면 `PARCEL_NOT_FOUND`(보고서 입력값은 **주소 원문**).
+
+**5) 실패 사유와 보고서**: `PARSE_FAILED`·`SIDO_UNKNOWN`·`LEGAL_DONG_NOT_FOUND`·`JIBUN_MISSING`·`ROAD_NOT_FOUND`·`BUILDING_NO_NOT_FOUND`·`AMBIGUOUS`·`OUT_OF_COVERAGE`·`PARCEL_NOT_FOUND`·`EMPTY`. `AMBIGUOUS`는 `tbl_user_map_import_failure.candidates_json`(문자열 JSON 배열)에 후보 문장을 남기고 보고서 `rows[].candidates`·실패 행 엑셀에 나온다. 실패 행의 `input_value`는 주소 원문(500자 절단).
+
+**6) 성능(실측, 2026-09 자료·운영 DB 읽기 전용 확인)**: 사전 만들기 약 3초(한 번), 무작위 도로명주소 5,000건 해석 0.8초(500건 묶음 10회), 폴리곤 조회 4.7초 — 5,000행 가져오기가 십여 초. 도로명주소 98.6%·지번 99.6%가 지적도 폴리곤을 찾는다(나머지는 `PARCEL_NOT_FOUND`).
+
+**7) 이식 방법**: 해석 규칙은 `AddressRefReader`(좁은 인터페이스: `readyVersion()`·`legalDongs()`·`findRoadCodes(names)`·`findBuildings(keys)` 4개) 뒤에 있다. 업무 프로젝트(MyBatis/Oracle)는 이 인터페이스만 다시 구현하면 `AddressNormalizer`·`TableAddressResolver`를 그대로 쓴다. 주소 API(juso.go.kr 등)를 쓰려면 `AddressResolver` 포트 구현을 통째로 바꾼다.
+
 ### U8·U9. `/api/mymap/{id}/share` (소유자만) — 공유 대상 조회·저장(통째로 바꾸기)
 
 - U8 GET → `{ users:[{userId, name, state}], roles:[{code, label, state}] }`. `state`는 `ACTIVE`·`INACTIVE`(비활성 사용자)·`MISSING`(없는 대상 — 예전에 세부권한 코드 단독으로 저장돼 죽은 공유 등). 소유자가 아니면 403.
@@ -436,7 +486,7 @@ DELETE FROM tbl_user_map                   WHERE id = #{id};
 - U11 GET `/srid-options`: 상수 `["EPSG:5186","EPSG:4326","EPSG:5179","EPSG:3857"]`, DB 없음.
 - U12 GET `/api/admin/mymap`: `SELECT * FROM tbl_user_map ORDER BY created_at DESC`, 모든 항목 `owner = false`.
 
-업로드 흐름(U6·U7 변경): 미리보기는 xlsx를 SAX 스트리밍으로 읽어 값 있는 행이 5,000을 넘으면 즉시 400(`MYMAP_ROW_LIMIT`), 같은 사용자 동시 1건·서버 전체 4건(429). 확정은 비동기 처리(PNU는 `ref.lsmd_cont_ldreg`에서 폴리곤을 찾아 **그 순간의 모양을 복사 저장**, 주소 모드는 아직 `MYMAP_MODE_UNSUPPORTED`). 같은 사용자의 가져오기(엑셀·shp)는 동시에 1건. PNU 조회는 `PnuParcelProvider` 인터페이스 뒤에 있고 기본 구현이 `ref.lsmd_cont_ldreg`(시도별 파티션)을 읽는다.
+업로드 흐름(U6·U7 변경): 미리보기는 xlsx를 SAX 스트리밍으로 읽어 값 있는 행이 5,000을 넘으면 즉시 400(`MYMAP_ROW_LIMIT`), 같은 사용자 동시 1건·서버 전체 4건(429). 확정은 비동기 처리(PNU는 `ref.lsmd_cont_ldreg`에서 폴리곤을 찾아 **그 순간의 모양을 복사 저장**, 주소 모드는 U7a 참고). 같은 사용자의 가져오기(엑셀·shp)는 동시에 1건. PNU 조회는 `PnuParcelProvider` 인터페이스 뒤에 있고 기본 구현이 `ref.lsmd_cont_ldreg`(시도별 파티션)을 읽는다.
 
 ---
 

@@ -85,10 +85,10 @@ mymap:
       sido-column: sido
       geom-column: geom
       srid: 4326
-    legal-dong:
-      table: ref.legal_dong           # 2단계(주소 엑셀)에서 사용
-    road-address:
-      table: ref.road_address         # 2단계(주소 엑셀)에서 사용
+    address:                          # 주소 엑셀(도로명주소·지번주소 → PNU) — 도로명주소 건물DB (backend/scripts/mymap-ref/load-juso.sh)
+      building-table: ref.ti_spbd_buld   # 건물정보: 법정동 사전(메모리)·도로명주소 → 지번
+      road-code-table: ref.ti_sprd_stret # 도로명코드: 도로명 → road_cd
+      max-candidates: 5                  # AMBIGUOUS 후보를 보고서에 남기는 최대 개수
     load-meta-table: ref.load_meta
     datasource:                       # 비우면 서비스 DataSource. 별도 DB로 옮길 때만 환경 변수로 채운다(값은 저장소에 쓰지 않는다)
       url: ${MYMAP_REF_DB_URL:}

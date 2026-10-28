@@ -3,7 +3,7 @@ package com.gtp.domain.mymap.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gtp.domain.mymap.infra.FakePnuParcelProvider;
 import com.gtp.domain.mymap.infra.PostgisPnuParcelProvider;
-import com.gtp.domain.mymap.infra.UnsupportedAddressResolver;
+import com.gtp.domain.mymap.infra.TableAddressResolver;
 import com.gtp.domain.mymap.model.ImportMode;
 import com.gtp.domain.mymap.port.AddressResolver;
 import com.gtp.domain.mymap.port.PnuParcelProvider;
@@ -137,6 +137,9 @@ class MyMapConfigGuardTest {
         assertThat(p.getRef().getParcel().getGeomColumn()).isEqualTo("geom");
         assertThat(p.getRef().getParcel().getSrid()).isEqualTo(4326);
         assertThat(p.getRef().getLoadMetaTable()).isEqualTo("ref.load_meta");
+        assertThat(p.getRef().getAddress().getBuildingTable()).isEqualTo("ref.ti_spbd_buld");
+        assertThat(p.getRef().getAddress().getRoadCodeTable()).isEqualTo("ref.ti_sprd_stret");
+        assertThat(p.getRef().getAddress().getMaxCandidates()).isEqualTo(5);
         assertThat(p.getRef().getExpectedSidoCodes()).hasSize(16).contains("12", "36");   // 전국 기준 16개(전남광주통합 12 포함)
         assertThat(p.getRef().getDatasource().isConfigured()).isFalse(); // 환경 변수가 없으면 서비스 DataSource
         assertThat(p.getMaintenance().isEnabled()).isTrue();
@@ -183,10 +186,34 @@ class MyMapConfigGuardTest {
     }
 
     @Test
-    void 주소_해석기는_1단계에서_미지원_자리표시() {
-        AddressResolver r = new MyMapConfig().addressResolver();
-        assertThat(r).isInstanceOf(UnsupportedAddressResolver.class);
-        assertThat(r.supported()).isFalse();
+    void 주소_해석기는_provider에_따라_표_구현과_메모리_구현_모두_지원한다() {
+        MyMapConfig config = new MyMapConfig();
+        MyMapProperties props = new MyMapProperties();
+        MyMapRefJdbc ref = MyMapRefJdbc.create(props.getRef().getDatasource(), new DriverManagerDataSource("jdbc:h2:mem:svc_guard4"));
+
+        props.getRef().setProvider("postgis");
+        AddressResolver postgis = config.addressResolver(props, ref);
+        assertThat(postgis).isInstanceOf(TableAddressResolver.class);
+        assertThat(postgis.supported()).isTrue();
+
+        props.getRef().setProvider("fake");
+        AddressResolver fake = config.addressResolver(props, ref);
+        assertThat(fake).isInstanceOf(TableAddressResolver.class);
+        assertThat(fake.available()).isTrue();   // 메모리 자료는 늘 준비됨
+        assertThat(fake.resolve(List.of("서울특별시 중구 세종대로 110")).get(0).pnu()).isEqualTo("1114010300100310000");
+
+        // 표 이름이 식별자 모양이 아니면 기동 때 바로 실패(SQL 주입 방지)
+        props.getRef().setProvider("postgis");
+        props.getRef().getAddress().setBuildingTable("ref.x; DROP TABLE y");
+        assertThatThrownBy(() -> config.addressResolver(props, ref)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void 주소_표_기본값은_건물DB_표다() {
+        MyMapProperties.Address a = new MyMapProperties().getRef().getAddress();
+        assertThat(a.getBuildingTable()).isEqualTo("ref.ti_spbd_buld");
+        assertThat(a.getRoadCodeTable()).isEqualTo("ref.ti_sprd_stret");
+        assertThat(a.getMaxCandidates()).isEqualTo(5);
     }
 
     @Test

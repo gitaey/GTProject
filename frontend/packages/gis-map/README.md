@@ -164,13 +164,13 @@ GTProject 저장소의 `.claude/skills/map-module-export/references/`에 있다.
 | `shareTarget?` | 공유 저장소(이름·상태가 붙은 현재 공유 · 일괄 더하기/빼기) — 아래 "공유" 절 | `getShare`·`setShare`로 단일 공유만(일괄 단추 없음) |
 | `getShare?` · `setShare?` | 옛 공유 입출력(아이디·코드 배열). `shareTarget`이 없을 때만 쓴다 | 공유 칸이 비어 있음 |
 | `quota?()` | `{ownedLayers, maxLayers, maxRows:{pnu,address,coord}, maxShpFeatures, maxExcelMb, maxShpMb, coverage}` — `coverage`는 아래 | 패널의 `내 레이어 n/20`과 한도·지적도 기준월 문구가 빠진다(패널을 열 때 1번만 받는다) |
-| `downloadSample?(kind)` | `'pnu' \| 'coord'`(`'address'`는 2단계) 샘플 xlsx **바이트(Blob)**. 저장은 위젯이 `<a download>`로 한다 | 업로드 창의 "샘플 받기"가 없다 |
+| `downloadSample?(kind)` | `'pnu'` · `'address'` · `'coord'` 중 하나, 샘플 xlsx **바이트(Blob)**. 저장은 위젯이 `<a download>`로 한다 | 업로드 창의 "샘플 받기"가 없다 |
 | `importReport?(id, {page, size, reason})` | 소유자 전용 결과 보고서 `{total, matched, failed, byReason, rows:[{rowNo, reason, message, input, candidates}], page, size, totalRows}` | `실패 N 보기`가 링크 대신 글자 |
 | `downloadImportFailures?(id)` | 실패 행 xlsx 바이트 | 보고서에 "실패 행 엑셀 받기"가 없다 |
 | `update?(id, {name?, description?, styleConfig?})` | 부분 수정(PATCH, **등록자만** — 아니면 서버가 403 + message로 reject). 빠진 키는 그대로, `styleConfig: ''`는 지움 | 패널의 스타일 단추(팔레트 아이콘)가 없다 — 스타일은 읽기만 한다 |
 
 - `confirmExcel(input)`은 `{ id }`를 돌려줄 수 있다(처리는 비동기 — 패널이 목록 폴링으로 진행률을 본다). 옛 소스처럼 아무것도 안 돌려줘도 된다. 입력의 `mode`(`'PNU' | 'ADDRESS' | 'COORD'`)·`pnuColumn`·`addressColumn`은 선택이고
-  없으면 좌표(`latColumn`·`lonColumn`·`sourceSrid`)다. 주소 모드는 2단계에서 켜지므로 업로드 창은 PNU·좌표만 보여 준다.
+  없으면 좌표(`latColumn`·`lonColumn`·`sourceSrid`)다. 업로드 창은 PNU·주소·좌표 세 방식을 보여 주고, 주소 모드의 후보(`AMBIGUOUS`)는 보고서의 `candidates`로 나온다.
 - `previewExcel`의 응답에 `suggestions`가 있으면 모드·컬럼을 미리 고르고, **없으면 옛 서버로 보고 좌표(위도·경도) 하나뿐인 옛 흐름**으로 동작한다. `totalRows`·`limits`·`warnings`
   (`NUMERIC_PNU_CELLS`·`DUPLICATE_FILE`·`OVER_LIMIT`)가 있으면 경고 배너와 행 한도 검사(모드별 `limits`, 없으면 `quota.maxRows`)를 한다. 모르는 경고 코드도 `message`를 그대로 보여 준다.
 - 목록 항목의 새 필드(전부 선택): `ownerId`·`ownerName`(공유받은 항목의 "보낸 사람" — 이름이 있으면 `이름(아이디)`)·`shareCount`(내 항목의 공유 대상 수 — 0보다 크면 `공유 n`)·`sourceKind`(`SHP|EXCEL_COORD|EXCEL_PNU|EXCEL_ADDRESS` — 있으면 종류 배지)·`progressTotal`/`progressDone`(처리 중 막대)·

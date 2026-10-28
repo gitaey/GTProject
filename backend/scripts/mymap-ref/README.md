@@ -1,12 +1,14 @@
-# mymap-ref — 연속지적도 적재 스크립트
+# mymap-ref — 연속지적도·도로명주소 건물DB 적재 스크립트
 
-나만의지도의 PNU 엑셀 매칭이 읽는 참조 데이터(`ref.lsmd_cont_ldreg`)를 만드는 도구다. **앱이 하지 않고 운영자가 앞서 실행한다.**
+나만의지도의 PNU 엑셀 매칭이 읽는 참조 데이터(`ref.lsmd_cont_ldreg`)와, 주소 엑셀이 읽는 도로명주소 건물DB(`ref.ti_spbd_buld`·`ref.ti_sprd_stret`·`ref.ti_scco_mvmn`)를 만드는 도구다. **앱이 하지 않고 운영자가 앞서 실행한다.**
 이 폴더의 스크립트는 DB에 직접 쓰므로 실행은 사용자(또는 메인 세션이 사용자 요청으로)만 한다.
 
 | 파일 | 내용 |
 |---|---|
 | `init-ref-schema.sql` | `ref` 스키마·`ref.lsmd_cont_ldreg`(시도별 파티션 20개)·`ref.load_meta` 만들기 — **한 번**, 적재 전에 |
 | `load-parcel.sh` | VWorld 연속지적도(zip/shp)를 시도별로 적재·검증·교체 |
+| `init-ref-juso-schema.sql` | 도로명주소 건물DB 빈 틀 3표(`ti_spbd_buld`·`ti_scco_mvmn`·`ti_sprd_stret`) — **한 번**, `init-ref-schema.sql` 다음에 (여러 번 실행해도 안전) |
+| `load-juso.sh` | 건물DB 전체분 txt(파이프·MS949)를 표별로 적재·검증·교체 — 아래 "도로명주소 건물DB(주소 엑셀용)" |
 | `rename-parcel-to-lsmd_cont_ldreg.sql` | 표 이름을 옛 `ref.parcel`에서 `ref.lsmd_cont_ldreg`로 바꾸는 이관 SQL — **이미 `ref.parcel`로 적재한 DB에서 한 번**, 새 코드 배포 **전에** (처음부터 새로 만드는 DB는 필요 없음) |
 
 ## 로컬 개발 주의 (크게)
@@ -92,3 +94,29 @@ UNLOGGED 표는 WAL(복구 기록)을 쓰지 않아서 대량 적재가 빠르�
 
 ## 이 스크립트를 시험한 방법 (DB 접속 없이)
 가짜 `psql`·`ogr2ogr`·`ogrinfo`(인자만 기록하고 준비된 답을 내는 스크립트)를 `PSQL`·`OGR2OGR`·`OGRINFO` 환경 변수로 끼워 정상·검증 실패 5종·재시작(건너뜀)·`--force`·`--unlogged`·`--via-stage`·`--all`·csv·잘못된 인자를 확인했다. GDAL의 OGR SQL(컬럼 이름 바꾸기·`SUBSTR`)은 실제 `ogr2ogr`로 로컬 shp(zip)를 GPKG로 변환해 확인했다. 실제 PostgreSQL에서의 `ATTACH`/인덱스 연결·`-append` 동작은 **확인하지 못했다** — 세종 한 시도로 먼저 돌려 본다.
+
+## 도로명주소 건물DB (주소 엑셀용)
+
+주소 엑셀(도로명주소·지번주소 → PNU → 연속지적도 폴리곤)이 읽는 표다. 원본은 행정안전부 주소기반산업지원서비스(business.juso.go.kr) > 주소정보 자료제공 > **건물DB(전체분)**.
+앱이 읽는 표는 `ref.ti_spbd_buld`(건물정보 — 법정동 사전과 도로명주소→지번)와 `ref.ti_sprd_stret`(도로명코드). `ref.ti_scco_mvmn`(관련지번)은 적재만 하고 아직 쓰지 않는다.
+**PNU 만들기**: `adm_cd || (mntn_yn::int + 1) || lpad(lnbr_mnnm,4,'0') || lpad(lnbr_slno,4,'0')`. 연속지적도(`load_meta.dataset='parcel'`)와 별개로 적재·기록되며 서로 영향이 없다.
+
+| 표 | 원본 파일 | 행 수(2026-09) | 키·인덱스 |
+|---|---|---|---|
+| `ref.ti_spbd_buld` | `build_*.txt` | 약 1,072만 | PK `bd_mgt_sn`, `ix_ti_spbd_buld_road (road_cd, udgd_yn, buld_mnnm, buld_slno)` |
+| `ref.ti_scco_mvmn` | `jibun_*.txt` | 약 177만 | PK `(road_cd, udgd_yn, buld_mnnm, buld_slno, jibun_seq)` |
+| `ref.ti_sprd_stret` | `road_code_total.txt` | 약 37만 | PK `(sgg_cd, road_no, emd_no)`, `ix_ti_sprd_stret_name (ctp_kor_nm, sig_kor_nm, rn)` |
+
+### 처음 적재
+1. 스키마(한 번): `psql -v ON_ERROR_STOP=1 -1 -f init-ref-schema.sql`(이미 했으면 건너뜀) 다음 `psql -v ON_ERROR_STOP=1 -1 -f init-ref-juso-schema.sql`. 접속 정보는 환경 변수(`PGHOST PGPORT PGDATABASE PGUSER`, `PGPASSWORD`)로만.
+2. 원본 txt 세 종류가 든 폴더를 준비(MS949 그대로 — 스크립트가 `iconv`로 UTF-8로 바꿔 COPY).
+3. `./load-juso.sh --dry-run --version 2026-09 <폴더>`로 명령 확인 후 `./load-juso.sh --first-load --version 2026-09 <폴더>`. 표 하나씩 새 표(`_new`)에 적재 → 행 수·한글 검증 → PK·인덱스 → 한 트랜잭션으로 교체. 같은 기준월로 이미 적재된 표는 건너뛰어 끊겨도 같은 명령을 다시 실행하면 된다(`--force`면 다시, `--only buld,mvmn,stret`로 일부만).
+4. 확인(읽기 전용): `SELECT dataset, version, status, row_count FROM ref.load_meta WHERE sido = '00' ORDER BY dataset;` — 세 표가 `READY`여야 앱이 주소 업로드를 받는다(없으면 확정이 503 `MYMAP_REF_UNAVAILABLE`).
+
+### 월 갱신
+1. 매월 새 건물DB 전체분을 받아 **같은 폴더 구조**로 풀어 둔다(`--version`은 새 기준월 `YYYY-MM`).
+2. `./load-juso.sh --version 2026-10 <폴더>` — `--first-load`를 빼면 지난달 대비 행 수 ±5%(`--tolerance`) 검사가 켜진다. 검증이 실패한 표는 교체하지 않아 지난달 데이터가 그대로다.
+3. 앱 재시작은 필요 없다. 앱은 업로드 때마다 `load_meta`의 `ti_spbd_buld` version을 읽고, 기준월이 바뀌었으면 법정동 사전(메모리, 약 1.9만 건)을 **다시 만든다**.
+4. 연속지적도(`load-parcel.sh`)와 갱신 시기가 달라도 된다 — 주소가 가리킨 PNU가 새 지적도에 없으면 그 행은 `PARCEL_NOT_FOUND`(지번 변경·말소)로 보고된다.
+
+앱 계정에는 `ref` 스키마에 SELECT 권한만 주고, 적재 계정은 따로 쓴다. 새 표·인덱스는 만들지 않는다(법정동 사전은 앱 메모리).

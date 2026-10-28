@@ -6,6 +6,8 @@ import com.gtp.domain.mymap.config.MyMapProperties;
 import com.gtp.domain.mymap.dto.ExcelPreviewResponse.Suggestions;
 import com.gtp.domain.mymap.entity.UserMap;
 import com.gtp.domain.mymap.infra.FakePnuParcelProvider;
+import com.gtp.domain.mymap.infra.InMemoryAddressRefReader;
+import com.gtp.domain.mymap.infra.TableAddressResolver;
 import com.gtp.domain.mymap.model.ImportMode;
 import com.gtp.domain.mymap.repository.UserMapRepository;
 import com.gtp.domain.mymap.util.CellData;
@@ -104,8 +106,17 @@ class SampleFilesTest {
     }
 
     @Test
-    void 주소_샘플은_1단계에서_추천하지_않는다() throws Exception {
-        assertThat(suggest(file("address")).getMode()).isNull();
+    void 주소_샘플은_주소_컬럼으로_추천되고_7곳이_모두_필지가_된다() throws Exception {
+        Path f = file("address");
+        var s = suggest(f);
+        assertThat(s.getMode()).isEqualTo("ADDRESS");
+        assertThat(s.getAddressColumn()).isEqualTo("주소");
+
+        UserMap m = repo.saveAndFlush(UserMap.builder().name("주소 샘플").ownerId("alice").sourceType("EXCEL").sourceKind("EXCEL_ADDRESS").sourceSrid("EPSG:4326").progressTotal(7).build());
+        job().execute(new UserMapImportJob.Request(m.getId(), "alice", ImportMode.ADDRESS, f, 7, null, null, null, "EPSG:4326", "주소"));
+        assertThat(jdbc.queryForObject("SELECT status FROM tbl_user_map WHERE id = ?", String.class, m.getId())).isEqualTo("READY");
+        assertThat(jdbc.queryForObject("SELECT matched_count FROM tbl_user_map WHERE id = ?", Integer.class, m.getId())).isEqualTo(7);
+        assertThat(jdbc.queryForObject("SELECT failed_count FROM tbl_user_map WHERE id = ?", Integer.class, m.getId())).isZero();
     }
 
     @Test
@@ -120,6 +131,11 @@ class SampleFilesTest {
                 String text = all.toString();
                 assertThat(text).as(kind).contains("최대 5,000행");
                 assertThat(text).as(kind).doesNotContain("1,000행").doesNotContain("오래 걸립니다").doesNotContain("확정되면");
+                if (kind.equals("address")) {
+                    // 현재 동작과 맞는 안내: 시도만 적어도 대부분 되고, 같은 이름이 여러 곳이면 후보가 보고서에 나옴, 법정동·도로명 기준(행정동 X)
+                    assertThat(text).contains("시도만 적어도 대부분").contains("후보가 나오니 시도·시군구를 붙여").contains("행정동").contains("법정동");
+                    assertThat(text).doesNotContain("틀리게 찾아질 수 있습니다");
+                }
             }
         }
     }
@@ -136,7 +152,7 @@ class SampleFilesTest {
     }
 
     private UserMapImportJob job() {
-        return new UserMapImportJob(FakePnuParcelProvider.fromClasspath(new ObjectMapper()), new UserMapImportStore(jdbc), jdbc,
+        return new UserMapImportJob(FakePnuParcelProvider.fromClasspath(new ObjectMapper()), new TableAddressResolver(InMemoryAddressRefReader.samples(), 5), new UserMapImportStore(jdbc), jdbc,
                 new MyMapProperties(), new MyMapImportExecutor(1, 1), new ImportGuard());
     }
 }

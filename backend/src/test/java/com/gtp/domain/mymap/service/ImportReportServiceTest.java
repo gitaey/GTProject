@@ -108,7 +108,7 @@ class ImportReportServiceTest {
         ImportReportResponse r = service.report(map.getId(), "alice", 0, 100, null);
         ImportReportResponse.Row ambiguous = r.getRows().get(0);
         assertThat(ambiguous.getReason()).isEqualTo("AMBIGUOUS");
-        assertThat(ambiguous.getMessage()).contains("후보가 여러 개");
+        assertThat(ambiguous.getMessage()).contains("같은 이름이 여러 곳");
         assertThat(ambiguous.getInput()).isEqualTo("세종대로 110");
         assertThat(ambiguous.getCandidates()).containsExactly("서울 중구", "부산 중구");
 
@@ -173,7 +173,7 @@ class ImportReportServiceTest {
         assertThat(rows.get(0)).containsExactly("PNU", "이름", "비고", "실패사유", "후보");
         assertThat(rows).hasSize(6);
         // 행 번호순: 7(AMBIGUOUS) 12 30 45 50
-        assertThat(rows.get(1)).containsExactly("", "d", "", "후보가 여러 개입니다(시도·시군구를 붙여 주세요)", "서울 중구 | 부산 중구");
+        assertThat(rows.get(1)).containsExactly("", "d", "", "같은 이름이 여러 곳에 있어 정하지 못했습니다(시도·시군구를 붙여 주세요)", "서울 중구 | 부산 중구");
         assertThat(rows.get(2)).containsExactly("12345", "b", "추가열", "PNU가 19자리 숫자가 아닙니다", "");
         assertThat(rows.get(3).get(0)).isEqualTo("1114010300100999990");
         assertThat(rows.get(3).get(3)).contains("지적도에 없는 필지");

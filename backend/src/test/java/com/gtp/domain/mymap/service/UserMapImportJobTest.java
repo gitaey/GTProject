@@ -8,6 +8,10 @@ import com.gtp.domain.mymap.config.MyMapImportExecutor;
 import com.gtp.domain.mymap.config.MyMapProperties;
 import com.gtp.domain.mymap.entity.UserMap;
 import com.gtp.domain.mymap.infra.FakePnuParcelProvider;
+import com.gtp.domain.mymap.infra.InMemoryAddressRefReader;
+import com.gtp.domain.mymap.infra.TableAddressResolver;
+import com.gtp.domain.mymap.infra.UnsupportedAddressResolver;
+import com.gtp.domain.mymap.port.AddressResolver;
 import com.gtp.domain.mymap.model.ImportMode;
 import com.gtp.domain.mymap.port.Coverage;
 import com.gtp.domain.mymap.port.ParcelShape;
@@ -54,6 +58,8 @@ class UserMapImportJobTest {
     MyMapProperties props;
     FakePnuParcelProvider fake;
     PnuParcelProvider provider;
+    InMemoryAddressRefReader addressData;
+    AddressResolver addressResolver;
     UserMapImportStore store;
     ImportGuard guard;
     UserMapImportJob job;
@@ -65,13 +71,15 @@ class UserMapImportJobTest {
         props.getRef().setSwapWaitSeconds(1);
         fake = FakePnuParcelProvider.fromClasspath(new ObjectMapper());
         provider = fake;
+        addressData = InMemoryAddressRefReader.samples();
+        addressResolver = new TableAddressResolver(addressData, 5);
         store = spy(new UserMapImportStore(jdbc));
         guard = new ImportGuard();
         rebuild();
     }
 
     private void rebuild() {
-        job = new UserMapImportJob(provider, store, jdbc, props, new MyMapImportExecutor(1, 1), guard);
+        job = new UserMapImportJob(provider, addressResolver, store, jdbc, props, new MyMapImportExecutor(1, 1), guard);
     }
 
     // ---------- 도우미 ----------
@@ -488,11 +496,109 @@ class UserMapImportJobTest {
         assertThat(columnSchema(id)).isNull();
     }
 
+    // ---------- 주소 ----------
+
+    private Request addressRequest(long id, Path file, int total) {
+        return new Request(id, OWNER, ImportMode.ADDRESS, file, total, null, null, null, "EPSG:4326", "주소");
+    }
+
     @Test
-    void 주소_모드는_FAILED_지원_안_함() {
+    void 주소를_쓰지_않는_구현이면_FAILED_지원_안_함() {
+        addressResolver = new UnsupportedAddressResolver();
+        rebuild();
         long id = layer("EXCEL_ADDRESS", 1);
-        job.execute(new Request(id, OWNER, ImportMode.ADDRESS, xlsx(List.of(row("주소"), row("서울"))), 1, null, null, null, "EPSG:4326"));
+        job.execute(addressRequest(id, xlsx(List.of(row("주소"), row("서울"))), 1));
         assertThat(layerRow(id).get("STATUS")).isEqualTo("FAILED");
+    }
+
+    @Test
+    void 주소_자료가_준비되지_않으면_FAILED_이고_아무것도_남기지_않는다() {
+        addressData.setReadyVersion(null);
+        long id = layer("EXCEL_ADDRESS", 1);
+        job.execute(addressRequest(id, xlsx(List.of(row("주소"), row("서울특별시 중구 세종대로 110"))), 1));
+        assertThat(layerRow(id).get("STATUS")).isEqualTo("FAILED");
+        assertThat((String) layerRow(id).get("ERROR_MESSAGE")).isEqualTo(GisErrorCode.MYMAP_REF_UNAVAILABLE.getMessage());
+        assertThat(featureCount(id)).isZero();
+    }
+
+    @Test
+    void 주소_혼합_파일은_사유별로_정확히_나뉘고_후보가_남는다() throws Exception {
+        List<List<Object>> rows = new ArrayList<>();
+        rows.add(row("주소", "이름"));
+        rows.add(row("서울특별시 중구 세종대로 110 (태평로1가)", "서울"));   // 2  도로명 → 매칭
+        rows.add(row("세종특별자치시 보람동 718", "세종"));                  // 3  지번 → 매칭
+        rows.add(row(null, "주소없음"));                                     // 4  EMPTY
+        rows.add(row("어디쯤", "형식"));                                     // 5  PARSE_FAILED
+        rows.add(row("울산광역시 남구 중앙로 999", "번호없음"));              // 6  BUILDING_NO_NOT_FOUND
+        rows.add(row("중앙로 201", "모호"));                                 // 7  AMBIGUOUS(울산·대구)
+        rows.add(row("서울특별시 중구 없는길 1", "길없음"));                  // 8  ROAD_NOT_FOUND
+        rows.add(row("서울특별시 중구 없는동 3", "동없음"));                  // 9  LEGAL_DONG_NOT_FOUND
+        rows.add(row("서울 중구 세종대로 110", "중복"));                      // 10 같은 주소(약칭) — 행마다 피처
+        rows.add(row("대구광역시 중구 중앙로 201", "필지없음"));              // 11 PARCEL_NOT_FOUND(건물DB엔 있으나 지적도엔 없음)
+        rows.add(row("경상도 어딘가동 1", "시도"));                           // 12 SIDO_UNKNOWN
+        rows.add(row("신정동 646-4", "동명"));                                // 13 AMBIGUOUS(울산·서울 양천)
+        rows.add(row(null, null));                                           // 14 완전히 빈 행 — 건너뜀
+        Path file = xlsx(rows);
+        long id = layer("EXCEL_ADDRESS", 12);
+
+        job.execute(addressRequest(id, file, 12));
+
+        Map<String, Object> l = layerRow(id);
+        assertThat(l.get("STATUS")).isEqualTo("READY");
+        assertThat(l.get("MATCHED_COUNT")).isEqualTo(3);
+        assertThat(l.get("FAILED_COUNT")).isEqualTo(9);
+        assertThat(l.get("PARCEL_VERSION")).isEqualTo("FAKE");
+        assertThat(l.get("GEOM_TYPE")).isEqualTo("POLYGON");
+        assertThat(reasons(id)).containsExactly(
+                Map.entry("4", "EMPTY"), Map.entry("5", "PARSE_FAILED"), Map.entry("6", "BUILDING_NO_NOT_FOUND"),
+                Map.entry("7", "AMBIGUOUS"), Map.entry("8", "ROAD_NOT_FOUND"), Map.entry("9", "LEGAL_DONG_NOT_FOUND"),
+                Map.entry("11", "PARCEL_NOT_FOUND"), Map.entry("12", "SIDO_UNKNOWN"), Map.entry("13", "AMBIGUOUS"));
+
+        List<Map<String, Object>> f = features(id);
+        assertThat(f).extracting(m -> m.get("row_no")).containsExactly(2, 3, 10);
+        assertThat(f).extracting(m -> m.get("pnu")).containsExactly(SEOUL, SEJONG, SEOUL);
+
+        // 실패 행의 입력값은 주소 원문, 후보는 JSON 배열
+        assertThat(failures(id).get(2).get("input")).isEqualTo("울산광역시 남구 중앙로 999");
+        assertThat(failures(id).get(3).get("input")).isEqualTo("중앙로 201");
+        assertThat(failures(id).get(6).get("input")).isEqualTo("대구광역시 중구 중앙로 201");   // PARCEL_NOT_FOUND도 PNU가 아니라 주소 원문
+        List<String> cand = jdbc.queryForList("SELECT candidates_json FROM tbl_user_map_import_failure WHERE user_map_id = ? AND row_no = 7", String.class, id);
+        assertThat(OM.readValue(cand.get(0), String[].class)).containsExactly("대구광역시 중구 중앙로 201 (동인동1가)", "울산광역시 남구 중앙로 201 (신정동)");
+        assertThat(jdbc.queryForObject("SELECT candidates_json FROM tbl_user_map_import_failure WHERE user_map_id = ? AND row_no = 5", String.class, id)).isNull();
+    }
+
+    @Test
+    void 같은_주소는_한_번만_풀고_500행씩_묶어_조회한다() {
+        List<List<Object>> rows = new ArrayList<>();
+        rows.add(row("주소"));
+        for (int i = 0; i < 1200; i++) rows.add(row(i % 2 == 0 ? "서울특별시 중구 세종대로 110" : "세종특별자치시 보람동 718"));
+        long id = layer("EXCEL_ADDRESS", 1200);
+
+        job.execute(addressRequest(id, xlsx(rows), 1200));
+
+        assertThat(layerRow(id).get("STATUS")).isEqualTo("READY");
+        assertThat(layerRow(id).get("MATCHED_COUNT")).isEqualTo(1200);
+        assertThat(addressData.findRoadCodesCalls).isEqualTo(1);        // 1200행이어도 서로 다른 주소는 둘뿐 — 첫 묶음에서 한 번 풀고 나머지는 재사용
+        assertThat(addressData.findBuildingsCalls).isEqualTo(1);
+        assertThat(addressData.legalDongsCalls).isEqualTo(1);           // 법정동 사전은 한 번만 만든다
+    }
+
+    @Test
+    void 허용_시도_밖의_주소는_OUT_OF_COVERAGE() {
+        props.getRef().setAllowedSidoCodes(List.of("11"));
+        long id = layer("EXCEL_ADDRESS", 2);
+        job.execute(addressRequest(id, xlsx(List.of(row("주소"), row("서울특별시 중구 세종대로 110"), row("세종특별자치시 보람동 718"))), 2));
+        assertThat(layerRow(id).get("MATCHED_COUNT")).isEqualTo(1);
+        assertThat(reasons(id)).containsExactly(Map.entry("3", "OUT_OF_COVERAGE"));
+    }
+
+    @Test
+    void 주소_컬럼이_머리글에_없으면_FAILED() {
+        long id = layer("EXCEL_ADDRESS", 1);
+        job.execute(new Request(id, OWNER, ImportMode.ADDRESS, xlsx(List.of(row("소재지"), row("서울특별시 중구 세종대로 110"))), 1,
+                null, null, null, "EPSG:4326", "주소"));
+        assertThat(layerRow(id).get("STATUS")).isEqualTo("FAILED");
+        assertThat((String) layerRow(id).get("ERROR_MESSAGE")).isEqualTo("주소에 쓸 컬럼을 선택하세요.");
     }
 
     @Test
@@ -620,7 +726,7 @@ class UserMapImportJobTest {
             started.await();
             full.submit(() -> {
             });
-            UserMapImportJob j = new UserMapImportJob(provider, store, jdbc, props, full, guard);
+            UserMapImportJob j = new UserMapImportJob(provider, addressResolver, store, jdbc, props, full, guard);
             assertThatThrownBy(() -> j.submit(pnuRequest(1, dir.resolve("x.xlsx"), 1)))
                     .isInstanceOfSatisfying(CustomException.class, e -> assertThat(e.getErrorCode()).isEqualTo(GisErrorCode.MYMAP_IMPORT_BUSY));
         } finally {

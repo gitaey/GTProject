@@ -19,7 +19,7 @@ public class ExcelPreviewResponse {
     private Limits limits;
     private List<Warning> warnings;
 
-    /** 값의 모양으로 추천한 업로드 방식·컬럼. 주소 추천은 2단계(addressColumn은 항상 null). */
+    /** 값의 모양으로 추천한 업로드 방식·컬럼(PNU → 좌표 → 주소 순으로 먼저 맞는 것). */
     @Getter
     @Builder
     public static class Suggestions {

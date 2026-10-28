@@ -7,6 +7,8 @@ import com.gtp.domain.mymap.dto.ExcelPreviewResponse;
 import com.gtp.domain.mymap.dto.UserMapUploadResponse;
 import com.gtp.domain.mymap.entity.UserMap;
 import com.gtp.domain.mymap.infra.FakePnuParcelProvider;
+import com.gtp.domain.mymap.infra.InMemoryAddressRefReader;
+import com.gtp.domain.mymap.infra.TableAddressResolver;
 import com.gtp.domain.mymap.infra.UnsupportedAddressResolver;
 import com.gtp.domain.mymap.model.ImportMode;
 import com.gtp.domain.mymap.port.Coverage;
@@ -391,6 +393,92 @@ class UserMapUploadServiceTest {
         assertThat(e.getErrorCode().getStatus().value()).isEqualTo(400);
         verifyNoInteractions(job);
         assertThat(guard.isActive(ALICE)).isFalse();
+    }
+
+    // ---------- 주소 모드 ----------
+
+    private InMemoryAddressRefReader addressData;
+
+    private void withAddressResolver() {
+        addressData = InMemoryAddressRefReader.samples();
+        service = new UserMapUploadService(repo, processor, job, registry, guard, provider, new TableAddressResolver(addressData, 5), props);
+    }
+
+    private String addressPreviewId(int dataRows) {
+        List<List<Object>> rows = new ArrayList<>();
+        rows.add(row("소재지", "이름"));
+        for (int i = 0; i < dataRows; i++) rows.add(row(i % 2 == 0 ? "서울특별시 중구 세종대로 110" : "세종특별자치시 보람동 718", "n" + i));
+        return service.previewExcel(xlsx(rows), ALICE).getUploadId();
+    }
+
+    private ExcelConfirmRequest addressConfirm(String uploadId) {
+        ExcelConfirmRequest r = confirm(uploadId, "ADDRESS");
+        r.setPnuColumn(null);
+        r.setAddressColumn("소재지");
+        return r;
+    }
+
+    @Test
+    void 주소_파일_미리보기는_ADDRESS와_주소_컬럼을_추천한다() {
+        withAddressResolver();
+        List<List<Object>> rows = new ArrayList<>();
+        rows.add(row("소재지", "이름"));
+        rows.add(row("서울특별시 중구 세종대로 110", "a"));
+        rows.add(row("세종특별자치시 보람동 718", "b"));
+        ExcelPreviewResponse r = service.previewExcel(xlsx(rows), ALICE);
+        assertThat(r.getSuggestions().getMode()).isEqualTo("ADDRESS");
+        assertThat(r.getSuggestions().getAddressColumn()).isEqualTo("소재지");
+        assertThat(r.getLimits().getAddress()).isEqualTo(5000);
+    }
+
+    @Test
+    void 주소_모드_확정은_주소_컬럼을_요구하고_작업에_넘긴다() {
+        withAddressResolver();
+        String id = addressPreviewId(2);
+
+        ExcelConfirmRequest noCol = addressConfirm(id);
+        noCol.setAddressColumn(" ");
+        CustomException e = caught(() -> service.confirmExcel(noCol, ALICE));
+        assertCode(e, GisErrorCode.MYMAP_COLUMN_REQUIRED);
+        assertThat(e.getMessage()).isEqualTo("주소에 쓸 컬럼을 선택하세요.");
+        ExcelConfirmRequest missing = addressConfirm(id);
+        missing.setAddressColumn("없는열");
+        assertCode(caught(() -> service.confirmExcel(missing, ALICE)), GisErrorCode.MYMAP_COLUMN_REQUIRED);
+        verifyNoInteractions(job);
+
+        UserMapUploadResponse ok = service.confirmExcel(addressConfirm(id), ALICE);
+        assertThat(ok.getParcelVersion()).isEqualTo("FAKE");
+        ArgumentCaptor<UserMap> saved = ArgumentCaptor.forClass(UserMap.class);
+        verify(repo).save(saved.capture());
+        assertThat(saved.getValue().getSourceKind()).isEqualTo("EXCEL_ADDRESS");
+        ArgumentCaptor<UserMapImportJob.Request> req = ArgumentCaptor.forClass(UserMapImportJob.Request.class);
+        verify(job).submit(req.capture());
+        assertThat(req.getValue().mode()).isEqualTo(ImportMode.ADDRESS);
+        assertThat(req.getValue().addressColumn()).isEqualTo("소재지");
+    }
+
+    @Test
+    void 주소_자료가_준비되지_않았으면_503이고_처리를_시작하지_않는다() {
+        withAddressResolver();
+        String id = addressPreviewId(2);
+        addressData.setReadyVersion(null);
+        CustomException e = caught(() -> service.confirmExcel(addressConfirm(id), ALICE));
+        assertCode(e, GisErrorCode.MYMAP_REF_UNAVAILABLE);
+        assertThat(e.getErrorCode().getStatus().value()).isEqualTo(503);
+        verifyNoInteractions(job);
+        verify(repo, never()).save(any());
+        assertThat(guard.isActive(ALICE)).isFalse();
+    }
+
+    @Test
+    void 주소_모드_행수_한도는_주소_한도를_따른다() {
+        withAddressResolver();
+        props.getLimits().setMaxRowsAddress(2);
+        String id = addressPreviewId(3);
+        CustomException e = caught(() -> service.confirmExcel(addressConfirm(id), ALICE));
+        assertCode(e, GisErrorCode.MYMAP_ROW_LIMIT);
+        assertThat(e.getMessage()).contains("2행");
+        verifyNoInteractions(job);
     }
 
     @Test
