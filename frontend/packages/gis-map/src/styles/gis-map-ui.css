@@ -166,6 +166,124 @@
     color: var(--gm-color-gray-400);
 }
 
+/* ── 사용자 메뉴 (ui/shell/UserMenu) — 호스트가 userMenuItems를 줄 때만. 없으면 위 .gm-header__user 그대로 ── */
+.gm-user-menu {
+    position: relative;
+}
+
+.gm-user-menu__trigger {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--gm-spacing) * 2);
+    padding: calc(var(--gm-spacing) * 1);
+    background: transparent;
+    border: 0;
+    border-radius: var(--gm-radius-lg);
+    font: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+
+.gm-user-menu__trigger:hover,
+.gm-user-menu__trigger.gm-is-open {
+    background-color: var(--gm-color-gray-100);
+}
+
+.gm-user-menu__trigger:focus-visible,
+.gm-user-menu__item:focus-visible {
+    outline: 2px solid var(--gm-primary);
+    outline-offset: -1px;
+}
+
+/* 원래 <p> 두 줄(이름·역할)이던 자리 — 단추 안이라 span을 줄로 쌓는다 */
+.gm-user-menu__text > span {
+    display: block;
+}
+
+.gm-user-menu__caret {
+    color: var(--gm-color-gray-400);
+    flex-shrink: 0;
+}
+
+.gm-user-menu__list {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    min-width: 168px;
+    margin-top: calc(var(--gm-spacing) * 1);
+    padding: calc(var(--gm-spacing) * 1);
+    background-color: var(--gm-color-white);
+    border-style: solid;
+    border-width: 1px;
+    border-color: var(--gm-color-gray-100);
+    border-radius: var(--gm-radius-lg);
+    box-shadow: 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 0 rgba(0, 0, 0, 0), 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -4px rgba(0, 0, 0, .1);
+    z-index: 50;
+}
+
+.gm-user-menu__item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: calc(var(--gm-spacing) * 2);
+    padding-inline: calc(var(--gm-spacing) * 3);
+    padding-block: calc(var(--gm-spacing) * 2);
+    background: transparent;
+    border: 0;
+    border-radius: var(--gm-radius-md);
+    font: inherit;
+    font-size: var(--gm-text-sm);
+    line-height: var(--gm-text-sm--line-height);
+    color: var(--gm-color-gray-700);
+    white-space: nowrap;
+    text-align: left;
+    cursor: pointer;
+}
+
+.gm-user-menu__item:hover {
+    background-color: var(--gm-color-gray-50);
+    color: var(--gm-color-gray-800);
+}
+
+.gm-user-menu__icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    color: var(--gm-color-gray-400);
+}
+
+/* 모바일(768px 미만): 오른쪽 영역은 원래 통째로 숨김 → 메뉴가 있을 때만 사용자 원만 남긴다(배경지도 전환·구분선은 계속 숨김).
+   고정 폭 로고(282px)는 줄여 원이 화면 밖으로 밀리지 않게 한다 */
+@media (max-width: 47.99rem) {
+    .gm-header__actions--menu {
+        display: flex;
+    }
+
+    .gm-header__actions--menu > :not(.gm-user-menu) {
+        display: none;
+    }
+
+    .gm-user-menu__text,
+    .gm-user-menu__caret {
+        display: none;
+    }
+
+    .gm-header--menu .gm-header__brand {
+        width: auto;
+        min-width: 0;
+        flex-shrink: 1;
+        overflow: hidden;
+    }
+
+    .gm-header--menu .gm-header__brand-sub {
+        display: none;
+    }
+
+    .gm-header--menu .gm-search {
+        margin-left: 0;
+        min-width: 0;
+    }
+}
+
 /* ── 배경지도 전환 (ui/search/BasemapSwitcher) — 색·굵기는 인라인 ── */
 /* 옛: flex items-center p-0.5 rounded-lg */
 .gm-basemap {
@@ -3806,4 +3924,58 @@
     background: rgba(var(--gm-primary-rgb), .08);
     color: #374151;
     font-size: 11px;
+}
+
+/* ── 나만의지도 레이어 삭제 확인창 (ui/mymap/MyMapDeleteConfirm) — gm-modal 공용 틀 위에 폭·단추만 ── */
+.gm-delete-confirm {
+    width: 340px;
+    max-width: calc(100vw - 24px);
+}
+
+.gm-delete-confirm__msg {
+    font-size: 12.5px;
+    color: #374151;
+    line-height: 1.5;
+    word-break: break-all;
+}
+
+.gm-delete-confirm__name {
+    color: #111827;
+}
+
+.gm-delete-confirm__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.gm-delete-confirm__cancel,
+.gm-delete-confirm__ok {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.gm-delete-confirm__cancel {
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: #374151;
+}
+
+.gm-delete-confirm__ok {
+    border: none;
+    background: #ef4444;
+    color: #fff;
+}
+
+.gm-delete-confirm__cancel:disabled,
+.gm-delete-confirm__ok:disabled {
+    opacity: .6;
+    cursor: default;
 }

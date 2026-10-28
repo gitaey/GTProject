@@ -16,6 +16,21 @@ export interface MapPanelDef {
     render: (map: GisMap | null) => ReactNode
 }
 
+/**
+ * 머리줄 사용자 표시를 눌렀을 때 펼쳐지는 메뉴의 항목 하나 — 호스트가 만든다.
+ * 패키지는 페이지 이동·로그아웃 방식을 모른다: 무엇을 할지는 전부 onSelect(호스트 코드)다
+ */
+export interface MapUserMenuItem {
+    /** 항목 id(목록 안에서 겹치면 안 된다 — React key) */
+    id: string
+    /** 항목 글자 */
+    label: string
+    /** 글자 앞 아이콘(예: lucide 아이콘 요소 `<LogOut size={14} />`) */
+    icon?: ReactNode
+    /** 항목을 고르면 메뉴를 닫고 부른다 */
+    onSelect: () => void
+}
+
 /** 머리줄 왼쪽 로고 영역 */
 export interface MapShellBrand {
     /** 이름(굵은 글자) */

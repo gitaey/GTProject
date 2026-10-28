@@ -9,7 +9,9 @@ import type { ReactNode } from 'react'
 import { useGisHost } from '../../react'
 import SearchBar from '../search/SearchBar'
 import BasemapSwitcher from '../search/BasemapSwitcher'
-import type { MapShellBrand } from './types'
+import { cx } from '../cx'
+import UserMenu from './UserMenu'
+import type { MapShellBrand, MapUserMenuItem } from './types'
 
 // 서버 렌더 HTML에는 사용자 영역이 없다(로그인 정보는 브라우저에서만 안다). 첫 클라이언트 렌더도 서버와 똑같이 그린 뒤에 보여 준다 → 하이드레이션 불일치 경고 방지
 const subscribeNever = () => () => {}
@@ -30,18 +32,23 @@ export interface MapHeaderProps {
     showBasemapSwitcher?: boolean
     /** 기본 오른쪽 영역의 사용자 표시(host.getCurrentUser()가 있을 때). 기본 true */
     showUser?: boolean
+    /** 사용자 표시를 누르면 펼칠 메뉴 항목(호스트가 만든다 — 대시보드 이동·로그아웃 등). 없거나 비면 사용자 표시는 지금 그대로(누를 수 없음).
+     *  사용자 표시가 보일 때(showUser·right 없음·host.getCurrentUser()가 사용자를 줌)만 쓰인다 */
+    userMenuItems?: readonly MapUserMenuItem[]
 }
 
 export default function MapHeader({
-    brand = DEFAULT_MAP_BRAND, showSearch = true, right, showBasemapSwitcher = true, showUser = true,
+    brand = DEFAULT_MAP_BRAND, showSearch = true, right, showBasemapSwitcher = true, showUser = true, userMenuItems,
 }: MapHeaderProps) {
     // 현재 사용자는 호스트 주입값(GisMapHost.getCurrentUser) — 호스트가 바뀌면(setHost) 다시 그린다
     const user = useGisHost().getCurrentUser()
     const hydrated = useSyncExternalStore(subscribeNever, getHydrated, getHydratedOnServer)
     const userShown = hydrated && showUser && right === undefined ? user : null
+    const menuItems = userShown !== null && userMenuItems !== undefined && userMenuItems.length > 0 ? userMenuItems : null
+    const menuShown = menuItems !== null
 
     return (
-        <div className="gm-header">
+        <div className={cx('gm-header', menuShown && 'gm-header--menu')}>
 
             {/* 로고 */}
             {brand !== false && (
@@ -60,10 +67,14 @@ export default function MapHeader({
             {showSearch && <SearchBar />}
 
             {/* 우측 액션 */}
-            <div className="gm-header__actions">
+            <div className={cx('gm-header__actions', menuShown && 'gm-header__actions--menu')}>
                 {right !== undefined ? right : (showBasemapSwitcher && <BasemapSwitcher />)}
                 {userShown && showBasemapSwitcher && <div className="gm-header__divider" />}
-                {userShown && (
+                {userShown && menuItems && (
+                    <UserMenu initial={(userShown.nickname ?? userShown.userId).charAt(0).toUpperCase()}
+                        name={userShown.nickname ?? userShown.userId} roleLabel={userShown.roleLabel} items={menuItems} />
+                )}
+                {userShown && !menuShown && (
                     <div className="gm-header__user">
                         <div className="gm-header__avatar">
                             {(userShown.nickname ?? userShown.userId).charAt(0).toUpperCase()}

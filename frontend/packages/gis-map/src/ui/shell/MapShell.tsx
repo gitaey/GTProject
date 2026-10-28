@@ -19,7 +19,7 @@ import MapHeader from './MapHeader'
 import MapRoot from './MapRoot'
 import NavRail from './NavRail'
 import SidePanel from './SidePanel'
-import type { MapPanelDef, MapShellBrand } from './types'
+import type { MapPanelDef, MapShellBrand, MapUserMenuItem } from './types'
 
 export interface MapShellProps {
     /** 루트(gm-root gm-map-view)에 더할 class */
@@ -43,6 +43,9 @@ export interface MapShellProps {
     showUser?: boolean
     /** 머리줄 오른쪽 내용 교체(주면 배경지도 전환·사용자 표시 대신) */
     headerRight?: ReactNode
+    /** 머리줄 사용자 표시를 누르면 펼쳐지는 메뉴 항목(호스트가 만든다 — 예: 대시보드로 가기·로그아웃). 없거나 비면 사용자 표시는 그대로.
+     *  모바일에서도 쓸 수 있다(원 모양만 남는다). headerRight를 주면 사용자 표시가 없으므로 쓰이지 않는다 */
+    userMenuItems?: readonly MapUserMenuItem[]
     /** 왼쪽 네비(태블릿 이상). 기본 true. 끄면 패널을 열 버튼이 없다 — defaultPanel={null}과 함께 쓴다 */
     showNavRail?: boolean
     /** 지도 오른쪽 위 도구 모음(줌·바람길·그리기·측정·반경·초기화). 기본 true */
@@ -69,7 +72,7 @@ function initialPanelId(panels: readonly MapPanelDef[], defaultPanel: string | n
 
 export default function MapShell({
     className, brand, panels = defaultPanels, defaultPanel, onPanelChange,
-    showHeader = true, showSearch = true, showBasemapSwitcher = true, showUser = true, headerRight,
+    showHeader = true, showSearch = true, showBasemapSwitcher = true, showUser = true, headerRight, userMenuItems,
     showNavRail = true, showToolbar = true, showRegionBadge = true, showMobileLayerButton = true, showWindLegend = true,
     showStatusBar = true, statusBarProjection, children,
 }: MapShellProps) {
@@ -98,7 +101,7 @@ export default function MapShell({
         <MapRoot className={cx('gm-map-view', className)}>
             {showHeader && (
                 <MapHeader brand={brand} showSearch={showSearch} right={headerRight}
-                    showBasemapSwitcher={showBasemapSwitcher} showUser={showUser} />
+                    showBasemapSwitcher={showBasemapSwitcher} showUser={showUser} userMenuItems={userMenuItems} />
             )}
 
             <div className="gm-map-view__body">

@@ -13,6 +13,7 @@ import MyMapUploadModal from '../mymap/MyMapUploadModal'
 import MyMapShareDialog from '../mymap/MyMapShareDialog'
 import MyMapImportReportDialog from '../mymap/MyMapImportReport'
 import MyMapStyleDialog from '../mymap/MyMapStyleDialog'
+import MyMapDeleteConfirm from '../mymap/MyMapDeleteConfirm'
 import { formatCount, kindLabel } from '../mymap/format'
 import { SHARE_MAX_ITEMS } from '../share/shareModel'
 
@@ -47,6 +48,8 @@ export default function MyMapPanel() {
     const [selectedIds, setSelectedIds] = useState<ReadonlySet<number>>(() => new Set<number>())
     const [reportTarget, setReportTarget] = useState<{ id: number; name: string } | null>(null)
     const [styleTarget, setStyleTarget] = useState<{ id: number; name: string } | null>(null)
+    // 삭제 확인창에 띄울 레이어(삭제 단추 → 확인 → 실제 삭제)
+    const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null)
     // 스타일 저장 요청이 도는 동안 true — 그 사이 다른 레이어의 스타일 창을 열면 저장 결과·오류를 볼 창이 사라진다
     const styleSavingRef = useRef(false)
     // 업로드 직후 확정 응답의 "예정" 기준월(처리 중인 동안만 쓴다 — 끝나면 목록·상태의 확정값). 패널이 닫히면 사라진다
@@ -55,9 +58,10 @@ export default function MyMapPanel() {
     const owned = useMemo(() => items.filter(i => i.owner), [items])
     const shared = useMemo(() => items.filter(i => !i.owner), [items])
     // 한도: 서버가 준 maxLayers에 지금 목록의 내 레이어 수(업로드·삭제 직후에도 맞는 값)
-    // 일괄 공유 단추: 소스가 bulk를 갖고 내 레이어가 2개 이상일 때만(없으면 옛 화면 그대로)
+    // 공유(선택 모드) 단추: 소스가 bulk를 가질 때만(없으면 옛 화면 그대로). 내 레이어가 1개 이상이면 눌리고, 0개면 비활성
+    // (1개만 골라도 단일 공유 창이 열린다 — 레이어를 1개만 가진 사용자도 쓸 수 있게)
     const bulkAvailable = !!map?.sources.myMap?.shareTarget?.bulk
-    const selecting = selectMode && bulkAvailable && owned.length >= 2
+    const selecting = selectMode && bulkAvailable && owned.length >= 1
     // 목록이 바뀌어 사라진 레이어는 선택에서 뺀다
     const pickedIds = useMemo(() => owned.filter(i => selectedIds.has(i.id)).map(i => i.id), [owned, selectedIds])
     const maxLayers = quota?.maxLayers ?? null
@@ -83,7 +87,7 @@ export default function MyMapPanel() {
     const toggleAllSelected = () => setSelectedIds(allPicked ? new Set<number>() : new Set(owned.slice(0, SHARE_MAX_ITEMS).map(i => i.id)))
 
     // 옛 동작: 서버 응답과 관계없이 지도·목록에서 뺀다(네트워크 오류만 드러남)
-    const handleDelete = (id: number) => catalog?.remove(id)
+    const handleDelete = (id: number): Promise<void> => catalog?.remove(id) ?? Promise.resolve()
 
     const toggleVisibility = (item: UserMapListItem) => {
         if (item.status !== 'READY') return
@@ -237,7 +241,7 @@ export default function MyMapPanel() {
                 )}
 
                 {!selecting && item.owner && (
-                    <button onClick={() => handleDelete(item.id)} title="삭제"
+                    <button onClick={() => setDeleteTarget({ id: item.id, name: item.name })} title="삭제"
                         className="gm-panel__item-btn gm-panel__item-btn--delete"
                         onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
                         onMouseLeave={e => (e.currentTarget.style.color = '#d1d5db')}>
@@ -253,9 +257,11 @@ export default function MyMapPanel() {
             <div className="gm-panel__header">
                 <span className="gm-panel__title">나만의지도</span>
                 <div className="gm-mymap-panel__header-actions">
-                    {bulkAvailable && owned.length >= 2 && (
+                    {bulkAvailable && (
                         <button onClick={() => (selecting ? exitSelect() : setSelectMode(true))} aria-pressed={selecting}
-                            title="여러 레이어를 골라 한 번에 공유" aria-label="공유"
+                            disabled={owned.length === 0}
+                            title={owned.length === 0 ? '공유할 내 레이어가 없습니다' : owned.length === 1 ? '내 레이어를 골라 공유' : '여러 레이어를 골라 한 번에 공유'}
+                            aria-label="공유"
                             className={cx('gm-mymap-panel__upload', selecting && 'gm-is-on')}>
                             <Share2 size={13} /> 공유
                         </button>
@@ -267,7 +273,11 @@ export default function MyMapPanel() {
                     </button>
                 </div>
             </div>
-            {selecting && <div className="gm-mymap-panel__select-banner">공유할 내 레이어를 고르세요 (여러 개 선택 가능)</div>}
+            {selecting && (
+                <div className="gm-mymap-panel__select-banner">
+                    {owned.length >= 2 ? '공유할 내 레이어를 고르세요 (여러 개 선택 가능)' : '공유할 내 레이어를 고르세요'}
+                </div>
+            )}
             {maxLayers !== null && (
                 <div className={cx('gm-mymap-panel__quota', layerFull && 'gm-is-full')}>
                     내 레이어 {formatCount(owned.length)}/{formatCount(maxLayers)}
@@ -312,12 +322,16 @@ export default function MyMapPanel() {
             {shareItems && (
                 <MyMapShareDialog items={shareItems} fromSelection={shareFromSelection} onClose={() => setShareItems(null)}
                     onDone={() => {
-                        // 공유 수(shareCount) 갱신을 위해 목록을 다시 받고, 일괄 공유였다면 선택 모드를 끝낸다(결과 화면은 닫기 전까지 그대로)
-                        if (shareItems.length > 1) exitSelect()
+                        // 공유 수(shareCount) 갱신을 위해 목록을 다시 받고, 선택 모드에서 연 공유였다면(1개만 골라도) 선택 모드를 끝낸다(결과 화면은 닫기 전까지 그대로)
+                        if (shareFromSelection) exitSelect()
                         void catalog?.load()
                     }} />
             )}
             {reportTarget && <MyMapImportReportDialog id={reportTarget.id} name={reportTarget.name} onClose={() => setReportTarget(null)} />}
+            {deleteTarget && (
+                <MyMapDeleteConfirm key={deleteTarget.id} name={deleteTarget.name} onConfirm={() => handleDelete(deleteTarget.id)}
+                    onClose={() => setDeleteTarget(null)} />
+            )}
             {styleTarget && (
                 <MyMapStyleDialog key={styleTarget.id} id={styleTarget.id} name={styleTarget.name} catalog={catalog}
                     onClose={() => setStyleTarget(null)} onSavingChange={saving => { styleSavingRef.current = saving }} />

@@ -14,7 +14,7 @@
 // 셸·패널
 export { default as MapShell } from './shell/MapShell'
 export type { MapShellProps } from './shell/MapShell'
-export type { MapPanelDef, MapShellBrand } from './shell/types'
+export type { MapPanelDef, MapShellBrand, MapUserMenuItem } from './shell/types'
 export { default as MapRoot } from './shell/MapRoot'
 export type { MapRootProps } from './shell/MapRoot'
 export { primaryThemeVars } from './shell/themeVars'

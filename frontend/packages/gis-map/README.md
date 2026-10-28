@@ -76,6 +76,11 @@ export default function MapPage() {
 
 - `MapShell` 주요 props: `brand`(false면 숨김), `panels`(기본 레이어·TIFF·나만의지도, 호스트 패널을 더함), `defaultPanel`·`onPanelChange`,
   `show*`(Header·Search·BasemapSwitcher·User·NavRail·Toolbar·RegionBadge·MobileLayerButton·WindLegend·StatusBar), `statusBarProjection`(기본 EPSG:5186).
+- **머리줄 사용자 메뉴** `userMenuItems`(옵션): `{ id, label, icon?: ReactNode, onSelect }[]`를 주면 머리줄의 사용자 표시(원·이름·역할)가 단추가 되어 누르면 드롭다운으로 항목을 보여 준다
+  (바깥 클릭·Esc·Tab·항목 선택으로 닫힘, 단추에서 ↓로 열고 ↑↓·Home·End로 이동, 768px 미만에서는 원 모양만 남아 모바일에서도 쓸 수 있다). 대시보드 이동·로그아웃처럼 패키지가 모르는 동작은 전부 호스트의 `onSelect`다
+  (패키지는 라우터·로그아웃 방식을 모른다 — `GisMapHost`는 건드리지 않는다). 없거나 빈 배열이면 사용자 표시는 옛 모양 그대로. `host.getCurrentUser()`가 사용자를 줄 때만 보이고 `headerRight`·`showUser={false}`면 쓰이지 않는다.
+  GTProject 예: `_gtp/useGtpUserMenu.ts`(훅) + `_gtp/gtpUserMenu.tsx`(항목 — `MAP_USER`는 `/`가 `/map`으로 되돌려지므로 대시보드 항목을 뺀다).
+  `MapHeader`도 같은 prop(`userMenuItems`).
 - 위젯을 따로 조립할 때는 `<MapRoot>`(또는 class `gm-root`) 안에 두고, 지도 div는 `<GisMapView>`로 만든다. 위젯은 가장 가까운 Provider의 엔진만 본다
   → 한 화면에 Provider 둘이면 지도 둘이 서로 독립이다.
 - 이미 만든 `ol.Map`에 붙이려면 `<GisMapProvider attachTo={olMap}>`(이때 `<GisMapView>`는 필요 없다). 앱과 패키지가 **같은 ol 사본**을 써야 한다.
@@ -198,8 +203,9 @@ GTProject 저장소의 `.claude/skills/map-module-export/references/`에 있다.
 - 역할 체크 목록: 역할 아래 세부권한(부서)을 들여쓴다 — **체크는 서로 독립**(역할 전체 ≠ 세부권한). 8개를 넘으면 걸러보기. 목록에 없는 저장값은 "목록에 없는 역할" 칩. 코드는 회색 작은 글씨.
 - 일괄 공유(레이어 2개 이상, `shareTarget.bulk` 필요): **[대상 추가 | 대상 빼기]만 있다(덮어쓰기 없음)**. 빼기는 `getMany`로 모은 현재 공유 대상(`2/3개 레이어`)에서 눌러 고른다. 저장 → 결과 화면 `성공 n · 실패 m`(실패 레이어 이름·사유).
   한 번에 레이어 50개·대상(사용자+그룹) 100개까지(화면이 먼저 막고 서버도 검사). `shareTarget.getMany`·`bulk`는 50개 단위 한도를 어댑터·화면이 지킨다.
-- 나만의지도 패널: 내 레이어 2개 이상 + `shareTarget.bulk`가 있으면 머리줄에 "공유" 단추(업로드 옆) → 선택 모드(내 레이어 줄 전체가 선택 대상, 줄 단추 숨김, 공유받은 레이어는 흐리게, 하단 `n개 선택 · 전체 선택 · 공유하기 · 취소`).
-  공유가 끝나면 선택 모드를 닫고 목록을 다시 받는다(`shareCount` 갱신). 공유받은 쪽 화면에는 다음 목록 조회(패널 열기) 때 반영된다.
+- 나만의지도 패널: `shareTarget.bulk`가 있으면 머리줄에 "공유" 단추(업로드 옆) → 선택 모드(내 레이어 줄 전체가 선택 대상, 줄 단추 숨김, 공유받은 레이어는 흐리게, 하단 `n개 선택 · 전체 선택 · 공유하기 · 취소`).
+  **내 레이어가 1개만 있어도** 단추가 눌린다(1개만 골라도 단일 공유 창 + 안내 한 줄). 내 레이어가 0개(공유받은 것만·빈 목록)이면 단추는 보이되 비활성(title "공유할 내 레이어가 없습니다").
+  선택 모드에서 연 공유가 끝나면(1개만 골랐어도) 선택 모드를 닫고 목록을 다시 받는다(`shareCount` 갱신). 공유받은 쪽 화면에는 다음 목록 조회(패널 열기) 때 반영된다.
 - React 호스트가 자기 자원에 쓰려면 `@gtp/gis-map/ui`의 `ShareDialog`(`target`·`directory`·`items`·`resourceNoun`·`note`·`selfUserId`·`onClose`·`onDone`)와 `legacyShareTarget`을 쓴다. UMD에는 없다(React 위젯).
 - 어댑터: `restSources()`가 `shareDirectory`(`/api/gis/share-directory/{users,groups}`)를 더하고 `myMap.shareTarget`을 `/api/mymap/{id}/share`·`/api/mymap/shares?ids=`·`/api/mymap/shares/bulk`로 구현한다.
   `get` 응답에 `users`·`roles`가 없는 옛 서버는 `userIds`·`roleCodes`로 채운다(이름 null·ACTIVE).
