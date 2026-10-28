@@ -153,3 +153,60 @@ export function pageRange(page: number, total: number): { start: number; end: nu
     const start = clampPage(page, total) * TABLE_PAGE_SIZE
     return { start, end: Math.min(total, start + TABLE_PAGE_SIZE) }
 }
+
+// ── 행 → 지도 이동 ─────────────────────────────────────────────────────────
+
+/** [minLon, minLat, maxLon, maxLat] (EPSG:4326) */
+export type LonLatExtent = [number, number, number, number]
+
+/** 중첩된 GeometryCollection을 따라 내려가는 깊이 상한(악의적으로 깊은 응답에서 호출 스택을 지킨다) */
+const GEOMETRY_NEST_MAX = 8
+
+function featureGeometry(fc: unknown, index: number): unknown {
+    const features = fc && typeof fc === 'object' ? (fc as { features?: unknown }).features : null
+    const f = Array.isArray(features) ? features[index] : null
+    return f && typeof f === 'object' ? (f as { geometry?: unknown }).geometry : null
+}
+
+/** 좌표 배열(coordinates)들을 stack에 모은다 — GeometryCollection이면 안쪽 geometry로 내려간다. 모은 게 없으면 false */
+function collectCoordinates(g: unknown, stack: unknown[][], depth: number): boolean {
+    if (!g || typeof g !== 'object' || depth > GEOMETRY_NEST_MAX) return false
+    const o = g as { coordinates?: unknown; geometries?: unknown }
+    if (Array.isArray(o.geometries)) {
+        let any = false
+        for (const x of o.geometries) if (collectCoordinates(x, stack, depth + 1)) any = true
+        return any
+    }
+    if (Array.isArray(o.coordinates) && o.coordinates.length > 0) { stack.push(o.coordinates); return true }
+    return false
+}
+
+/** 이 행의 피처에 지도로 옮길 모양(geometry)이 있는가. 범위 계산은 눌렀을 때만 하므로(10만 행을 미리 훑지 않는다) 여기서는 껍데기만 본다 */
+export function hasFeatureGeometry(fc: unknown, index: number): boolean {
+    return collectCoordinates(featureGeometry(fc, index), [], 0)
+}
+
+/**
+ * 한 피처의 좌표 범위(EPSG:4326). 점·선·면·멀티·GeometryCollection을 모두 훑고, 숫자가 아니거나 경위도 범위 밖(±180·±90)인 좌표는 건너뛴다.
+ * 쓸 수 있는 좌표가 하나도 없으면 null(이동하지 않는다). 점 하나면 두 모서리가 같다.
+ */
+export function featureExtent(fc: unknown, index: number): LonLatExtent | null {
+    const stack: unknown[][] = []
+    if (!collectCoordinates(featureGeometry(fc, index), stack, 0)) return null
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    while (stack.length > 0) {
+        const a = stack.pop() as unknown[]
+        if (a.length >= 2 && typeof a[0] === 'number' && typeof a[1] === 'number') {
+            const x = a[0], y = a[1]
+            if (Number.isFinite(x) && Number.isFinite(y) && x >= -180 && x <= 180 && y >= -90 && y <= 90) {
+                if (x < minX) minX = x
+                if (x > maxX) maxX = x
+                if (y < minY) minY = y
+                if (y > maxY) maxY = y
+            }
+        } else {
+            for (const c of a) if (Array.isArray(c)) stack.push(c)
+        }
+    }
+    return minX <= maxX ? [minX, minY, maxX, maxY] : null
+}

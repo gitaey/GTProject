@@ -3,16 +3,17 @@
 // 나만의지도 속성 테이블 — 레이어의 피처 속성을 표로(열 = 모든 피처 속성 키 합집합, 맨 앞 `#` 행 번호).
 // 데이터는 소스의 geojson(id)(EPSG:4326 FeatureCollection)을 한 번 받아 한 번만 파싱한다(useMemo). 큰 레이어(shp 최대 10만 피처)에서도
 // 멈추지 않게 현재 쪽(100행)만 그리고, 필터·정렬은 행 번호 배열(tableModel)만 만든다. 공유받은 레이어도 연다(서버가 권한을 판단).
+// 행을 누르면 그 피처의 좌표 범위로 지도를 옮기고(레이어가 꺼져 있으면 켠다) 모달을 작은 막대로 접는다 — 막대를 누르면 필터·정렬·쪽 그대로 다시 펼쳐진다.
 // 스타일: gm-modal(업로드·공유와 공용), gm-table-dialog
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { X, Loader2, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Search } from 'lucide-react'
+import { X, Loader2, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Search, Table2 } from 'lucide-react'
 import { useGisMap } from '../../react'
 import { cx } from '../cx'
 import { formatCount } from './format'
 import {
     CELL_MAX_CHARS, CELL_TITLE_MAX_CHARS, CELL_TITLE_MIN_CHARS, TABLE_MAX_COLUMNS, TABLE_PAGE_SIZE,
-    buildTable, cellText, clampPage, clipText, filterIndices, pageCount, pageRange, sortIndices,
+    buildTable, cellText, clampPage, clipText, featureExtent, filterIndices, hasFeatureGeometry, pageCount, pageRange, sortIndices,
 } from './tableModel'
 import type { RowOrder, SortDir } from './tableModel'
 
@@ -28,8 +29,9 @@ const FILTER_DELAY_MS = 250
 interface SortState { key: string; dir: SortDir }
 
 export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialogProps) {
-    // 소스 객체는 엔진마다 하나(참조 고정) → 아래 effect가 다시 돌지 않는다
-    const myMap = useGisMap()?.sources.myMap
+    // 엔진·소스 객체는 엔진마다 하나(참조 고정) → 아래 effect가 다시 돌지 않는다
+    const map = useGisMap()
+    const myMap = map?.sources.myMap
     const [raw, setRaw] = useState<unknown>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -39,6 +41,10 @@ export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialog
     const [page, setPage] = useState(0)
     // 쪽 번호 입력 중인 글자(null이면 현재 쪽 번호를 보여 준다)
     const [pageDraft, setPageDraft] = useState<string | null>(null)
+    // 마지막으로 눌러 지도로 간 행(표시용) · 지도를 보려고 모달을 접은 상태(마운트는 그대로 — 필터·정렬·쪽을 지킨다)
+    const [picked, setPicked] = useState<number | null>(null)
+    const [minimized, setMinimized] = useState(false)
+    const pillOpenRef = useRef<HTMLButtonElement>(null)
 
     // 요청 도중 닫거나 다른 레이어로 바뀌면 늦게 온 응답은 버린다
     useEffect(() => {
@@ -73,6 +79,9 @@ export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialog
         return () => document.removeEventListener('keydown', onKey)
     }, [])
 
+    // 접히면 펼치기 단추로 포커스를 옮긴다(키보드 사용자가 길을 잃지 않게)
+    useEffect(() => { if (minimized) pillOpenRef.current?.focus() }, [minimized])
+
     // 입력 지연 처리: 멈춘 뒤에 적용한다(쪽은 입력하는 순간 첫 쪽으로 — onChange)
     useEffect(() => {
         const t = setTimeout(() => setFilter(filterInput), FILTER_DELAY_MS)
@@ -101,6 +110,17 @@ export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialog
         })
     }
 
+    // 행 → 지도: 피처 범위로 이동. 레이어가 꺼져 있으면 켜서 피처가 보이게 하고, 점 하나면 너무 확대되지 않게 17까지만
+    const goTo = (ri: number) => {
+        const extent = featureExtent(raw, ri)
+        if (!map || !extent) return
+        setPicked(ri)
+        if (!map.vector.isVisible(id)) Promise.resolve(map.vector.show(id)).catch(() => {})
+        const isPoint = extent[0] === extent[2] && extent[1] === extent[3]
+        map.fitLonLatExtent(extent, { maxZoom: isPoint ? 17 : 18 })
+        setMinimized(true)
+    }
+
     const commitPage = () => {
         const n = Number.parseInt(pageDraft ?? '', 10)
         if (Number.isFinite(n)) setPage(clampPage(n - 1, total))
@@ -112,8 +132,12 @@ export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialog
         for (let p = start; p < end; p++) {
             const ri = order ? order[p] : p
             const row = table.rows[ri]
+            const canGo = !!map && hasFeatureGeometry(raw, ri)
             bodyRows.push(
-                <tr key={ri}>
+                <tr key={ri} className={cx(canGo && 'gm-table-dialog__row--go', picked === ri && 'gm-is-picked')}
+                    tabIndex={canGo ? 0 : undefined} title={canGo ? '누르면 지도에서 이 위치로 이동합니다' : undefined}
+                    onClick={canGo ? () => goTo(ri) : undefined}
+                    onKeyDown={canGo ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goTo(ri) } } : undefined}>
                     <td className="gm-table-dialog__rowno">{ri + 1}</td>
                     {table.columns.map(col => {
                         const v = row[col]
@@ -148,7 +172,8 @@ export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialog
     }, [table])
 
     return (
-        <div className="gm-modal" onClick={onClose}>
+        <>
+        <div className={cx('gm-modal', minimized && 'gm-is-min')} onClick={onClose}>
             <div onClick={e => e.stopPropagation()} className="gm-modal__dialog gm-table-dialog" role="dialog" aria-modal="true" aria-label={`속성 테이블 — ${name}`}>
                 <div className="gm-modal__header">
                     <span className="gm-modal__title gm-table-dialog__title">
@@ -230,5 +255,14 @@ export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialog
                 ) : null}
             </div>
         </div>
+        {minimized && (
+            <div className="gm-table-dialog__pill" role="region" aria-label="속성 테이블(접힘)">
+                <button type="button" ref={pillOpenRef} className="gm-table-dialog__pill-open" onClick={() => setMinimized(false)}>
+                    <Table2 size={12} /> 속성 테이블 — {name} · 펼치기
+                </button>
+                <button type="button" className="gm-table-dialog__pill-close" aria-label="닫기" onClick={onClose}><X size={12} /></button>
+            </div>
+        )}
+        </>
     )
 }

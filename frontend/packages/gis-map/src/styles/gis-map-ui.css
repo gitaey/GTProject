@@ -4139,6 +4139,9 @@
 }
 
 .gm-table-dialog__table {
+    /* 모달 폭을 꽉 채우되, 열이 많아 내용이 더 넓으면 가로 스크롤(.gm-table-dialog__scroll) */
+    width: 100%;
+    min-width: max-content;
     border-collapse: separate;
     border-spacing: 0;
     font-size: 11.5px;
@@ -4238,4 +4241,73 @@
     border-radius: 4px;
     font-size: 11px;
     text-align: center;
+}
+
+/* 행을 누르면 그 위치로 이동 — 눌러 볼 수 있는 행·마지막으로 간 행 표시, 지도를 보려고 모달을 접은 막대 */
+.gm-table-dialog__row--go {
+    cursor: pointer;
+}
+
+.gm-table-dialog__table tr.gm-table-dialog__row--go:hover td {
+    background: #fff7ed;
+}
+
+.gm-table-dialog__row--go:focus-visible {
+    outline: 2px solid var(--gm-primary);
+    outline-offset: -2px;
+}
+
+.gm-table-dialog__table tr.gm-is-picked td {
+    background: rgba(var(--gm-primary-rgb), 0.1);
+}
+
+/* 접힌 상태: 마운트는 유지(필터·정렬·쪽 보존)하고 화면에서만 뺀다 */
+.gm-modal.gm-is-min {
+    display: none;
+}
+
+.gm-table-dialog__pill {
+    position: fixed;
+    left: 50%;
+    bottom: 40px;
+    transform: translateX(-50%);
+    z-index: 1000;
+    display: flex;
+    align-items: stretch;
+    max-width: calc(100vw - 24px);
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .18);
+    overflow: hidden;
+}
+
+.gm-table-dialog__pill button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border: none;
+    background: none;
+    color: #374151;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.gm-table-dialog__pill button:hover {
+    background: #f3f4f6;
+    color: var(--gm-primary);
+}
+
+.gm-table-dialog__pill-open {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gm-table-dialog__pill .gm-table-dialog__pill-close {
+    border-left: 1px solid #f1f5f9;
+    color: #9ca3af;
 }
