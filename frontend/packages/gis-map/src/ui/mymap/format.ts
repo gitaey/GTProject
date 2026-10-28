@@ -17,6 +17,26 @@ export function kindLabel(item: Pick<UserMapListItem, 'sourceKind' | 'sourceType
     return (item.sourceKind ? KIND_LABELS[item.sourceKind] : undefined) ?? item.sourceType
 }
 
+/**
+ * 항목 줄의 툴팁(결과 줄을 평소엔 숨기는 대신). 끝난 항목: '매칭 N · 실패 M · 지적도 YYYY-MM'(엑셀 PNU·주소만 기준월), 처리 중: '지적도 YYYY-MM 예정'.
+ * 보여 줄 값이 없으면 undefined
+ */
+export function resultTooltip(
+    item: Pick<UserMapListItem, 'status' | 'sourceKind' | 'matchedCount' | 'failedCount' | 'parcelVersion'>,
+    expectedVersion?: string,
+): string | undefined {
+    if (item.status === 'PROCESSING') {
+        const v = item.parcelVersion ?? expectedVersion
+        return v ? `지적도 ${v} 예정(매칭에 쓸 연속지적도 기준월)` : undefined
+    }
+    const matched = item.matchedCount ?? 0
+    const failed = item.failedCount ?? 0
+    if (matched + failed === 0) return undefined
+    const base = `매칭 ${formatCount(matched)} · 실패 ${formatCount(failed)}`
+    const withMonth = item.parcelVersion && (item.sourceKind === 'EXCEL_PNU' || item.sourceKind === 'EXCEL_ADDRESS')
+    return withMonth ? `${base} · 지적도 ${item.parcelVersion}` : base
+}
+
 /** 행 실패 사유 코드 → 화면 글자(설계 4.6). 모르는 코드는 코드 그대로 */
 const REASON_LABELS: Readonly<Record<string, string>> = Object.freeze({
     EMPTY: '값이 비어 있습니다',

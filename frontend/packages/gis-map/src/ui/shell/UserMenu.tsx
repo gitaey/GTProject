@@ -7,6 +7,7 @@ import { ChevronDown } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { cx } from '../cx'
+import { menuNextIndex } from '../menuNav'
 import type { MapUserMenuItem } from './types'
 
 export interface UserMenuProps {
@@ -61,13 +62,9 @@ export default function UserMenu({ initial, name, roleLabel, items }: UserMenuPr
     const onListKeyDown = (e: ReactKeyboardEvent) => {
         const refs = itemRefs.current.slice(0, items.length)
         const at = refs.findIndex(r => r !== null && r === document.activeElement)
-        let next = -1
-        if (e.key === 'ArrowDown') next = at < 0 ? 0 : (at + 1) % refs.length
-        else if (e.key === 'ArrowUp') next = at <= 0 ? refs.length - 1 : at - 1
-        else if (e.key === 'Home') next = 0
-        else if (e.key === 'End') next = refs.length - 1
-        else if (e.key === 'Tab') { setOpen(false); return }
-        else return
+        if (e.key === 'Tab') { setOpen(false); return }
+        const next = menuNextIndex(e.key, at, refs.length)
+        if (next < 0) return
         e.preventDefault()
         refs[next]?.focus()
     }

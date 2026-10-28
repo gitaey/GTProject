@@ -159,33 +159,41 @@ GTProject 저장소의 `.claude/skills/map-module-export/references/`에 있다.
 
 | 메서드 | 하는 일 | 없으면 |
 |---|---|---|
-| `list()` · `status(id)` · `geojson(id)` · `remove(id)` | 목록 · 처리 상태 폴링 · GeoJSON(EPSG:4326) · 삭제 | 나만의지도 기능 없음 |
+| `list()` · `status(id)` · `geojson(id)` · `remove(id)` | 목록 · 처리 상태 폴링 · GeoJSON(EPSG:4326, 지도에 올릴 때와 `속성 테이블`이 같이 씀) · 삭제 | 나만의지도 기능 없음 |
 | `uploadShp?` · `previewExcel?` · `confirmExcel?` | SHP·엑셀 업로드 | 해당 업로드가 안 됨 |
 | `shareTarget?` | 공유 저장소(이름·상태가 붙은 현재 공유 · 일괄 더하기/빼기) — 아래 "공유" 절 | `getShare`·`setShare`로 단일 공유만(일괄 단추 없음) |
 | `getShare?` · `setShare?` | 옛 공유 입출력(아이디·코드 배열). `shareTarget`이 없을 때만 쓴다 | 공유 칸이 비어 있음 |
 | `quota?()` | `{ownedLayers, maxLayers, maxRows:{pnu,address,coord}, maxShpFeatures, maxExcelMb, maxShpMb, coverage}` — `coverage`는 아래 | 패널의 `내 레이어 n/20`과 한도·지적도 기준월 문구가 빠진다(패널을 열 때 1번만 받는다) |
 | `downloadSample?(kind)` | `'pnu'` · `'address'` · `'coord'` 중 하나, 샘플 xlsx **바이트(Blob)**. 저장은 위젯이 `<a download>`로 한다 | 업로드 창의 "샘플 받기"가 없다 |
-| `importReport?(id, {page, size, reason})` | 소유자 전용 결과 보고서 `{total, matched, failed, byReason, rows:[{rowNo, reason, message, input, candidates}], page, size, totalRows}` | `실패 N 보기`가 링크 대신 글자 |
+| `importReport?(id, {page, size, reason})` | 소유자 전용 결과 보고서 `{total, matched, failed, byReason, rows:[{rowNo, reason, message, input, candidates}], page, size, totalRows}` | 항목의 빨간 `실패 N`이 링크 대신 글자, ⋯ 메뉴에 `업로드 결과`가 없다 |
 | `downloadImportFailures?(id)` | 실패 행 xlsx 바이트 | 보고서에 "실패 행 엑셀 받기"가 없다 |
-| `update?(id, {name?, description?, styleConfig?})` | 부분 수정(PATCH, **등록자만** — 아니면 서버가 403 + message로 reject). 빠진 키는 그대로, `styleConfig: ''`는 지움 | 패널의 스타일 단추(팔레트 아이콘)가 없다 — 스타일은 읽기만 한다 |
+| `update?(id, {name?, description?, styleConfig?})` | 부분 수정(PATCH, **등록자만** — 아니면 서버가 403 + message로 reject). 빠진 키는 그대로, `styleConfig: ''`는 지움 | 항목 ⋯ 메뉴에 `스타일·라벨`이 없다 — 스타일은 읽기만 한다 |
 
 - `confirmExcel(input)`은 `{ id }`를 돌려줄 수 있다(처리는 비동기 — 패널이 목록 폴링으로 진행률을 본다). 옛 소스처럼 아무것도 안 돌려줘도 된다. 입력의 `mode`(`'PNU' | 'ADDRESS' | 'COORD'`)·`pnuColumn`·`addressColumn`은 선택이고
   없으면 좌표(`latColumn`·`lonColumn`·`sourceSrid`)다. 업로드 창은 PNU·주소·좌표 세 방식을 보여 주고, 주소 모드의 후보(`AMBIGUOUS`)는 보고서의 `candidates`로 나온다.
 - `previewExcel`의 응답에 `suggestions`가 있으면 모드·컬럼을 미리 고르고, **없으면 옛 서버로 보고 좌표(위도·경도) 하나뿐인 옛 흐름**으로 동작한다. `totalRows`·`limits`·`warnings`
   (`NUMERIC_PNU_CELLS`·`DUPLICATE_FILE`·`OVER_LIMIT`)가 있으면 경고 배너와 행 한도 검사(모드별 `limits`, 없으면 `quota.maxRows`)를 한다. 모르는 경고 코드도 `message`를 그대로 보여 준다.
-- 목록 항목의 새 필드(전부 선택): `ownerId`·`ownerName`(공유받은 항목의 "보낸 사람" — 이름이 있으면 `이름(아이디)`)·`shareCount`(내 항목의 공유 대상 수 — 0보다 크면 `공유 n`)·`sourceKind`(`SHP|EXCEL_COORD|EXCEL_PNU|EXCEL_ADDRESS` — 있으면 종류 배지)·`progressTotal`/`progressDone`(처리 중 막대)·
-  `matchedCount`/`failedCount`(`매칭 N · 실패 M`)·`parcelVersion`·`errorMessage`. `status(id)` 응답에도 같은 진행률·건수 필드를 실을 수 있고, 있으면 처리 중에도 목록에 반영한다(없으면 옛 동작 — 끝났을 때만).
+- 목록 항목의 새 필드(전부 선택): `ownerId`·`ownerName`(공유받은 항목의 "보낸 사람" — 줄 끝에 이름만, 툴팁은 `이름(아이디)`)·`shareCount`(내 항목의 공유 대상 수 — 0보다 크면 사람 아이콘+숫자)·`sourceKind`(`SHP|EXCEL_COORD|EXCEL_PNU|EXCEL_ADDRESS` — 있으면 종류 색 칩)·`progressTotal`/`progressDone`(처리 중 `처리 중 n/m` + 항목 아래 얇은 막대)·
+  `matchedCount`/`failedCount`(툴팁 `매칭 N · 실패 M · 지적도 YYYY-MM`, 실패가 있으면 줄 끝 빨간 `실패 N`)·`parcelVersion`·`errorMessage`. `status(id)` 응답에도 같은 진행률·건수 필드를 실을 수 있고, 있으면 처리 중에도 목록에 반영한다(없으면 옛 동작 — 끝났을 때만).
 - `quota().coverage`(= `MyMapCoverage`): `{ sidoCodes, parcelVersion, loaded?, nationwide?, restrictedSidoCodes? }`. **`nationwide`가 있는 새 서버**에서는 `sidoCodes` = 실제 적재된 시도(지역 제한이 있으면 그 교집합), `parcelVersion` = 그 중 가장 이른 기준월,
   `loaded` = 시도별 기준월, `nationwide` = 전국 기준 시도(서버 설정, 기본 현행 16개)가 전부 적재되고 제한이 없을 때만 true, `restrictedSidoCodes` = 지역 제한 설정값. **빈 `sidoCodes`는 전국이 아니다.** 업로드 창 문구:
   `nationwide` → "지적도 기준월 2026-10(전국)" / 일부 → "제공 지역: 세종 · 기준월 2026-10"(시도 4개 이상은 "제공 지역: 일부 시도(n/16) · 기준월 …", 시도별 기준월은 마우스를 올리면) + "적재된 시도 밖의 PNU는 실패합니다" 안내 / 비어 있으면 "지적도 자료 준비 중입니다"(PNU 확정은 서버가 503).
   **`nationwide`가 없는 옛 서버**에서는 `sidoCodes`를 지역 제한 설정값으로 보고(비면 "(전국)", 있으면 "(제공 지역: …)") 옛 문구를 그대로 쓴다. 시도 이름표는 `ui/mymap/format.ts`의 `SIDO_NAMES`(12 전남광주·42·45 포함).
 - 목록 항목 `errorMessage`(실패한 레이어의 이유)는 패널에 그대로 보이고, `status(id)` 응답의 `parcelVersion`·`geomType`은 끝났을 때 목록에 합친다(목록을 다시 받지 않아도 "지적도 YYYY-MM"이 나온다).
-- `confirmExcel`의 반환 `MyMapConfirmResult { id, parcelVersion? }`: PNU 모드의 "예정" 기준월이면 패널이 처리 중인 동안 "지적도 2026-10 예정"으로 보이고, 끝나면 상태·목록의 확정값으로 바뀐다. `importReport`의 `duplicatePnuCount`(같은 PNU가 여러 행이라 피처가 겹친 수)가 0보다 크면 보고서에 "중복 PNU N건" 한 줄.
+- `confirmExcel`의 반환 `MyMapConfirmResult { id, parcelVersion? }`: PNU 모드의 "예정" 기준월이면 패널이 처리 중인 동안 툴팁 "지적도 2026-10 예정"으로 보이고, 끝나면 상태·목록의 확정값으로 바뀐다. `importReport`의 `duplicatePnuCount`(같은 PNU가 여러 행이라 피처가 겹친 수)가 0보다 크면 보고서에 "중복 PNU N건" 한 줄.
 - 서버가 거절하면(5,001행부터 미리보기 400, 미리보기·확정·shp 동시 실행 429 등) 서버 `message`를 업로드 창에 그대로 보여 준다. 파일 고르는 단계에는 "수식은 값으로 붙여넣은 파일" 안내 한 줄이 있다(서버가 수식 셀을 엑셀이 저장한 계산값으로 읽는다).
 - 파일 저장(샘플·실패 행 엑셀)은 `<a download>`를 클릭하고 **30초 뒤에** `URL.revokeObjectURL`한다(Firefox가 클릭 직후 해제를 취소로 처리하는 것을 피함). 실패 행이 보관 기간(30일)이 지나 지워진 레이어는 보고서가 안내만 보여 준다.
 - `adapters/rest`: 응답 본문이 JSON이 아니면(프록시의 413·502 HTML 등) "Unexpected token" 대신 호출부의 기본 문구, 413은 "파일이 너무 큽니다(서버 한도)"로 던진다.
 - 엔진: `map.vector.openCatalog()`의 상태(`MyMapCatalogState`)에 `quota: MyMapQuota | null`이 늘었다. 훅은 새로 만들지 않았다(`useMyMapCatalog()`로 같은 상태). 패널은 내 레이어 / 공유받은 레이어 두 묶음으로 나눠 그린다
   (공유받은 항목이 있을 때만 묶음 제목이 나온다).
+- 패널 항목은 **두 줄**이다: 1줄 이름(체크 켜짐이면 굵게, 실패는 빨강), 2줄 `종류 칩 · N개 · (공유 수) · (처리 중 n/m | 처리 실패 · 오류 메시지) · (실패 N) · (보낸 사람)`.
+  결과 줄(매칭·실패·기준월)은 평소 숨기고 1·2줄의 `title` 툴팁으로만 보인다. 오른쪽 단추는 `위치로 이동`과 `⋯`(더보기) 둘뿐이다(선택 모드에서는 둘 다 숨김).
+  `⋯` 메뉴(소유자): `스타일·라벨`(`update` + 완료) / `업로드 결과`(`importReport` + 건수가 있거나 끝난 엑셀 — **실패 0이어도** 요약이 열린다) / `속성 테이블`(완료) / `삭제`(확인창을 거침).
+  처리 중·실패 항목은 해당되는 것만(삭제는 항상), 공유받은 항목은 `속성 테이블` 하나(없으면 `⋯` 자체가 없다). 공유는 `⋯` 메뉴에 없고 패널 상단 `공유`(선택 모드) 하나로만 한다 — 상단 `공유`는 **항상 보이고**(내 레이어가 0개면 비활성), 일괄 공유(`shareTarget.bulk`)가 없는 옛 소스(`getShare/setShare`)에서는 한 번에 1개만 고르고(전체 선택 없음, 안내문 없음) 단일 공유 창이 열린다.
+  메뉴는 `position: fixed` + 단추 좌표로 놓아(`ui/mymap/menuPosition.ts`) 패널 스크롤 영역에 잘리지 않고, 아래가 모자라면 위로 뜬다. 닫기: 바깥 클릭·Esc(단추로 포커스 복귀)·Tab·스크롤·창 크기 변경·항목 선택, 한 번에 하나만. 키보드는 `ui/menuNav.ts`(UserMenu와 공용).
+- 속성 테이블(`ui/mymap/MyMapTableDialog`): 소스의 `geojson(id)`를 한 번 받아 `features[].properties`를 표로 — 열 = 모든 피처 속성 키 합집합(처음 나온 순서, 최대 200열) + 맨 앞 `#`(원래 행 번호), 값은 null→빈 칸·객체→JSON·긴 값→말줄임+`title`, 숫자는 오른쪽 정렬.
+  큰 레이어(shp 최대 10만 피처)에서도 멈추지 않게 현재 쪽 100행만 그리고, 필터(전체 열·대소문자 무시, 입력 250ms 뒤 적용)·열 머리글 정렬(오름 → 내림 → 원래, 숫자/글자 구분, 빈 값은 항상 뒤)은 행 번호 배열만 만든다(`ui/mymap/tableModel.ts`).
+  숫자 정렬은 값이 모두 숫자(또는 `007`·19자리 PNU가 아닌 숫자 글자)인 열만, 그 밖은 대소문자 무시 글자 순서(로캘 비의존). 공유받은 레이어도 열 수 있다(서버가 권한을 판단, 실패하면 오류 문구). 새 소스·서버 변경 없음.
 - 어댑터: `restSources()`의 `myMap`이 위 메서드를 `/api/mymap/{quota, samples/{kind}, {id}/import-report(.xlsx)}`로 구현한다. 파일 응답은 봉투가 없고, 오류 본문의 `message`가 있으면 그 글을 `Error`로 던진다.
 
 ### 공유 (`MyMapSource.shareTarget` · `GisMapSources.shareDirectory`)

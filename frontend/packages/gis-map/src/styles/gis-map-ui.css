@@ -1608,12 +1608,6 @@
     font-weight: 600;
 }
 
-/* 옛 인라인: color #9ca3af, fontWeight 400 ("(공유됨)") */
-.gm-mymap-panel__shared {
-    color: #9ca3af;
-    font-weight: 400;
-}
-
 /* ── 레이어 패널 (ui/layer/LayerPanel) ── */
 /* 옛 인라인: position relative, display flex, flexDirection column, height 100% */
 .gm-layer-panel {
@@ -2509,20 +2503,51 @@
     font-weight: 400;
 }
 
-.gm-mymap-panel__lock {
-    vertical-align: -1px;
+/* 항목 한 줄(두 줄 구성) — 이름 / 종류 칩 · 개수 · 공유 수 · 처리 중 · 실패 N · 보낸 사람. 처리 중 막대는 항목 맨 아래에 얇게 */
+.gm-mymap-panel__item {
+    position: relative;
+    padding-right: 6px;
 }
 
-.gm-mymap-panel__sender {
-    font-size: 10px;
-    color: #9ca3af;
+.gm-mymap-panel__name {
+    color: #374151;
+}
+
+.gm-mymap-panel__name.gm-is-active {
+    color: #111827;
+    font-weight: 600;
+}
+
+.gm-mymap-panel__name.gm-is-failed {
+    color: #ef4444;
+}
+
+/* 정보 줄: 한 줄 고정(넘치면 보낸 사람·오류 메시지만 말줄임) */
+.gm-mymap-panel__meta {
+    flex-wrap: nowrap;
+    gap: 5px;
+    margin-top: 2px;
     overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.gm-mymap-panel__meta {
-    flex-wrap: wrap;
+.gm-mymap-panel__meta > * {
+    flex-shrink: 0;
+}
+
+.gm-mymap-panel__meta > .gm-mymap-panel__sender,
+.gm-mymap-panel__meta > .gm-mymap-panel__error {
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gm-mymap-panel__dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: #d1d5db;
 }
 
 /* 종류 배지(SHP·PNU·주소·좌표) — 종류를 아는 새 서버일 때만 배지 모양 */
@@ -2553,64 +2578,124 @@
     color: #92400e;
 }
 
-.gm-mymap-panel__version {
-    color: #94a3b8;
+.gm-mymap-panel__sender {
+    color: #9ca3af;
 }
 
-.gm-mymap-panel__progress {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 3px;
+.gm-mymap-panel__error {
+    color: #ef4444;
 }
 
-.gm-mymap-panel__progress-bar {
-    flex: 1;
-    height: 5px;
-    border-radius: 3px;
+.gm-mymap-panel__bar {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 0;
+    height: 2px;
+    border-radius: 2px;
     background: #f3f4f6;
     overflow: hidden;
 }
 
-.gm-mymap-panel__progress-fill {
+.gm-mymap-panel__bar-fill {
     height: 100%;
     background: var(--gm-primary);
     transition: width .3s;
 }
 
-.gm-mymap-panel__progress-text {
-    font-size: 10px;
-    color: #64748b;
-    white-space: nowrap;
-}
-
-.gm-mymap-panel__result {
-    margin-top: 2px;
-    font-size: 10.5px;
-    color: #64748b;
-}
-
+/* 실패 N — 있을 때만 빨갛게. 소유자는 눌러서 결과 보고서 */
 .gm-mymap-panel__fail-link {
     background: none;
     border: none;
     padding: 0;
     cursor: pointer;
-    font-size: inherit;
-    color: #b91c1c;
+    font: inherit;
+    font-weight: 600;
+    color: #ef4444;
+}
+
+.gm-mymap-panel__fail-link:hover {
     text-decoration: underline;
 }
 
 .gm-mymap-panel__fail-text {
-    color: #b91c1c;
+    font-weight: 600;
+    color: #ef4444;
 }
 
-.gm-mymap-panel__error {
-    margin-top: 2px;
-    font-size: 10px;
-    line-height: 1.35;
+/* 항목 오른쪽 단추 묶음(위치 이동 · ⋯) */
+.gm-mymap-panel__acts {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.gm-mymap-panel__ib {
+    padding: 5px;
+    border-radius: 6px;
+}
+
+.gm-mymap-panel__ib:hover,
+.gm-mymap-panel__ib.gm-is-open {
+    background: #f3f4f6;
+    color: var(--gm-primary);
+}
+
+.gm-mymap-panel__ib:focus-visible,
+.gm-mymap-panel__menu-item:focus-visible {
+    outline: 2px solid var(--gm-primary);
+    outline-offset: -1px;
+}
+
+.gm-mymap-panel__menu-wrap {
+    display: flex;
+}
+
+/* ⋯ 메뉴: 화면 기준 고정 위치(left·top은 단추 좌표로 계산해 인라인으로 넣는다) — 패널 스크롤 영역에 잘리지 않는다 */
+.gm-mymap-panel__menu {
+    position: fixed;
+    z-index: 60;
+    min-width: 148px;
+    padding: 4px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .12);
+}
+
+.gm-mymap-panel__menu-sep {
+    margin: 3px 0;
+    border-top: 1px solid #f1f5f9;
+}
+
+.gm-mymap-panel__menu-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: transparent;
+    border: 0;
+    border-radius: 5px;
+    font: inherit;
+    font-size: 11.5px;
+    color: #374151;
+    white-space: nowrap;
+    text-align: left;
+    cursor: pointer;
+}
+
+.gm-mymap-panel__menu-item:hover {
+    background: #f3f4f6;
+}
+
+.gm-mymap-panel__menu-item.gm-is-danger {
     color: #ef4444;
-    word-break: keep-all;
-    overflow-wrap: anywhere;
+}
+
+.gm-mymap-panel__menu-icon {
+    display: inline-flex;
+    flex-shrink: 0;
 }
 
 /* 업로드 마법사 — 머리줄 단계 표시(① 종류 → ② 파일·컬럼 → ③ 이름) */
@@ -3978,4 +4063,179 @@
 .gm-delete-confirm__ok:disabled {
     opacity: .6;
     cursor: default;
+}
+
+/* ── 나만의지도 속성 테이블 (ui/mymap/MyMapTableDialog) — gm-modal 공용 틀 위에 폭·표·머리글 고정·쪽 이동 ── */
+.gm-table-dialog {
+    display: flex;
+    flex-direction: column;
+    width: min(960px, calc(100vw - 24px));
+    max-height: 85vh;
+    overflow: hidden;
+}
+
+.gm-table-dialog__title {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
+}
+
+.gm-table-dialog__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gm-table-dialog__dims {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 400;
+    color: #64748b;
+}
+
+.gm-table-dialog__toolbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 8px 14px;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 11px;
+    color: #64748b;
+}
+
+.gm-table-dialog__search {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    color: #9ca3af;
+}
+
+.gm-table-dialog__filter {
+    width: 220px;
+    max-width: 50vw;
+    border: none;
+    outline: none;
+    font-size: 12px;
+    color: #111827;
+    background: transparent;
+}
+
+.gm-table-dialog__note {
+    color: #b45309;
+}
+
+/* 표 영역만 스크롤(가로·세로) — 머리글은 위에 붙어 있는다 */
+.gm-table-dialog__scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+}
+
+.gm-table-dialog__table {
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 11.5px;
+    color: #374151;
+}
+
+.gm-table-dialog__table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+    text-align: left;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.gm-table-dialog__table td {
+    max-width: 260px;
+    padding: 4px 8px;
+    border-bottom: 1px solid #f3f4f6;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gm-table-dialog__table th.gm-table-dialog__rowno,
+.gm-table-dialog__table td.gm-table-dialog__rowno {
+    position: sticky;
+    left: 0;
+    padding: 4px 8px;
+    background: #f9fafb;
+    color: #9ca3af;
+    text-align: right;
+}
+
+.gm-table-dialog__table th.gm-table-dialog__rowno {
+    z-index: 2;
+}
+
+.gm-table-dialog__table td.gm-table-dialog__num,
+.gm-table-dialog__table th.gm-table-dialog__num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.gm-table-dialog__sort {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    width: 100%;
+    padding: 5px 8px;
+    background: none;
+    border: none;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+}
+
+.gm-table-dialog__num .gm-table-dialog__sort {
+    justify-content: flex-end;
+}
+
+.gm-table-dialog__sort:hover,
+.gm-table-dialog__sort.gm-is-active {
+    color: var(--gm-primary);
+}
+
+.gm-table-dialog__sort:focus-visible {
+    outline: 2px solid var(--gm-primary);
+    outline-offset: -2px;
+}
+
+.gm-table-dialog__col-name {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gm-table-dialog__pager {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-top: 1px solid #f3f4f6;
+    font-size: 11px;
+    color: #64748b;
+}
+
+.gm-table-dialog__page-input {
+    width: 56px;
+    padding: 2px 4px;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    font-size: 11px;
+    text-align: center;
 }
