@@ -134,7 +134,7 @@ class Stage1SqlTest {
     void ref_스키마_SQL의_약속() throws Exception {
         String sql = Files.readString(REF_SQL);
         // 기본(DEFAULT) 파티션이 있으면 DETACH PARTITION ... CONCURRENTLY가 막힌다 — 두지 않는다
-        assertThat(sql.toLowerCase()).doesNotContain("partition of ref.parcel default").doesNotContain("for values in (default");
+        assertThat(sql.toLowerCase()).doesNotContain("partition of ref.lsmd_cont_ldreg default").doesNotContain("for values in (default");
         assertThat(sql).doesNotContainPattern("(?i)PARTITION OF [a-z_.]+ DEFAULT");
         // 시도코드 20개(현행 17 + 신규 12 + 옛 29·46·42·45)
         for (String c : List.of("11", "12", "26", "27", "28", "29", "30", "31", "36", "41", "42", "43", "44", "45", "46", "47", "48", "50", "51", "52")) {

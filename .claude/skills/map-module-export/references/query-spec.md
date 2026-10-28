@@ -436,7 +436,7 @@ DELETE FROM tbl_user_map                   WHERE id = #{id};
 - U11 GET `/srid-options`: 상수 `["EPSG:5186","EPSG:4326","EPSG:5179","EPSG:3857"]`, DB 없음.
 - U12 GET `/api/admin/mymap`: `SELECT * FROM tbl_user_map ORDER BY created_at DESC`, 모든 항목 `owner = false`.
 
-업로드 흐름(U6·U7 변경): 미리보기는 xlsx를 SAX 스트리밍으로 읽어 값 있는 행이 5,000을 넘으면 즉시 400(`MYMAP_ROW_LIMIT`), 같은 사용자 동시 1건·서버 전체 4건(429). 확정은 비동기 처리(PNU는 `ref.parcel`에서 폴리곤을 찾아 **그 순간의 모양을 복사 저장**, 주소 모드는 아직 `MYMAP_MODE_UNSUPPORTED`). 같은 사용자의 가져오기(엑셀·shp)는 동시에 1건. PNU 조회는 `PnuParcelProvider` 인터페이스 뒤에 있고 기본 구현이 `ref.parcel`(시도별 파티션)을 읽는다.
+업로드 흐름(U6·U7 변경): 미리보기는 xlsx를 SAX 스트리밍으로 읽어 값 있는 행이 5,000을 넘으면 즉시 400(`MYMAP_ROW_LIMIT`), 같은 사용자 동시 1건·서버 전체 4건(429). 확정은 비동기 처리(PNU는 `ref.lsmd_cont_ldreg`에서 폴리곤을 찾아 **그 순간의 모양을 복사 저장**, 주소 모드는 아직 `MYMAP_MODE_UNSUPPORTED`). 같은 사용자의 가져오기(엑셀·shp)는 동시에 1건. PNU 조회는 `PnuParcelProvider` 인터페이스 뒤에 있고 기본 구현이 `ref.lsmd_cont_ldreg`(시도별 파티션)을 읽는다.
 
 ---
 

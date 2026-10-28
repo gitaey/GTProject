@@ -26,7 +26,7 @@ CREATE EXTENSION IF NOT EXISTS postgis;   -- 이미 있으면 아무 일도 하�
 --   A4 지번(10, 본번-부번) → jibun    A5 지번+지목(200) → jibun_jimok   A6 기준일 → base_date
 --   A7 시군구코드(5) → sgg_code        (A0 일련번호는 쓰지 않는다)
 -- 좌표계: 원본 EPSG:5186 → 적재 때 EPSG:4326으로 변환해 저장(앱은 4326만 쓴다 → 조회마다 변환 없음)
-CREATE TABLE IF NOT EXISTS ref.parcel (
+CREATE TABLE IF NOT EXISTS ref.lsmd_cont_ldreg (
     pnu          varchar(19)  NOT NULL,
     sido         char(2)      NOT NULL,        -- 파티션 키 = PNU 앞 2자리
     bjd_code     char(10),
@@ -46,15 +46,15 @@ DO $$
 DECLARE c text;
 BEGIN
   FOREACH c IN ARRAY ARRAY['11','12','26','27','28','29','30','31','36','41','42','43','44','45','46','47','48','50','51','52'] LOOP
-    EXECUTE format('CREATE TABLE IF NOT EXISTS ref.parcel_%s PARTITION OF ref.parcel FOR VALUES IN (%L)', c, c);
+    EXECUTE format('CREATE TABLE IF NOT EXISTS ref.lsmd_cont_ldreg_%s PARTITION OF ref.lsmd_cont_ldreg FOR VALUES IN (%L)', c, c);
   END LOOP;
 END $$;
 
 -- 분할 인덱스(부모에 만들면 파티션마다 생긴다). PNU는 중복이 있을 수 있어 UNIQUE가 아니다
-CREATE INDEX IF NOT EXISTS ix_parcel_pnu ON ref.parcel (pnu);
+CREATE INDEX IF NOT EXISTS ix_lsmd_cont_ldreg_pnu ON ref.lsmd_cont_ldreg (pnu);
 -- 만들지 않는 것: GiST(geom) — 앱은 PNU로만 찾는다(공간 검색 없음, 약 2~3GB 절약).
 -- 2단계(주소 엑셀)에서 법정동 이름+지번으로 찾는다면 그때 추가를 검토한다:
---   CREATE INDEX ix_parcel_bjd_jibun ON ref.parcel (bjd_code, jibun);
+--   CREATE INDEX ix_lsmd_cont_ldreg_bjd_jibun ON ref.lsmd_cont_ldreg (bjd_code, jibun);
 
 -- 적재 기록: 시도마다 기준월·행 수. status=SWAPPING이면 앱 업로드 매칭이 그 시도 교체가 끝날 때까지 잠시 기다린다
 CREATE TABLE IF NOT EXISTS ref.load_meta (
@@ -69,5 +69,5 @@ CREATE TABLE IF NOT EXISTS ref.load_meta (
 );
 
 -- 확인(읽기 전용):
---   SELECT count(*) FROM pg_inherits WHERE inhparent = 'ref.parcel'::regclass;      -- 20
+--   SELECT count(*) FROM pg_inherits WHERE inhparent = 'ref.lsmd_cont_ldreg'::regclass;      -- 20
 --   SELECT * FROM ref.load_meta ORDER BY sido;

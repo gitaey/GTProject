@@ -4,7 +4,7 @@ import java.util.Collection;
 import java.util.Map;
 
 /**
- * PNU(필지고유번호)로 필지 모양을 찾는 포트. 기본 구현은 서비스 DB {@code ref.parcel}을 읽는 {@code PostgisPnuParcelProvider},
+ * PNU(필지고유번호)로 필지 모양을 찾는 포트. 기본 구현은 서비스 DB {@code ref.lsmd_cont_ldreg}을 읽는 {@code PostgisPnuParcelProvider},
  * 시험·로컬 개발용은 {@code FakePnuParcelProvider}. 다른 프로젝트로 옮길 때는 이 인터페이스 구현 하나만 새로 쓴다
  * (Oracle Spatial·MyBatis, 또는 지적 WFS 호출 등).
  */

@@ -1,12 +1,13 @@
 # mymap-ref — 연속지적도 적재 스크립트
 
-나만의지도의 PNU 엑셀 매칭이 읽는 참조 데이터(`ref.parcel`)를 만드는 도구다. **앱이 하지 않고 운영자가 앞서 실행한다.**
+나만의지도의 PNU 엑셀 매칭이 읽는 참조 데이터(`ref.lsmd_cont_ldreg`)를 만드는 도구다. **앱이 하지 않고 운영자가 앞서 실행한다.**
 이 폴더의 스크립트는 DB에 직접 쓰므로 실행은 사용자(또는 메인 세션이 사용자 요청으로)만 한다.
 
 | 파일 | 내용 |
 |---|---|
-| `init-ref-schema.sql` | `ref` 스키마·`ref.parcel`(시도별 파티션 20개)·`ref.load_meta` 만들기 — **한 번**, 적재 전에 |
+| `init-ref-schema.sql` | `ref` 스키마·`ref.lsmd_cont_ldreg`(시도별 파티션 20개)·`ref.load_meta` 만들기 — **한 번**, 적재 전에 |
 | `load-parcel.sh` | VWorld 연속지적도(zip/shp)를 시도별로 적재·검증·교체 |
+| `rename-parcel-to-lsmd_cont_ldreg.sql` | 표 이름을 옛 `ref.parcel`에서 `ref.lsmd_cont_ldreg`로 바꾸는 이관 SQL — **이미 `ref.parcel`로 적재한 DB에서 한 번**, 새 코드 배포 **전에** (처음부터 새로 만드는 DB는 필요 없음) |
 
 ## 로컬 개발 주의 (크게)
 **로컬 `application-local.yml`의 DB는 운영 DB다.** 로컬 백엔드를 띄워 나만의지도를 시험하기 전에 gitignore된 `application-local.yml`에 아래를 넣는다.
@@ -15,7 +16,7 @@ mymap:
   maintenance:
     enabled: false      # 기동 직후 운영의 PROCESSING 레이어를 FAILED로 바꾸는 정리 작업과 실패 행 삭제를 끈다
   ref:
-    provider: fake      # 운영 ref.parcel 대신 가짜 사각형 필지 — 업로드가 운영 tbl_user_map에 실제 레이어를 만드는 일은 남는다(작은 파일로만)
+    provider: fake      # 운영 ref.lsmd_cont_ldreg 대신 가짜 사각형 필지 — 업로드가 운영 tbl_user_map에 실제 레이어를 만드는 일은 남는다(작은 파일로만)
 ```
 `provider`를 `postgis`로 둔 채 PNU 업로드를 시험하면 운영에 실제 레이어·피처·실패 행이 생긴다. S1 SQL(`backend/scripts/mymap/ddl-stage1.sql`)을 실행하기 전에는 새 엔티티로 로컬 백엔드를 띄우지 않는다.
 
@@ -28,7 +29,7 @@ mymap:
 
 ## 순서
 1. **디스크 점검**: 세종(약 21만 필지)은 **실측 99MB**, 전국은 행당 약 0.5KB로 **약 16GB 추정**(2026-10 자료 기준, 표·PNU 인덱스 합계). 인덱스 빌드·WAL 여유까지 보면 첫 전국 적재는 **40GB 안팎의 여유**면 충분해 보인다(설계 초안의 "80GB"는 폴리곤 평균 0.6~1KB 가정이라 보수적이었다). 시도별 교체라 월 갱신의 피크 추가 공간은 가장 큰 시도 1개분(경기, 전국의 약 15~20% 추정 → 3GB 안팎). 백업은 `pg_dump -N ref`로 `ref` 제외.
-2. **스키마**: `psql -v ON_ERROR_STOP=1 -1 -f init-ref-schema.sql`(적재 계정). 앱 계정에는 `ref` 읽기만 GRANT(파일 안 주석). 앱은 부모 표 `ref.parcel`만 읽으므로 부모·`load_meta`에 SELECT면 충분하다.
+2. **스키마**: `psql -v ON_ERROR_STOP=1 -1 -f init-ref-schema.sql`(적재 계정). 앱 계정에는 `ref` 읽기만 GRANT(파일 안 주석). 앱은 부모 표 `ref.lsmd_cont_ldreg`만 읽으므로 부모·`load_meta`에 SELECT면 충분하다.
 3. **한 시도로 시험**(세종 36, 약 21만 필지):
    ```bash
    ./load-parcel.sh --dry-run --sido 36 "D:/데이터/연속지적도/20261008/AL_D002_36_20261008.zip"   # 명령만 확인
@@ -42,7 +43,7 @@ mymap:
 zip은 풀지 않는다 — GDAL이 `/vsizip/`으로 바로 읽으므로 임시 디스크(압축 해제 20~30GB)가 필요 없다.
 
 ## 한 시도의 흐름
-1. 새 표 `ref.parcel_<c>_new`를 부모와 같은 모양으로(`LIKE ref.parcel`) 만든다 — 인덱스·제약 없음.
+1. 새 표 `ref.lsmd_cont_ldreg_<c>_new`를 부모와 같은 모양으로(`LIKE ref.lsmd_cont_ldreg`) 만든다 — 인덱스·제약 없음.
 2. 파일마다 `ogr2ogr`로 적재(`-append`, COPY, `PROMOTE_TO_MULTI`, 좌표 → EPSG:4326, 컬럼 이름 바꾸기·시도 계산은 OGR SQL).
 3. **검증**(하나라도 실패하면 이 시도는 교체하지 않고 임시 표를 지운 뒤 다음 시도로): 행 수 = `ogrinfo` 피처 수, PNU 19자리 ≥ 99.9%, PNU 앞 2자리 = 시도코드, **법정동명(`bjd_name`) 글자 점검 — 값이 있는 행 중 한글 포함 ≥ 99%, 깨진 글자(`?`·U+FFFD) 0건**(한글 없는 시험 자료는 `--skip-text-check`), (기존 파티션이 비어 있지 않으면) 지난달 대비 ±5%. 잘못된 지오메트리는 `ST_MakeValid`로 고치고 빈 결과는 지운다.
 4. 인덱스(PNU)·CHECK 제약·`ANALYZE`.
@@ -52,7 +53,7 @@ zip은 풀지 않는다 — GDAL이 `/vsizip/`으로 바로 읽으므로 임시 
 ## 원본 컬럼 매핑 (2026-10-08 받은 VWorld 파일에서 확인)
 DBF 컬럼 이름이 A0~A7로 익명이다. 기본값이 이 이름이고 `--col-*` 인자로 바꿀 수 있다.
 
-| 원본 | 내용 | ref.parcel | 인자 |
+| 원본 | 내용 | ref.lsmd_cont_ldreg | 인자 |
 |---|---|---|---|
 | A0 | 일련번호 | (쓰지 않음) | |
 | **A1** | PNU(19) | `pnu` (+ 앞 2자리 → `sido` 파티션 키) | `--col-pnu` |
@@ -81,13 +82,13 @@ UNLOGGED 표는 WAL(복구 기록)을 쓰지 않아서 대량 적재가 빠르�
 - 측정 방법(읽기 전용): 적재 전후에 `SELECT pg_current_wal_lsn();`을 찍어 `SELECT pg_size_pretty(pg_wal_lsn_diff('후','전'));`로 WAL 양을, 스크립트 로그의 초 단위 시간으로 시간을 본다.
 
 ## 문제 해결
-- **"법정동명에 한글이 있는 행이 99% 미만" / "깨진 글자"**: 글자 인코딩이 틀렸다. 기본(CP949)이 안 맞는 자료면 `--encoding UTF-8` 또는 `--encoding auto`로 다시 실행(이 시도는 교체되지 않았으니 지난달 데이터는 그대로다). 이미 잘못된 인코딩으로 적재해 둔 시도는 `SELECT bjd_name, jibun_jimok FROM ref.parcel_36 LIMIT 5;`로 확인하고 `--force --encoding CP949`로 다시 적재한다.
-- **"PNU 앞 2자리가 <코드>가 아닌 행 N건"**: 시도 파일 하나에 다른 코드의 PNU가 섞인 경우(예: 12 파일에 옛 29·46 코드). 로그에 분포가 나온다. 파티션 규칙을 정해야 한다 — 12 파일이 29·46 접두 PNU를 담는다면 `ref.parcel_12`를 `FOR VALUES IN ('12','29','46')`로 만들고 `sido`를 PNU 앞 2자리 그대로 두는 방식을 검토(앱은 PNU 앞 2자리로 파티션을 고르므로 이 방식이 앱과 맞다). 데이터를 본 뒤 결정.
+- **"법정동명에 한글이 있는 행이 99% 미만" / "깨진 글자"**: 글자 인코딩이 틀렸다. 기본(CP949)이 안 맞는 자료면 `--encoding UTF-8` 또는 `--encoding auto`로 다시 실행(이 시도는 교체되지 않았으니 지난달 데이터는 그대로다). 이미 잘못된 인코딩으로 적재해 둔 시도는 `SELECT bjd_name, jibun_jimok FROM ref.lsmd_cont_ldreg_36 LIMIT 5;`로 확인하고 `--force --encoding CP949`로 다시 적재한다.
+- **"PNU 앞 2자리가 <코드>가 아닌 행 N건"**: 시도 파일 하나에 다른 코드의 PNU가 섞인 경우(예: 12 파일에 옛 29·46 코드). 로그에 분포가 나온다. 파티션 규칙을 정해야 한다 — 12 파일이 29·46 접두 PNU를 담는다면 `ref.lsmd_cont_ldreg_12`를 `FOR VALUES IN ('12','29','46')`로 만들고 `sido`를 PNU 앞 2자리 그대로 두는 방식을 검토(앱은 PNU 앞 2자리로 파티션을 고르므로 이 방식이 앱과 맞다). 데이터를 본 뒤 결정.
 - **`ogr2ogr` 직접 `-append`가 FID 칸이 없다며 실패**: `--via-stage`로 임시 표를 거쳐 INSERT..SELECT(시간·WAL 약 2배).
-- **교체가 `lock_timeout`으로 실패**: 오래 걸리는 조회가 `ref.parcel`을 잡고 있었다. 지난달 데이터는 그대로이니 같은 명령을 다시.
-- **임시 표가 남았다**(스크립트가 강제 종료된 경우): `DROP TABLE IF EXISTS ref.parcel_<c>_new, ref._stage_<c>;`
+- **교체가 `lock_timeout`으로 실패**: 오래 걸리는 조회가 `ref.lsmd_cont_ldreg`을 잡고 있었다. 지난달 데이터는 그대로이니 같은 명령을 다시.
+- **임시 표가 남았다**(스크립트가 강제 종료된 경우): `DROP TABLE IF EXISTS ref.lsmd_cont_ldreg_<c>_new, ref._stage_<c>;`
 - **시도 상태 확인**: `SELECT * FROM ref.load_meta ORDER BY sido;`, 앱은 이 표의 `version`을 업로드 화면 "지적도 기준월"로 쓴다(시도별로 다르면 가장 이른 달).
-- 같은 PNU가 여러 행인지: `SELECT pnu, count(*) FROM ref.parcel_36 GROUP BY 1 HAVING count(*) > 1 LIMIT 20;` (앱은 같은 PNU 다중 폴리곤을 `ST_Union`으로 합쳐 하나로 쓴다)
+- 같은 PNU가 여러 행인지: `SELECT pnu, count(*) FROM ref.lsmd_cont_ldreg_36 GROUP BY 1 HAVING count(*) > 1 LIMIT 20;` (앱은 같은 PNU 다중 폴리곤을 `ST_Union`으로 합쳐 하나로 쓴다)
 
 ## 이 스크립트를 시험한 방법 (DB 접속 없이)
 가짜 `psql`·`ogr2ogr`·`ogrinfo`(인자만 기록하고 준비된 답을 내는 스크립트)를 `PSQL`·`OGR2OGR`·`OGRINFO` 환경 변수로 끼워 정상·검증 실패 5종·재시작(건너뜀)·`--force`·`--unlogged`·`--via-stage`·`--all`·csv·잘못된 인자를 확인했다. GDAL의 OGR SQL(컬럼 이름 바꾸기·`SUBSTR`)은 실제 `ogr2ogr`로 로컬 shp(zip)를 GPKG로 변환해 확인했다. 실제 PostgreSQL에서의 `ATTACH`/인덱스 연결·`-append` 동작은 **확인하지 못했다** — 세종 한 시도로 먼저 돌려 본다.

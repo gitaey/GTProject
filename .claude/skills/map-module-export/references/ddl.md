@@ -156,7 +156,7 @@ CREATE TABLE tbl_user_map_import_failure (
 CREATE INDEX ix_umap_fail_map ON tbl_user_map_import_failure (user_map_id, row_no);
 
 -- 연속지적도 참조 데이터(`ref` 스키마, JPA 엔티티 아님 — 앱은 JdbcTemplate으로 읽기만): `backend/scripts/mymap-ref/init-ref-schema.sql`
---   ref.parcel(pnu, sido, bjd_code, bjd_name, jibun, jibun_jimok, base_date, sgg_code, geom MultiPolygon 4326) 시도별 LIST 파티션 20개, ref.load_meta(적재 기록)
+--   ref.lsmd_cont_ldreg(pnu, sido, bjd_code, bjd_name, jibun, jibun_jimok, base_date, sgg_code, geom MultiPolygon 4326) 시도별 LIST 파티션 20개, ref.load_meta(적재 기록)
 --   적재: `backend/scripts/mymap-ref/load-parcel.sh`(VWorld AL_D002_*.zip, DBF 인코딩은 `.cpg`가 UTF-8이라 적혀 있어도 실제 CP949)
 
 -- 피처 한 건 = 한 행. geometry_json은 EPSG:4326 GeoJSON geometry 객체 문자열

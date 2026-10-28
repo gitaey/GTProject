@@ -38,7 +38,7 @@ class PostgisPnuParcelProviderTest {
     void 기본_설정의_SQL_모양() {
         PostgisPnuParcelProvider p = new PostgisPnuParcelProvider(mock(JdbcOperations.class), new MyMapProperties.Ref());
         assertThat(p.selectSql())
-                .contains("FROM ref.parcel")
+                .contains("FROM ref.lsmd_cont_ldreg")
                 .contains("sido = ANY(?::char(2)[])")
                 .contains("pnu = ANY(?::varchar[])")
                 .contains("ST_AsGeoJSON(geom, 7)")
@@ -72,7 +72,7 @@ class PostgisPnuParcelProviderTest {
     @Test
     void 식별자_모양이_아닌_설정은_거절한다() {
         MyMapProperties.Ref ref = new MyMapProperties.Ref();
-        ref.getParcel().setTable("ref.parcel; DROP TABLE x");
+        ref.getParcel().setTable("ref.lsmd_cont_ldreg; DROP TABLE x");
         assertThatThrownBy(() -> new PostgisPnuParcelProvider(mock(JdbcOperations.class), ref)).isInstanceOf(IllegalArgumentException.class);
 
         MyMapProperties.Ref ref2 = new MyMapProperties.Ref();

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# load-parcel.sh — 연속지적도(VWorld AL_D002_<시도코드>_<YYYYMMDD>.zip|.shp)를 ref.parcel 시도 파티션으로 적재·교체
+# load-parcel.sh — 연속지적도(VWorld AL_D002_<시도코드>_<YYYYMMDD>.zip|.shp)를 ref.lsmd_cont_ldreg 시도 파티션으로 적재·교체
 #
 # 시도 하나씩 "새 표 적재 → 검증 → 인덱스 → 한 트랜잭션으로 교체"를 한다. 한 시도가 실패해도 그 시도는 지난달 데이터가 그대로고
 # (임시 표는 정리), 다음 시도로 넘어간다. 이미 같은 기준월로 적재된 시도는 건너뛰므로(재시작 가능) 중간에 끊겨도 같은 명령을 다시 실행하면 된다.
@@ -30,7 +30,7 @@ usage() {
   --only 36,41             --all에서 이 시도들만
   --version YYYY-MM        기준월(기본: 파일 이름의 _YYYYMMDD에서)
   --force                  이미 같은 기준월로 적재(READY)된 시도도 다시 적재
-  --keep-old               교체 뒤 옛 파티션을 지우지 않고 ref.parcel_<코드>_old로 남김(다음 적재 때 지움)
+  --keep-old               교체 뒤 옛 파티션을 지우지 않고 ref.lsmd_cont_ldreg_<코드>_old로 남김(다음 적재 때 지움)
   --unlogged               UNLOGGED로 적재 → 검증·인덱스 → SET LOGGED → 교체(README "UNLOGGED" 절 참고, 기본 끔)
   --via-stage              ogr2ogr가 임시 표(ref._stage_<코드>)로 적재한 뒤 INSERT..SELECT(직접 -append가 안 될 때의 대체, 시간·WAL 약 2배)
   --first-load             지난달 대비 ±허용치 검사를 건너뜀(기존 파티션이 비어 있으면 자동으로 건너뜀)
@@ -149,8 +149,8 @@ preflight() {
   for exe in "$PSQL" "$OGR2OGR" "$OGRINFO"; do
     command -v "$exe" >/dev/null 2>&1 || [[ -x "$exe" ]] || die "실행 파일을 찾을 수 없습니다: $exe (OGR2OGR·OGRINFO·PSQL 환경 변수로 경로 지정)"
   done
-  local ok; ok=$(q "SELECT to_regclass('ref.parcel') IS NOT NULL AND to_regclass('ref.load_meta') IS NOT NULL") || die "DB에 접속하지 못했습니다"
-  [[ "$ok" == "t" ]] || die "ref.parcel·ref.load_meta가 없습니다 — 먼저 init-ref-schema.sql을 실행하세요"
+  local ok; ok=$(q "SELECT to_regclass('ref.lsmd_cont_ldreg') IS NOT NULL AND to_regclass('ref.load_meta') IS NOT NULL") || die "DB에 접속하지 못했습니다"
+  [[ "$ok" == "t" ]] || die "ref.lsmd_cont_ldreg·ref.load_meta가 없습니다 — 먼저 init-ref-schema.sql을 실행하세요"
 }
 
 # 파일 이름에서 시도코드·기준월 읽기: AL_D002_36_20261008.zip → 36 / 2026-10
@@ -176,7 +176,7 @@ feature_count() {  # ogrinfo -so 의 "Feature Count: N"
   "$OGRINFO" -ro -so "$1" "$2" | sed -n 's/^Feature Count: *//p' | head -1
 }
 
-# 원본 컬럼 → ref.parcel 컬럼. sido는 PNU 앞 2자리(파티션 키)로 계산한다
+# 원본 컬럼 → ref.lsmd_cont_ldreg 컬럼. sido는 PNU 앞 2자리(파티션 키)로 계산한다
 ogr_sql() {
   printf 'SELECT %s AS pnu, SUBSTR(%s, 1, 2) AS sido, %s AS bjd_code, %s AS bjd_name, %s AS jibun, %s AS jibun_jimok, %s AS base_date, %s AS sgg_code FROM "%s"' \
     "$COL_PNU" "$COL_PNU" "$COL_BJD_CODE" "$COL_BJD_NAME" "$COL_JIBUN" "$COL_JIMOK" "$COL_BASE_DATE" "$COL_SGG" "$1"
@@ -197,7 +197,7 @@ cleanup_tables() {
 load_sido() {  # 인자: 코드 버전 파일...
   local c=$1 ver=$2; shift 2
   local files=("$@")
-  local new="ref.parcel_${c}_new" cur="ref.parcel_${c}" old="ref.parcel_${c}_old" stage="ref._stage_${c}"
+  local new="ref.lsmd_cont_ldreg_${c}_new" cur="ref.lsmd_cont_ldreg_${c}" old="ref.lsmd_cont_ldreg_${c}_old" stage="ref._stage_${c}"
   CUR="시도 $c"
   local t0=$SECONDS
 
@@ -223,7 +223,7 @@ load_sido() {  # 인자: 코드 버전 파일...
   local persist="" set_logged=""
   if [[ $UNLOGGED -eq 1 ]]; then persist="UNLOGGED"; set_logged="ALTER TABLE $new SET LOGGED;"; fi
   q "DROP TABLE IF EXISTS $new" >/dev/null || return 1
-  q "CREATE $persist TABLE $new (LIKE ref.parcel)" >/dev/null || return 1
+  q "CREATE $persist TABLE $new (LIKE ref.lsmd_cont_ldreg)" >/dev/null || return 1
 
   # 2) 파일마다 적재
   local expected=0 f ds layer n
@@ -290,7 +290,7 @@ SQL
   qf <<SQL || return 1
 SET maintenance_work_mem = '$MWM';
 CREATE INDEX ON $new (pnu);
-ALTER TABLE $new ADD CONSTRAINT parcel_${c}_new_sido_chk CHECK (sido = '$c');
+ALTER TABLE $new ADD CONSTRAINT lsmd_cont_ldreg_${c}_new_sido_chk CHECK (sido = '$c');
 $set_logged
 ANALYZE $new;
 SQL
@@ -301,10 +301,10 @@ SQL
 DROP TABLE IF EXISTS $old;
 BEGIN;
 SET LOCAL lock_timeout = '30s';
-ALTER TABLE ref.parcel DETACH PARTITION $cur;
-ALTER TABLE ref.parcel ATTACH PARTITION $new FOR VALUES IN ('$c');
-ALTER TABLE $cur RENAME TO parcel_${c}_old;
-ALTER TABLE $new RENAME TO parcel_${c};
+ALTER TABLE ref.lsmd_cont_ldreg DETACH PARTITION $cur;
+ALTER TABLE ref.lsmd_cont_ldreg ATTACH PARTITION $new FOR VALUES IN ('$c');
+ALTER TABLE $cur RENAME TO lsmd_cont_ldreg_${c}_old;
+ALTER TABLE $new RENAME TO lsmd_cont_ldreg_${c};
 INSERT INTO ref.load_meta (dataset, sido, version, status, row_count, base_date, loaded_at)
   SELECT 'parcel', '$c', '$ver', 'READY', count(*), max(base_date), now() FROM $cur
   ON CONFLICT (dataset, sido) DO UPDATE

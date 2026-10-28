@@ -93,7 +93,7 @@ class MyMapConfigGuardTest {
         assertThat(l.getMaxShpMb()).isEqualTo(300);
         assertThat(p.getRef().getProvider()).isEqualTo("postgis");
         assertThat(p.getRef().getAllowedSidoCodes()).isEmpty();
-        assertThat(p.getRef().getParcel().getTable()).isEqualTo("ref.parcel");
+        assertThat(p.getRef().getParcel().getTable()).isEqualTo("ref.lsmd_cont_ldreg");
         assertThat(p.getRef().getParcel().getSrid()).isEqualTo(4326);
         assertThat(p.getRef().getExpectedSidoCodes()).containsExactly("11", "12", "26", "27", "28", "30", "31", "36", "41", "43", "44", "47", "48", "50", "51", "52");
         assertThat(p.getUpload().getPreviewTtlMinutes()).isEqualTo(30);
@@ -131,7 +131,7 @@ class MyMapConfigGuardTest {
         assertThat(p.getLimits().getMaxShpMb()).isEqualTo(300);
         assertThat(p.getRef().getProvider()).isEqualTo("postgis");
         assertThat(p.getRef().getAllowedSidoCodes()).isEmpty();          // 비움 = 전국
-        assertThat(p.getRef().getParcel().getTable()).isEqualTo("ref.parcel");
+        assertThat(p.getRef().getParcel().getTable()).isEqualTo("ref.lsmd_cont_ldreg");
         assertThat(p.getRef().getParcel().getPnuColumn()).isEqualTo("pnu");
         assertThat(p.getRef().getParcel().getSidoColumn()).isEqualTo("sido");
         assertThat(p.getRef().getParcel().getGeomColumn()).isEqualTo("geom");

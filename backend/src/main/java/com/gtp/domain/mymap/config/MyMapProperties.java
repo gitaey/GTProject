@@ -63,7 +63,7 @@ public class MyMapProperties {
     @Getter
     @Setter
     public static class Parcel {
-        private String table = "ref.parcel";
+        private String table = "ref.lsmd_cont_ldreg";
         private String pnuColumn = "pnu";
         private String jibunColumn = "jibun";
         private String sidoColumn = "sido";
