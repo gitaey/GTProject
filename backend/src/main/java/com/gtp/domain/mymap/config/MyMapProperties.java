@@ -34,6 +34,8 @@ public class MyMapProperties {
         private int maxShpFeatures = 100_000;
         private int maxExcelMb = 10;
         private int maxShpMb = 300;
+        /** 주소 변환(엑셀로만 받기) 결과 파일 크기 한도(MB) — 응답에 base64로 실어 보내므로 막아 둔다 */
+        private int maxConvertResultMb = 25;
     }
 
     @Getter

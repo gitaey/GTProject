@@ -4,16 +4,23 @@
 // 엑셀은 PNU·주소(도로명/지번 → PNU, 둘 다 필지 폴리곤)와 좌표(점) 세 모드다.
 // 서버가 미리보기에 suggestions를 안 주는 옛 서버면 좌표 모드 하나뿐인 옛 흐름(위도·경도 컬럼)으로 동작한다.
 // 요청은 엔진의 나만의지도 소스(map.sources.myMap — 짝 백엔드면 adapters/rest)가 보낸다.
+// 주소 모드 + 소스에 convertExcel이 있으면 "결과 받는 방법: 지도에 올리기 / 엑셀로만 받기"가 나온다 — 엑셀로만 받기는 레이어를 만들지 않고
+// 변환 결과 엑셀을 받아 결과 화면(MyMapConvertResultDialog)으로 바뀐다(소스에 메서드가 없으면 이 화면은 옛 모양 그대로).
 // 스타일: gm-modal(공유·보고서와 공용), gm-upload-modal, gm-wizard(마법사 조각). 선택 상태에 따라 바뀌는 값은 gm-is-* 클래스
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { X, Loader2, Layers, FileSpreadsheet, Download, AlertCircle, Info } from 'lucide-react'
-import type { ExcelPreviewResponse, MyMapConfirmResult, MyMapQuota, MyMapSampleKind, MyMapUploadMode } from '../../core'
+import type { ExcelPreviewResponse, MyMapConfirmResult, MyMapConvertResult, MyMapExportSrid, MyMapQuota, MyMapSampleKind, MyMapUploadMode } from '../../core'
+import { GisHttpError } from '../../core'
 import { useGisMap } from '../../react'
 import { cx } from '../cx'
+import { ConvertOptions, DeliveryChoice } from './MyMapConvertForm'
+import MyMapConvertResultDialog from './MyMapConvertResultDialog'
+import { DEFAULT_CONVERT_FLAGS, toConvertInclude } from './convertModel'
+import type { ConvertFlags, Delivery } from './convertModel'
 import { describeCoverage, formatCount, sampleFileName } from './format'
 import { saveBlob } from './saveBlob'
-import { SRID_OPTIONS } from './sridOptions'
+import { DEFAULT_EXPORT_SRID, SRID_OPTIONS } from './sridOptions'
 
 interface MyMapUploadModalProps {
     onClose: () => void
@@ -27,6 +34,8 @@ type Kind = 'shp' | 'excel'
 
 const STEP_LABELS: readonly string[] = Object.freeze(['종류', '파일·컬럼', '이름'])
 const PREVIEW_ROWS = 10
+/** 한도를 알 수 없을 때 변환 안내에 쓰는 행 수(서버 기본 한도) */
+const FALLBACK_CONVERT_ROWS = 5000
 /** 화면에서 고르게 하는 엑셀 모드 */
 const MODES: readonly MyMapUploadMode[] = Object.freeze(['PNU', 'ADDRESS', 'COORD'] as MyMapUploadMode[])
 const LEGACY_MODES: readonly MyMapUploadMode[] = Object.freeze(['COORD'] as MyMapUploadMode[])
@@ -142,9 +151,27 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
     const [lonColumn, setLonColumn] = useState('')
     const [addressColumn, setAddressColumn] = useState('')
 
+    // 주소 변환(엑셀로만 받기)
+    const convertAvailable = !!myMap?.convertExcel
+    const [delivery, setDelivery] = useState<Delivery>('map')
+    const [flags, setFlags] = useState<ConvertFlags>(DEFAULT_CONVERT_FLAGS)
+    const [convertSrid, setConvertSrid] = useState<MyMapExportSrid>(DEFAULT_EXPORT_SRID)
+    const [converted, setConverted] = useState<{ result: MyMapConvertResult; sourceName: string; notice: string | null } | null>(null)
+    /** 변환 요청의 세대 번호 — 모드·컬럼·옵션이 바뀌면 올려서 늦게 온 이전 응답을 버린다 */
+    const convertSeqRef = useRef(0)
+    const convertingRef = useRef(false)
+    /** 닫힌 뒤에 도착한 응답으로 내려받기·상태 변경을 하지 않게 */
+    const aliveRef = useRef(true)
+    useEffect(() => {
+        aliveRef.current = true
+        return () => { aliveRef.current = false }
+    }, [])
+
     /** 서버가 모드·추천을 모르는 옛 서버(suggestions 없음) → 좌표 하나뿐인 옛 흐름 */
     const legacy = preview !== null && preview.suggestions === undefined
     const modes = legacy ? LEGACY_MODES : MODES
+    /** 이번 제출이 "엑셀로만 받기"인가(주소 모드에서만, 소스에 convertExcel이 있을 때만) */
+    const toExcel = convertAvailable && !legacy && mode === 'ADDRESS' && delivery === 'excel'
 
     const limits = preview?.limits ?? quota?.maxRows ?? null
     const limit = limits ? (mode === 'PNU' ? limits.pnu : mode === 'ADDRESS' ? limits.address : limits.coord) : null
@@ -158,17 +185,30 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
     const excelReady = preview !== null && columnsReady && !overLimit && !serverOverLimit
     const fileReady = kind === 'shp' ? shpFiles.length > 0 : excelReady
     /** 지금 단계(머리줄 표시용): 1 종류 · 2 파일·컬럼 · 3 이름 */
-    const step = kind === null ? 1 : fileReady ? 3 : 2
+    const step = kind === null ? 1 : fileReady && !toExcel ? 3 : 2
+    /** 엑셀로만 받기는 이름 단계가 없다 */
+    const stepLabels = toExcel ? STEP_LABELS.slice(0, 2) : STEP_LABELS
+
+    /** 이전 변환 결과를 버린다(옵션·컬럼·모드·파일이 바뀔 때) */
+    const invalidateConvert = () => {
+        convertSeqRef.current += 1
+        setConverted(null)
+    }
+    /** 변환 요청이 도는 동안은 모든 입력이 잠긴다(화면은 disabled, 이벤트가 새어 와도 여기서 막는다) — 옵션이 바뀌어 요청이 겹치는 경로 자체가 없다 */
+    const converting = submitting && toExcel
+    const locked = () => convertingRef.current
 
     const pickKind = (k: Kind) => {
-        if (k === kind) return
+        if (locked() || k === kind) return
         setKind(k)
         setError(null)
     }
 
     /** 이전: 미리보기가 있으면 파일 고르기로, 아니면 종류 고르기로 */
     const goBack = () => {
+        if (locked()) return
         setError(null)
+        invalidateConvert()
         if (kind === 'excel' && preview) setPreview(null)
         else setKind(null)
     }
@@ -187,6 +227,7 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
     const handleExcelPreview = async (file: File) => {
         setPreviewing(true)
         setError(null)
+        invalidateConvert()
         try {
             if (!myMap?.previewExcel) throw new Error('미리보기 실패')
             const res = await myMap.previewExcel(file)
@@ -206,6 +247,7 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
             setPreview(res)
             setFileName(file.name)
             setMode(next)
+            if (next !== 'ADDRESS') setDelivery('map')
             setPnuColumn(pnu)
             setLatColumn(lat)
             setLonColumn(lon)
@@ -274,6 +316,62 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
         }
     }
 
+    const handleConvert = async () => {
+        if (convertingRef.current) return
+        if (!preview || !addressColumn) {
+            setError('주소 컬럼을 선택해주세요')
+            return
+        }
+        if (overLimit || serverOverLimit) {
+            setError('행 수가 한도를 넘어 변환할 수 없습니다')
+            return
+        }
+        if (!myMap?.convertExcel) {
+            setError('주소 변환을 할 수 없습니다')
+            return
+        }
+        const seq = ++convertSeqRef.current
+        convertingRef.current = true
+        setSubmitting(true)
+        setError(null)
+        setConverted(null)
+        try {
+            const result = await myMap.convertExcel({ uploadId: preview.uploadId, addressColumn, include: toConvertInclude(flags), srid: convertSrid })
+            if (!aliveRef.current || seq !== convertSeqRef.current) return
+            // 끝나는 순간 한 번 내려받는다. 저장이 막혀도 결과 화면의 "엑셀 다시 받기"가 남는다
+            let notice: string | null = null
+            try {
+                saveBlob(result.file, result.fileName)
+            } catch {
+                notice = '파일을 자동으로 저장하지 못했습니다. "엑셀 다시 받기"를 눌러 주세요.'
+            }
+            setConverted({ result, sourceName: fileName, notice })
+        } catch (e) {
+            if (!aliveRef.current || seq !== convertSeqRef.current) return
+            if (e instanceof GisHttpError && e.status === 404) {
+                // 올린 파일이 없거나 만료 — 같은 uploadId로는 다시 못 한다. 파일 고르기 단계로 되돌린다(방식·붙일 열·좌표계는 유지)
+                setPreview(null)
+                setError(`${e.message || '올린 파일을 찾을 수 없습니다'} — 올린 파일을 다시 선택해 주세요.`)
+            } else {
+                // 503·413·500·429 등 — 같은 uploadId로 다시 시도할 수 있다(단추는 finally에서 다시 켜진다)
+                setError(e instanceof Error && e.message ? e.message : '주소 변환에 실패했습니다')
+            }
+        } finally {
+            if (seq === convertSeqRef.current) {
+                convertingRef.current = false
+                if (aliveRef.current) setSubmitting(false)
+            }
+        }
+    }
+
+    /** 결과 화면 → 마법사 처음(종류 고르기). 방식·붙일 열·좌표계는 그대로 둔다 */
+    const restart = () => {
+        invalidateConvert()
+        setKind(null)
+        setPreview(null)
+        setError(null)
+    }
+
     const selectedColumns = mode === 'PNU' ? [pnuColumn] : mode === 'ADDRESS' ? [addressColumn] : [latColumn, lonColumn]
     const usesParcel = mode === 'PNU' || mode === 'ADDRESS'
     const coverageNote = describeCoverage(quota?.coverage)
@@ -283,7 +381,7 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
     const columnSelect = (label: string, value: string, set: (v: string) => void) => (
         <label className="gm-wizard__field-row">
             <span className="gm-wizard__field-label">{label}</span>
-            <select value={value} onChange={e => set(e.target.value)} className="gm-modal__field gm-wizard__field-select">
+            <select value={value} disabled={converting} onChange={e => set(e.target.value)} className="gm-modal__field gm-wizard__field-select">
                 <option value="">선택</option>
                 {preview?.headers.map((h, i) => <option key={i} value={h}>{h}</option>)}
             </select>
@@ -297,6 +395,13 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
         ? `PNU · 주소 · 좌표 컬럼 중 하나 · 최대 ${formatCount(quota.maxRows.pnu)}행`
         : 'PNU · 주소 · 좌표 컬럼 중 하나'
 
+    if (converted) {
+        return <MyMapConvertResultDialog sourceName={converted.sourceName} result={converted.result} notice={converted.notice}
+            onRestart={restart} onClose={onClose} />
+    }
+
+    const convertRows = limit !== null ? limit : FALLBACK_CONVERT_ROWS
+
     return (
         <div className="gm-modal" onClick={onClose}>
             <div
@@ -307,7 +412,7 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
                 <div className="gm-modal__header">
                     <span className="gm-modal__title">나만의지도 업로드</span>
                     <ol className="gm-wizard__steps">
-                        {STEP_LABELS.map((label, i) => (
+                        {stepLabels.map((label, i) => (
                             <li key={label} className={cx('gm-wizard__step', step === i + 1 && 'gm-is-active', step > i + 1 && 'gm-is-done')}>
                                 {i + 1} {label}
                             </li>
@@ -390,7 +495,8 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
                                     {totalRows !== undefined ? `데이터 ${formatCount(totalRows)}행 · ` : ''}컬럼 {preview.headers.length}개
                                 </span>
                                 <button type="button" className="gm-wizard__link"
-                                    onClick={() => { setPreview(null); setError(null) }}>다른 파일</button>
+                                    disabled={converting}
+                                    onClick={() => { if (locked()) return; invalidateConvert(); setPreview(null); setError(null) }}>다른 파일</button>
                             </div>
                             {parcelNote && usesParcel && (
                                 <div className="gm-modal__note" title={coverageNote.title ?? undefined}>{parcelNote}</div>
@@ -403,7 +509,8 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
                                         {modes.map(m => (
                                             <label key={m} className={cx('gm-wizard__mode', mode === m && 'gm-is-active')}>
                                                 <input type="radio" name="gm-mymap-mode" value={m} checked={mode === m}
-                                                    onChange={() => { setMode(m); setError(null) }} />
+                                                    disabled={converting}
+                                                    onChange={() => { if (locked()) return; invalidateConvert(); setMode(m); if (m !== 'ADDRESS') setDelivery('map'); setError(null) }} />
                                                 {MODE_LABELS[m]}
                                                 {preview.suggestions?.mode === m && <span className="gm-wizard__recommend">(추천)</span>}
                                             </label>
@@ -416,10 +523,18 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
                                 columnSelect('PNU 컬럼', pnuColumn, setPnuColumn)
                             ) : mode === 'ADDRESS' ? (
                                 <>
-                                    {columnSelect('주소 컬럼', addressColumn, setAddressColumn)}
+                                    {columnSelect('주소 컬럼', addressColumn, v => { if (locked()) return; invalidateConvert(); setAddressColumn(v) })}
                                     <div className="gm-modal__note">
                                         도로명주소와 지번주소가 한 컬럼에 섞여 있어도 됩니다. 시도·시군구까지 적을수록 정확하고, 시도만 적어도 대부분 찾지만, 같은 이름이 여러 곳이면 "정하지 못했습니다"로 실패하며 결과 보고서에서 후보를 볼 수 있습니다. 도로명 또는 법정동(행정동 아님) 기준입니다.
                                     </div>
+                                    {convertAvailable && !legacy && (
+                                        <DeliveryChoice value={delivery} disabled={converting}
+                                            onChange={v => { if (locked()) return; invalidateConvert(); setDelivery(v); setError(null) }} />
+                                    )}
+                                    {toExcel && (
+                                        <ConvertOptions flags={flags} onFlags={v => { if (locked()) return; invalidateConvert(); setFlags(v) }} disabled={converting}
+                                            srid={convertSrid} onSrid={v => { if (locked()) return; invalidateConvert(); setConvertSrid(v) }} />
+                                    )}
                                 </>
                             ) : (
                                 <>
@@ -458,7 +573,7 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
                         </>
                     )}
 
-                    {fileReady && (
+                    {fileReady && !toExcel && (
                         <label className="gm-wizard__field-row">
                             <span className="gm-wizard__field-label">지도 이름</span>
                             <input value={name} onChange={e => setName(e.target.value)} placeholder="예: 우리 동네 필지"
@@ -471,15 +586,19 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
 
                 <div className="gm-wizard__footer">
                     <span className="gm-wizard__footer-note">
-                        {kind === 'excel' && !legacy ? '올리면 바로 닫히고, 패널에서 진행률과 결과를 볼 수 있습니다.' : ''}
+                        {kind === 'excel' && !legacy
+                            ? toExcel
+                                ? `최대 ${formatCount(convertRows)}행 · 변환은 바로 끝나고 엑셀이 내려받아집니다`
+                                : '올리면 바로 닫히고, 패널에서 진행률과 결과를 볼 수 있습니다.'
+                            : ''}
                     </span>
                     {kind !== null && (
                         <button type="button" className="gm-wizard__back" onClick={goBack} disabled={submitting}>이전</button>
                     )}
                     <button type="button" className="gm-wizard__submit" disabled={submitting || !fileReady}
-                        onClick={kind === 'shp' ? handleShpSubmit : handleExcelConfirm}>
+                        onClick={kind === 'shp' ? handleShpSubmit : toExcel ? handleConvert : handleExcelConfirm}>
                         {submitting && <Loader2 size={13} className="gm-loader" />}
-                        업로드
+                        {toExcel ? '변환하고 엑셀 받기' : '업로드'}
                     </button>
                 </div>
             </div>

@@ -2,11 +2,14 @@ package com.gtp.domain.mymap.infra;
 
 import com.gtp.domain.mymap.infra.AddressRefReader.Building;
 import com.gtp.domain.mymap.infra.AddressRefReader.BuildingKey;
+import com.gtp.domain.mymap.infra.AddressRefReader.JibunKey;
+import com.gtp.domain.mymap.infra.AddressRefReader.StandardParts;
 import com.gtp.domain.mymap.infra.AddressRefReader.LegalDong;
 import com.gtp.domain.mymap.infra.AddressRefReader.RoadCode;
 import com.gtp.domain.mymap.model.ImportFailureReason;
 import com.gtp.domain.mymap.port.AddressMatch;
 import com.gtp.domain.mymap.port.AddressResolver;
+import com.gtp.domain.mymap.port.StandardAddress;
 import com.gtp.domain.mymap.util.AddressNormalizer;
 import com.gtp.domain.mymap.util.AddressNormalizer.Kind;
 import com.gtp.domain.mymap.util.AddressNormalizer.Parsed;
@@ -54,16 +57,88 @@ public class TableAddressResolver implements AddressResolver {
         return reader.readyVersion() != null;
     }
 
+    @Override
+    public String referenceVersion() {
+        return reader.readyVersion();
+    }
+
+    // ---------- 표준 주소 (변환 전용) ----------
+
+    /**
+     * 해석된 행의 표준 주소. 지번주소는 법정동 사전(메모리)으로, 도로명주소는 도로명 입력 행이면 해석 때 찾은 건물로,
+     * 지번 입력 행이면 건물정보에서 지번으로 찾을 수 있을 때만({@link AddressRefReader#jibunLookupReady()} — 색인이 있을 때) 만든다.
+     * DB 조회는 도로 키 묶음 1회 + (지번 행이 있고 색인이 있으면) 지번 키 묶음 1회(500개씩).
+     */
+    @Override
+    public List<StandardAddress> standardize(List<AddressMatch> matches, boolean wantRoad, boolean wantJibun) {
+        String version = reader.readyVersion();
+        if (version == null) throw new CustomException(GisErrorCode.MYMAP_REF_UNAVAILABLE);
+        Dictionary dict = dictionaryFor(version);
+
+        Set<BuildingKey> roadKeys = new LinkedHashSet<>();
+        Set<JibunKey> jibunKeys = new LinkedHashSet<>();
+        boolean jibunLookup = wantRoad && matches.stream().anyMatch(m -> isMatched(m) && m.building() == null) && reader.jibunLookupReady();
+        for (AddressMatch m : matches) {
+            if (!isMatched(m) || !wantRoad) continue;
+            if (m.building() != null) roadKeys.add(keyOf(m.building()));
+            else if (jibunLookup && m.pnu().length() == 19) jibunKeys.add(jibunKeyOf(m.pnu()));
+        }
+        Map<BuildingKey, StandardParts> byRoad = roadKeys.isEmpty() ? Map.of() : reader.standardPartsByRoad(roadKeys);
+        Map<JibunKey, StandardParts> byJibun = jibunKeys.isEmpty() ? Map.of() : reader.standardPartsByJibun(jibunKeys);
+
+        List<StandardAddress> out = new ArrayList<>(matches.size());
+        for (AddressMatch m : matches) {
+            if (!isMatched(m)) {
+                out.add(StandardAddress.EMPTY);
+                continue;
+            }
+            String jibun = wantJibun ? StandardAddressFormatter.jibunOfPnu(m.pnu(), dict.byCode::get) : "";
+            String road = "";
+            if (wantRoad) {
+                StandardParts parts = m.building() != null ? byRoad.get(keyOf(m.building()))
+                        : (jibunLookup && m.pnu().length() == 19 ? byJibun.get(jibunKeyOf(m.pnu())) : null);
+                if (parts != null) road = StandardAddressFormatter.road(parts);
+            }
+            out.add(new StandardAddress(road, jibun));
+        }
+        return out;
+    }
+
+    @Override
+    public java.util.function.Function<String, String> jibunAddressFormatter() {
+        String version = reader.readyVersion();
+        if (version == null) return pnu -> "";
+        Dictionary dict = dictionaryFor(version);
+        return pnu -> StandardAddressFormatter.jibunOfPnu(pnu, dict.byCode::get);
+    }
+
+    private static boolean isMatched(AddressMatch m) {
+        return m != null && m.status() == AddressMatch.Status.MATCHED && m.pnu() != null;
+    }
+
+    private static BuildingKey keyOf(AddressMatch.BuildingRef b) {
+        return new BuildingKey(b.roadCd(), b.udgd(), b.main(), b.sub());
+    }
+
+    /** PNU 19자리 → 지번 찾기 키(법정동코드 10 + 산여부 + 본번 + 부번) */
+    private static JibunKey jibunKeyOf(String pnu) {
+        return new JibunKey(pnu.substring(0, 10), pnu.charAt(10) == '2' ? "1" : "0",
+                Integer.parseInt(pnu.substring(11, 15)), Integer.parseInt(pnu.substring(15, 19)));
+    }
+
     // ---------- 법정동 사전 ----------
 
     private static final class Dictionary {
         final String version;
         /** 이름(리가 있으면 리, 없으면 읍면동) → 같은 이름의 법정동 */
         final Map<String, List<LegalDong>> byName;
+        /** 법정동코드 → 법정동(표준 지번주소용) */
+        final Map<String, LegalDong> byCode;
 
-        Dictionary(String version, Map<String, List<LegalDong>> byName) {
+        Dictionary(String version, Map<String, List<LegalDong>> byName, Map<String, LegalDong> byCode) {
             this.version = version;
             this.byName = byName;
+            this.byCode = byCode;
         }
     }
 
@@ -74,13 +149,15 @@ public class TableAddressResolver implements AddressResolver {
             d = dictionary;
             if (d != null && d.version.equals(version)) return d;
             Map<String, List<LegalDong>> by = new HashMap<>();
+            Map<String, LegalDong> byCode = new HashMap<>();
             int n = 0;
             for (LegalDong l : reader.legalDongs()) {
                 if (l.admCd().length() != 10 || l.emd().isEmpty()) continue;
                 by.computeIfAbsent(l.li().isEmpty() ? l.emd() : l.li(), k -> new ArrayList<>(2)).add(l);
+                byCode.putIfAbsent(l.admCd(), l);
                 n++;
             }
-            d = new Dictionary(version, by);
+            d = new Dictionary(version, by, byCode);
             dictionary = d;
             log.info("[나만의지도] 법정동 사전을 만들었습니다 기준월={} {}건", version, n);
             return d;
@@ -250,7 +327,8 @@ public class TableAddressResolver implements AddressResolver {
         boolean scoped = p.sido() != null || areas.size() == 1;
         if (scoped && hits.size() == 1) {
             Building rep = representative(hits.values().iterator().next());
-            return AddressMatch.matched(rep.pnu(), p.normalized());
+            return AddressMatch.matched(rep.pnu(), p.normalized(),
+                    new AddressMatch.BuildingRef(rep.key().roadCd(), rep.key().udgd(), rep.key().main(), rep.key().sub()));
         }
         // 지역을 못 가렸거나(시도·시군구 생략) 같은 지역에 같은 번호가 둘 이상 — 고르지 않고 후보를 보여 준다
         List<String> candidates = new ArrayList<>();

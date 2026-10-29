@@ -181,6 +181,9 @@ CREATE TABLE ref.ti_spbd_buld (                   -- 건물정보, 건물 1건 =
     CONSTRAINT ti_spbd_buld_pkey PRIMARY KEY (bd_mgt_sn)
 );
 CREATE INDEX ix_ti_spbd_buld_road ON ref.ti_spbd_buld (road_cd, udgd_yn, buld_mnnm, buld_slno);   -- 도로명주소 → 지번 조회가 타는 인덱스
+-- (선택) 지번 → 건물 조회용 — 주소 변환 엑셀의 지번 입력 행 도로명주소. 없으면 앱이 그 열을 비운다(전체 스캔 방지). 약 300MB 추정.
+--   SQL 파일: backend/scripts/mymap-ref/add-ix-juso-jibun.sql (load-juso.sh가 새 표에도 만든다). 앱은 to_regclass('ref.ix_ti_spbd_buld_jibun')로 확인.
+CREATE INDEX IF NOT EXISTS ix_ti_spbd_buld_jibun ON ref.ti_spbd_buld (adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno);
 
 CREATE TABLE ref.ti_sprd_stret (                  -- 도로명코드, 도로명 1건 = 읍면동별 1행, 약 37만 행
     sgg_cd varchar(5) NOT NULL, road_no varchar(7) NOT NULL, emd_no varchar(2) NOT NULL,

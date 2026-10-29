@@ -42,6 +42,12 @@
 **주소 엑셀(2단계) 추가분** — 새·수정 파일 4곳이 Java 16 `record`를 쓴다(대체는 위 `record` 행과 같다: `final class` + final 필드 + 생성자 + getter):
 `mymap/util/AddressNormalizer.java`(`Parsed` — 필드 11개), `mymap/infra/AddressRefReader.java`(`LegalDong`·`RoadCode`·`BuildingKey`·`Building` — `BuildingKey`는 `Map` 키라 `equals`·`hashCode`를 직접 써야 한다), `mymap/service/UserMapImportJob.java`(`PnuRow`, `Request`의 보조 생성자 — 이미 있던 `record`에 필드 1개 추가), `mymap/port/AddressMatch.java`(옛 record 유지). 화살표 `switch`는 `UserMapImportJob.resolveAddresses`의 `switch (m.status())` 하나가 늘었다. 새 코드에 `Stream.toList()`·텍스트 블록·`instanceof` 패턴·`var`는 없다(`List.copyOf`·`String.strip`·`toArray(String[]::new)`는 JDK 11에서 된다). `AddressNormalizer`는 한글 식별자가 없지만 `InMemoryAddressRefReader.samples()`에는 한글 지역 변수 이름이 있다(시험·fake 전용, 이식 불필요).
 
+**주소 변환·내보내기 추가분(2026-10-29)** — 새 파일이 Java 16/17 문법을 쓴다. 대체 방법은 위 표와 같다:
+- `record`: `port/{StandardAddress,ParcelPoint}.java`, `port/AddressMatch.java`(`BuildingRef` 추가·컴포넌트 1개 늘림 — 옛 5개 인자 생성자 유지), `infra/AddressRefReader.java`(`JibunKey`·`StandardParts` — `JibunKey`는 `Map` 키라 `equals`·`hashCode` 필요, `StandardParts`는 compact 생성자의 null → "" 정리를 일반 생성자로), `infra/JdbcAddressRefReader.java`(`IndexState`), `util/ResultXlsx.java`(`Num`), `service/AddressConvertService.java`(`Options`, `RowResult`), `service/UserMapExportService.java`(`Prepared`).
+- `instanceof` 패턴 **새로 쓴다**: `util/ResultXlsx.java`(`v instanceof Num n`) — `if (v instanceof Num) { Num n = (Num) v; … }`.
+- `switch` 식·화살표: `UserMapExportService.parseFormat`, `StandardAddressFormatter.isEup`·`undergroundPrefix`, `CoordinateTransformUtil.buildFromWgs84`(기존 `buildTransform`과 같은 모양) — 전통 `switch`로.
+- `String.strip()`(11 OK), `"0".repeat(n)`(11 OK). `Stream.toList()`·텍스트 블록·`var`는 새 코드에 없다(`ArrayList` 사용). 인터페이스 `default` 메서드(8 OK)를 `PnuParcelProvider`·`AddressResolver`·`AddressRefReader`에 추가했다.
+
 설계문서 B3 표의 "`toList()` 11회/4파일"은 일부 파일(`UserMapService`, `GeoServerService`, `global/gis`)을 빠뜨린 수치였다.
 감사 스크립트 14번이 세는 16회(geotiff 1회 포함)와도 다르다 — geotiff의 1회는 `Collectors.toList()`라서 Java 16 API가 아니다(`GeoTiffService.java:98`).
 

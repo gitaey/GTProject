@@ -96,6 +96,8 @@ GTProject 구현은 JWT principal 문자열을 읽는다(`SecurityContextGisUser
 | U5 | POST `/api/mymap/upload/shp` | 로그인 | A | 선택: 업로드 |
 | U6 | POST `/api/mymap/upload/excel/preview` | 로그인 | A | 선택: 업로드 |
 | U7 | POST `/api/mymap/upload/excel/confirm` | 로그인 | A | 선택: 업로드 |
+| U23 | POST `/api/mymap/upload/excel/convert` | 로그인 | A | 선택: 주소 변환(엑셀로만 받기) |
+| U24 | GET `/api/mymap/{id}/export` | 로그인 | A | 선택: 내보내기(엑셀·GeoJSON) |
 | U8 | GET `/api/mymap/{id}/share` | 로그인 | A | 선택: 공유 |
 | U9 | PUT `/api/mymap/{id}/share` | 로그인 | A | 선택: 공유 |
 | U10 | PATCH `/api/mymap/{id}` | 소유자만 | A | 선택: 스타일·이름·표시 수정 |
@@ -480,6 +482,60 @@ WHERE coalesce(b.mv_rs_cd,'') NOT IN ('63','72');
 
 `{v, rowCount, truncated, columns:[{name, kind:"number"|"text", filled, numericCount, distinct, distinctCapped, min?, max?, quantiles?(21개), top[{value,count}] 20개}]}`. 볼 수 있는 사람만, 처리 중·실패 레이어는 409. 업로드가 끝날 때 `column_schema`에 기록한다.
 **숫자 판정 규칙**(서버 `NumericText`와 프론트 `readNumber`가 같아야 함): NFKC·JS `trim` 공백 정리 뒤 `^[+-]?(d+(.d*)?|.d+)([eE][+-]?d+)?$` 또는 올바르게 묶은 천 단위 쉼표만 숫자. 앞자리 0 코드(`007`)·`12%`·`NaN`·**절댓값 1e15 이상**은 숫자가 아니다. 컬럼은 값 있는 칸의 90% 이상이 숫자면 `number`. 공유 시험 표 `backend/src/test/resources/mymap/numeric-cases.json`(138건).
+
+### U23. POST `/api/mymap/upload/excel/convert` — 주소 변환("엑셀로만 받기"): 지도에 올리지 않고 결과 엑셀만 (구현: `mymap/service/AddressConvertService`)
+
+요청 JSON `{ uploadId, addressColumn, include:{pnu, roadAddress, jibunAddress, lonLat, area}, srid: 4326|5186|5179|3857 }`(include 생략 시 area만 끈 기본, srid 생략 시 4326). 응답 `ApiResponse<{ total, matched, failed, fileName, fileBase64, preview:{columns:[], rows:[[]]} }>` — `fileBase64`는 결과 .xlsx, `preview`는 앞 5행(결과 파일과 같은 열·값, 모두 문자열).
+
+1. **지도 레이어를 만들지 않는다(`tbl_user_map`·`tbl_user_map_feature` 쓰기 0), 결과를 서버에 저장하지 않는다.** 올린 임시 파일(uploadId)은 **변환이 성공한 직후에만** 지운다(성공 뒤 같은 uploadId는 404). 실패하면 — 검사 단계 거절(컬럼·좌표계·한도·503·429)이든 변환 도중 오류(503·413·500 등)든 — 지우지 않고 남겨 **같은 uploadId로 다시 시도**할 수 있게 하며, 남은 파일은 만료 정리(미리보기 TTL 30분, `PendingUploadRegistry.sweepExpired`·고아 파일 정리)가 지운다. **개인정보 안내 문구(정확한 표현)**: "엑셀로만 받기는 결과를 저장하지 않으며, 올린 임시 파일은 변환 성공 직후 지우고 실패하면 30분 만료 때 지운다." 사용자 락(`ImportGuard`)과 전체 동시 실행 칸(2)은 어느 경로에서도 `finally`로 돌려준다.
+2. 검사(순서): 업로드 없음·남의 업로드 404 `EXCEL_UPLOAD_NOT_FOUND` → 주소 컬럼이 머리글에 없음 400 `MYMAP_COLUMN_REQUIRED` → srid가 네 가지 밖 400 `MYMAP_SRID_UNSUPPORTED` → 행 수 > 5,000 400 `MYMAP_ROW_LIMIT`(읽는 도중에도 다시 검사) → 지적도·주소 자료 준비 안 됨 503 `MYMAP_REF_UNAVAILABLE` → 같은 사용자의 가져오기·변환이 돌고 있거나 전체 동시 2건 초과 429 `MYMAP_IMPORT_BUSY`. 결과 파일이 `limits.maxConvertResultMb`(25)를 넘으면 413 `MYMAP_FILE_TOO_LARGE`("변환 결과가 너무 큽니다(최대 25MB). 행을 나눠 올려 주세요").
+   **배포 주의(운영 프록시)**: 처음 보는 PNU 묶음은 대표점 쿼리가 묶음(500개)당 3.5~5.3초라(실측), 5,000행이 차가운 DB에서는 35~50초가 걸릴 수 있다. 프록시(nginx) 읽기 제한 시간을 **최소 120초**로 둔다 — 변환 경로 `/api/mymap/upload/excel/convert`에 `proxy_read_timeout 120s;`(기본 60초면 504로 끊긴다).
+3. 처리: 시트 읽기(셀 보이는 값, 한 번) → 주소 풀기(U7a, 같은 주소 한 번·500개씩) → 표준 주소 → 필지 대표점·면적(PNU 묶음 500) → 결과 엑셀(SXSSF). **필지를 지적도에서 못 찾으면 PNU·표준 주소는 보여 주되 실패(PARCEL_NOT_FOUND)로 센다**(가져오기와 같은 판정, 열 선택과 관계없이 항상 확인).
+4. 결과 열: **원본 열(보이는 값, 문자열)** + `매칭상태`(성공/실패) + `PNU`·`법정동코드`(PNU의 앞 10자리) + `표준_도로명주소` + `표준_지번주소` + `경도`·`위도`(srid 4326, 소수 7자리) 또는 `X좌표`·`Y좌표`(그 밖, m, 소수 2자리) + `필지면적_㎡`(소수 1자리) + 마지막 `실패사유/후보`(`ImportFailureReason` 한글 라벨, 후보가 있으면 `라벨 (후보: 가 / 나)`). 원본에 같은 이름이 있으면 `이름 (2)`. 실패 행도 지우지 않는다. 시트 `결과`·`열설명`(붙은 열의 뜻 + 지적도 기준월(load_meta parcel version) + 건물DB 기준월(ti_spbd_buld version) + 좌표계 + 처리 결과). 머리글 굵게·첫 행 고정·열 폭 자동(글자 수 기준, 최대 60). `열설명` 시트에는 "필지면적_㎡는 지구 표면 기준 계산값이라 토지대장 면적과 다를 수 있습니다", "지적도에 없는 필지는 실패로 세지만 PNU·표준 주소는 채워질 수 있습니다" 두 줄이 있다. **수식 주입 방지**: 문자열이 `= + - @`(또는 탭·CR·LF)로 시작하는 셀은 — 제어문자를 공백으로 바꾸기 전 원본과 바꾼 뒤 둘 다 검사 — **머리글 칸도 포함** 텍스트 서식 + quotePrefix로 쓴다(값은 그대로).
+5. **표준 도로명주소 규칙**(「도로명주소 활용 가이드(건물DB)」 붙임 2, 구현 `mymap/infra/StandardAddressFormatter`): `시도 + 시군구 + [법정읍면동(법정리명이 있을 때)] + 도로명 + [지하·공중·수상] + 건물본번[-건물부번(0이면 생략)] + (참고항목)`. 지하 `udgd_yn` 1·2·3 = "지하"·"공중"·"수상"을 본번 앞에 붙여 쓴다(`왕산로 지하205`). 참고항목은 도로명코드 표의 읍면동구분(`ti_sprd_stret.emd_gb`, 건물정보의 `emd_no`로 이어 붙임) 0 읍면 / 1 동 과 공동주택(`apt_yn`=1)으로: 읍면+비공동 → 없음, 읍면+공동 → `(시군구용건물명)`, 동+비공동 → `(법정동명)`, 동+공동 → `(법정동명, 시군구용건물명)`(건물명이 비면 있는 것만). 구분을 모르면(2 미부여·없음) 법정동 이름이 읍·면으로 끝나면 읍면, 아니면 동으로 본다. 시군구가 없으면(세종) 생략하고 공백은 하나. 지번주소는 `시도 시군구 법정동 [리] [산 ]본번[-부번]`(법정동 사전, DB 조회 없음).
+6. **도로명주소를 채우는 법**: 도로명 입력 행은 해석 때 찾은 건물(`AddressMatch.building`)로 → 키 묶음 쿼리 1회(500개씩):
+
+```sql
+-- addressRef.standardByRoad   (도로명코드+건물번호 인덱스 ix_ti_spbd_buld_road, 도로명코드 PK)
+SELECT DISTINCT ON (k.n) k.n, b.udgd_yn, b.buld_mnnm, b.buld_slno, b.ctp_kor_nm, b.sig_kor_nm, b.emd_kor_nm, b.li_kor_nm, b.rn, b.apt_yn, b.sgg_buld_nm, s.emd_gb
+FROM unnest(#{roadCds}::varchar[], #{udgds}::varchar[], #{mains}::int[], #{subs}::int[]) WITH ORDINALITY AS k(road_cd, udgd_yn, buld_mnnm, buld_slno, n)
+JOIN ref.ti_spbd_buld b ON b.road_cd = k.road_cd AND b.udgd_yn = k.udgd_yn AND b.buld_mnnm = k.buld_mnnm AND b.buld_slno = k.buld_slno
+LEFT JOIN ref.ti_sprd_stret s ON s.sgg_cd = substr(b.road_cd, 1, 5) AND s.road_no = substr(b.road_cd, 6, 7) AND s.emd_no = b.emd_no
+WHERE coalesce(b.mv_rs_cd, '') NOT IN ('63', '72')
+ORDER BY k.n, b.adm_cd, b.mntn_yn, b.lnbr_mnnm, b.lnbr_slno, b.bd_mgt_sn;   -- 건물군이면 지번이 가장 앞선 1건
+```
+
+   **지번 입력 행**은 건물정보를 `(adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno)`(PNU에서 뽑음)로 찾는다(같은 모양, `JOIN … ON b.adm_cd = k.adm_cd AND b.mntn_yn = k.mntn_yn AND b.lnbr_mnnm = k.lnbr_mnnm AND b.lnbr_slno = k.lnbr_slno`, `ORDER BY k.n, b.buld_mnnm, b.buld_slno, b.udgd_yn, b.bd_mgt_sn` — 건물본번·부번 오름차순 첫 1건, 못 찾으면 빈 칸). **이 키의 색인 `ix_ti_spbd_buld_jibun`이 없으면 1,072만 행 전체 스캔**이라 앱은 `SELECT to_regclass('ref.ix_ti_spbd_buld_jibun') IS NOT NULL`로 색인이 있을 때만 이 쿼리를 하고(결과는 적재 기준월 단위로 기억, "없음"은 5분 뒤 재확인), 없으면 지번 입력 행의 도로명주소를 비운다(열설명 문구는 같다). 색인 만들기: `backend/scripts/mymap-ref/add-ix-juso-jibun.sql`(`CREATE INDEX IF NOT EXISTS ix_ti_spbd_buld_jibun ON ref.ti_spbd_buld (adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno)`, 약 300MB 추정), `load-juso.sh`가 새 표에도 만든다.
+7. **PNU 공식**: `adm_cd || (mntn_yn::int + 1) || lpad(lnbr_mnnm, 4, '0') || lpad(lnbr_slno, 4, '0')`(U7a와 같음, 코드는 `TableAddressResolver.pnu`). **필지 대표점·면적**(`PnuParcelProvider.findPointsByPnus`, 연속지적도는 pnu 인덱스뿐이라 항상 PNU 목록으로 — 이름·지번으로 찾지 않는다):
+
+```sql
+-- parcel.points   (#{sidos}는 PNU 앞 2자리 목록 = 파티션 가지치기, #{pnus} 500개씩)
+SELECT pnu, ST_X(p) AS lon, ST_Y(p) AS lat, a FROM (
+  SELECT pnu, (array_agg(ST_PointOnSurface(g) ORDER BY ST_Area(g) DESC))[1] AS p,
+         sum(ST_Area(g::geography)) AS a            -- 면적을 끄면 NULL::float8 AS a
+  FROM (SELECT pnu, geom AS g FROM ref.lsmd_cont_ldreg WHERE sido = ANY(#{sidos}::char(2)[]) AND pnu = ANY(#{pnus}::varchar[])) s
+  GROUP BY pnu) t;
+```
+   대표점은 중심이 아니라 필지 **안쪽** 점(ST_PointOnSurface), 면적은 `ST_Area(geom::geography)`(㎡, 앱이 소수 1자리로 반올림). 4326이 아닌 좌표는 앱이 순변환한다(`CoordinateTransformUtil.buildFromWgs84` — 4326·3857·5186·5179, EPSG DB 조회 없음).
+8. 보안: SQL은 전부 바인딩, 주소 원문을 로그·예외 메시지에 남기지 않는다(로그는 행·성공·실패 수뿐).
+
+### U24. GET `/api/mymap/{id}/export?format=xlsx|geojson&srid=4326&includeFailed=false` — 레이어 내보내기(스트리밍 바이너리) (구현: `mymap/service/UserMapExportService`)
+
+1. **권한은 U3과 같다**(`UserMapService.loadExportable` 공용): 없음 404 `USER_MAP_NOT_FOUND`, 소유자·공유받은 사람(사용자·역할) 아니면 403 `USER_MAP_FORBIDDEN`, `READY`가 아니면 409 `USER_MAP_NOT_READY`. 형식 밖 400 `MYMAP_EXPORT_FORMAT_INVALID`, 좌표계 네 가지(4326·5186·5179·3857, `EPSG:` 접두 허용) 밖 400 `MYMAP_SRID_UNSUPPORTED`. **모든 검사는 본문을 쓰기 전에** 끝나 오류는 JSON 봉투다.
+2. 응답: `Content-Disposition: attachment; filename="=?UTF-8?Q?…?="; filename*=UTF-8''{레이어이름}_yyyyMMdd.{xlsx|geojson}`(Spring이 RFC 2047 `filename`과 RFC 5987 `filename*` **둘 다** 낸다 — 이식 환경은 `filename*`을 우선 읽게 한다. 이름에서 제어문자·따옴표·경로·`; % , &` 등을 `_`로, 앞뒤 점·공백·밑줄 제거, **코드포인트 기준** 80자 이하), `Cache-Control: no-store`, `Content-Type` = xlsx 표준 / `application/geo+json`. 브라우저가 읽는 헤더는 CORS `exposedHeaders`에 있어야 한다(`CorsConfig`: `Content-Disposition`·`X-Export-Failed-Skipped`).
+3. **메모리에 전부 올리지 않는다**: 피처는 U3과 같은 JDBC 커서(fetchSize 500, `ORDER BY id`)로 한 행씩 읽어 바로 쓴다(엑셀 SXSSF 100행 창·임시 파일, GeoJSON `JsonGenerator`). 서비스 메서드는 `@Transactional(readOnly = true)`.
+   **동시 실행 제한**: 커서 때문에 스트리밍하는 내내 DB 연결을 잡는다(이 한계는 그대로). 그래서 **전체 동시 2건**으로 제한해 연결 풀 고갈을 막는다 — 자리가 없으면 본문·헤더를 쓰기 전에 429 `MYMAP_EXPORT_BUSY`("내보내기가 많아 잠시 후 다시 시도해 주세요."). 자리는 본문을 다 쓰거나 예외가 나거나 클라이언트가 끊으면 `finally`에서 돌려준다(스트림이 끝나기 전에는 풀리지 않는다).
+   **알려진 한계**: 본문을 쓰기 시작한 뒤 DB 오류가 나면 이미 200 응답이라 JSON 봉투를 못 돌려주고 **잘린 파일**(GeoJSON은 닫히지 않은 JSON)이 될 수 있다. 서버 로그에만 남는다 — 받는 쪽(프론트)은 GeoJSON 파싱 실패·엑셀 열기 실패를 오류로 안내한다.
+
+```sql
+-- export.features   (JdbcTemplate, fetchSize 500)
+SELECT pnu, geometry_json, properties_json FROM tbl_user_map_feature WHERE user_map_id = #{id} ORDER BY id;
+-- export.failures   (includeFailed=true, 1,000건씩 쪽 넘김)
+SELECT * FROM tbl_user_map_import_failure WHERE user_map_id = #{id} ORDER BY row_no, id;     -- + 건수: SELECT count(*) … WHERE user_map_id = #{id}
+```
+4. **엑셀 열**: 속성 열(`column_schema.columns[].name` 순서) + [`PNU`·`표준_지번주소` — 레이어 `source_kind`가 EXCEL_PNU·EXCEL_ADDRESS일 때만, 지번주소는 PNU로 법정동 사전에서] + `경도`·`위도`(srid 4326) 또는 `X좌표`·`Y좌표`(m; 점은 그 점, 그 밖은 모양 안쪽 점 = JTS getInteriorPoint) + (`includeFailed`) `매칭상태`·`실패사유`. 이름이 겹치면 `이름 (2)`. 수식 주입 방지·머리글·첫 행 고정은 U23과 같다.
+   `includeFailed=true`면 보관 중인 실패 행(`tbl_user_map_import_failure`, 30일)을 **성공 행 뒤에** 덧붙인다(원본 값 + `실패` + 사유 라벨(+ 후보)). 실패가 있었는데(`failed_count > 0`) 보관 기간이 지나 행이 없으면 건너뛰고(열도 붙이지 않음) 응답 헤더 `X-Export-Failed-Skipped: true`. GeoJSON에서는 `includeFailed`를 무시한다.
+5. **GeoJSON**: 저장된 피처 그대로(`{"type":"Feature","geometry":<geometry_json>,"properties":<properties_json 또는 {}>}`). srid가 4326이 아니면 geometry의 모든 좌표를 순변환(미터 좌표계는 소수 3자리, 높이 값은 그대로)하고 `FeatureCollection`에 `"crs":{"type":"name","properties":{"name":"urn:ogc:def:crs:EPSG::5186"}}`를 넣는다(4326이면 생략).
 
 ### U19 이후(아직 없음) · U11·U12
 

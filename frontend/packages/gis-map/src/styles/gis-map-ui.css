@@ -4311,3 +4311,231 @@
     border-left: 1px solid #f1f5f9;
     color: #9ca3af;
 }
+
+/* ── 나만의지도 주소 변환(엑셀로만 받기)·내보내기 (ui/mymap/MyMapConvertForm·MyMapConvertResultDialog·MyMapExportDialog) — gm-modal·gm-wizard 위에 얹는 조각 ── */
+/* 라디오 카드 둘(결과 받는 방법 · 내보내기 형식) */
+.gm-delivery {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.gm-delivery__options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.gm-delivery__option {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 9px 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 11.5px;
+    cursor: pointer;
+}
+
+.gm-delivery__option.gm-is-active {
+    border-color: var(--gm-primary);
+    background: rgba(var(--gm-primary-rgb), .06);
+}
+
+.gm-delivery__head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.gm-delivery__head input {
+    margin: 0;
+    accent-color: var(--gm-primary);
+}
+
+.gm-delivery__title {
+    font-weight: 700;
+    color: #111827;
+}
+
+.gm-delivery__desc {
+    margin-left: 18px;
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: #6b7280;
+}
+
+/* 결과 엑셀에 붙일 열 체크 묶음(내보내기의 체크 한 줄도 같은 모양) */
+.gm-convert-opts {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.gm-convert-opts legend {
+    padding: 0;
+    margin-bottom: 5px;
+}
+
+.gm-convert-opts__chk {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    color: #374151;
+    cursor: pointer;
+}
+
+.gm-convert-opts__chk input {
+    margin: 0;
+    accent-color: var(--gm-primary);
+}
+
+.gm-convert-opts__chk.gm-is-disabled {
+    color: #9ca3af;
+    cursor: default;
+}
+
+.gm-convert-opts__hint {
+    font-size: 10.5px;
+    color: #9ca3af;
+}
+
+/* 변환 결과 화면 */
+.gm-upload-modal--result {
+    width: 760px;
+}
+
+.gm-convert-result__title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gm-convert-result__file {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid #fed7aa;
+    border-radius: 8px;
+    background: rgba(var(--gm-primary-rgb), .06);
+}
+
+.gm-convert-result__file-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.gm-convert-result__file-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.gm-convert-result__file-meta {
+    font-size: 10.5px;
+    color: #6b7280;
+}
+
+.gm-convert-result__hint {
+    font-weight: 400;
+    color: #9ca3af;
+}
+
+/* 미리보기 표: 붙은 열(주황 머리글)·실패 행(연한 빨강)·상태 글자색 */
+.gm-wizard__table th.gm-is-appended {
+    background: #fff3eb;
+    color: #c2410c;
+}
+
+.gm-wizard__table td.gm-is-appended {
+    background: #fffaf5;
+}
+
+.gm-wizard__table tr.gm-is-fail td {
+    background: #fef2f2;
+}
+
+.gm-wizard__table tr.gm-is-fail td.gm-is-appended {
+    background: #fee2e2;
+}
+
+.gm-wizard__table td.gm-is-ok {
+    color: #16a34a;
+    font-weight: 700;
+}
+
+.gm-wizard__table td.gm-is-bad {
+    color: #ef4444;
+    font-weight: 700;
+}
+
+.gm-convert-result__legend {
+    display: flex;
+    gap: 12px;
+    font-size: 10.5px;
+    color: #6b7280;
+}
+
+.gm-convert-result__swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 4px;
+    border-radius: 2px;
+    vertical-align: -1px;
+}
+
+.gm-convert-result__swatch--add {
+    background: #fff3eb;
+    border: 1px solid #fed7aa;
+}
+
+.gm-convert-result__swatch--fail {
+    background: #fee2e2;
+}
+
+/* 내보내기 대화상자 */
+.gm-export-dialog {
+    display: flex;
+    flex-direction: column;
+    width: 440px;
+    max-width: calc(100vw - 24px);
+    max-height: 85vh;
+    overflow: hidden;
+}
+
+.gm-export-dialog .gm-modal__body {
+    overflow-y: auto;
+}
+
+.gm-export-dialog__title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gm-export-dialog__field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.gm-export-dialog__opt {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}

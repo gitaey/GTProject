@@ -22,6 +22,33 @@ public final class CoordinateTransformUtil {
         double[] toLonLat(double x, double y);
     }
 
+    public interface FromWgs84 {
+        /** (lon, lat) EPSG:4326 -> [x, y] 대상 좌표계(5186·5179·3857은 미터, 4326은 도) */
+        double[] toXy(double lon, double lat);
+    }
+
+    /** 내보내기·변환 결과가 쓰는 좌표계(숫자). 이 밖의 값은 {@link #buildFromWgs84}가 거절한다. */
+    public static final java.util.List<Integer> OUTPUT_SRIDS = java.util.List.of(4326, 5186, 5179, 3857);
+
+    /**
+     * 4326 경도·위도 → 대상 좌표계(순변환). 역변환 {@link #buildTransform}과 같은 공식·파라미터를 쓴다.
+     * @throws IllegalArgumentException 4326·3857·5186·5179가 아닐 때
+     */
+    public static FromWgs84 buildFromWgs84(String targetSrid) {
+        String srid = normalize(targetSrid);
+        return switch (srid) {
+            case "EPSG:4326" -> (lon, lat) -> new double[]{lon, lat};
+            case "EPSG:3857" -> CoordinateTransformUtil::lonLatToWebMercator;
+            case "EPSG:5179" -> new TransverseMercator(
+                    6378137.0, 1 / 298.257222101,
+                    Math.toRadians(38), Math.toRadians(127.5), 0.9996, 1_000_000, 2_000_000);
+            case "EPSG:5186" -> new TransverseMercator(
+                    6378137.0, 1 / 298.257222101,
+                    Math.toRadians(38), Math.toRadians(127), 1.0, 200_000, 600_000);
+            default -> throw new IllegalArgumentException("지원하지 않는 좌표계입니다: " + targetSrid);
+        };
+    }
+
     public static ToWgs84 buildTransform(String sourceSrid) {
         String srid = normalize(sourceSrid);
         return switch (srid) {
@@ -53,6 +80,13 @@ public final class CoordinateTransformUtil {
         return new Coordinate(lonLat[0], lonLat[1]);
     }
 
+    private static double[] lonLatToWebMercator(double lon, double lat) {
+        double r = 6378137.0;
+        double x = r * Math.toRadians(lon);
+        double y = r * Math.log(Math.tan(Math.PI / 4 + Math.toRadians(lat) / 2));
+        return new double[]{x, y};
+    }
+
     private static double[] webMercatorToLonLat(double x, double y) {
         double r = 6378137.0;
         double lon = Math.toDegrees(x / r);
@@ -71,7 +105,31 @@ public final class CoordinateTransformUtil {
      * Manual" 공식). 5186/5179 모두 GRS80 타원체를 쓰는 TM 계열 좌표계라 파라미터만 바꿔 재사용한다.
      */
     private record TransverseMercator(double a, double f, double lat0, double lon0, double k0,
-                                       double falseEasting, double falseNorthing) implements ToWgs84 {
+                                       double falseEasting, double falseNorthing) implements ToWgs84, FromWgs84 {
+
+        /** 순변환(Snyder 8-9, 8-10) — 역변환과 같은 파라미터 */
+        @Override
+        public double[] toXy(double lon, double lat) {
+            double e2 = f * (2 - f);
+            double ePrime2 = e2 / (1 - e2);
+            double phi = Math.toRadians(lat);
+            double sinPhi = Math.sin(phi);
+            double cosPhi = Math.cos(phi);
+            double tanPhi = Math.tan(phi);
+            double n = a / Math.sqrt(1 - e2 * sinPhi * sinPhi);
+            double t = tanPhi * tanPhi;
+            double c = ePrime2 * cosPhi * cosPhi;
+            double aa = (Math.toRadians(lon) - lon0) * cosPhi;
+            double m = meridionalArc(a, e2, phi);
+            double m0 = meridionalArc(a, e2, lat0);
+            double x = falseEasting + k0 * n * (aa
+                    + (1 - t + c) * Math.pow(aa, 3) / 6
+                    + (5 - 18 * t + t * t + 72 * c - 58 * ePrime2) * Math.pow(aa, 5) / 120);
+            double y = falseNorthing + k0 * (m - m0 + n * tanPhi * (aa * aa / 2
+                    + (5 - t + 9 * c + 4 * c * c) * Math.pow(aa, 4) / 24
+                    + (61 - 58 * t + t * t + 600 * c - 330 * ePrime2) * Math.pow(aa, 6) / 720));
+            return new double[]{x, y};
+        }
 
         @Override
         public double[] toLonLat(double x, double y) {

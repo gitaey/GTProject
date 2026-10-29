@@ -95,11 +95,21 @@ public class UserMapService {
      */
     @Transactional(readOnly = true)
     public void assertCanStreamGeoJson(Long id, String userId, List<String> roleCodes) {
+        loadExportable(id, userId, roleCodes);
+    }
+
+    /**
+     * geojson 스트리밍·내보내기가 공통으로 쓰는 검사: 레이어가 있고(404), 볼 수 있는 사람(소유자·공유받은 사람, 403)이며, 처리가 끝났을 때(READY, 409)만
+     * 레이어를 돌려준다. 내보내기는 geojson과 권한이 같다.
+     */
+    @Transactional(readOnly = true)
+    public UserMap loadExportable(Long id, String userId, List<String> roleCodes) {
         UserMap map = findById(id);
         permissionService.assertCanView(map, userId, roleCodes);
         if (!"READY".equals(map.getStatus())) {
             throw new CustomException(GisErrorCode.USER_MAP_NOT_READY);
         }
+        return map;
     }
 
     /**

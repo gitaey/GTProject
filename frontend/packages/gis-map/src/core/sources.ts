@@ -6,8 +6,8 @@ import type { GeoJsonObject } from './types/geojson'
 import type { GeoTiffItem, GeoTiffStatus } from './types/geotiff'
 import type { LayerDef, LayerTree } from './types/layer'
 import type {
-    ExcelConfirmInput, ExcelPreviewResponse, MyMapConfirmResult, MyMapImportReport, MyMapImportReportQuery, MyMapQuota, MyMapSampleKind,
-    MyMapUpdateInput, ShpUploadInput, UserMapListItem, UserMapShare, UserMapStatus,
+    ExcelConfirmInput, ExcelPreviewResponse, MyMapConfirmResult, MyMapConvertInput, MyMapConvertResult, MyMapExportOptions, MyMapExportResult,
+    MyMapImportReport, MyMapImportReportQuery, MyMapQuota, MyMapSampleKind, MyMapUpdateInput, ShpUploadInput, UserMapListItem, UserMapShare, UserMapStatus,
 } from './types/mymap'
 import type { AddressSearchItem, VWorldLegendItem } from './types/search'
 import type { WindField, WindFrameMeta, WindScalarField } from './types/wind'
@@ -108,6 +108,11 @@ export interface MyMapSource {
     // ── 3단계(스타일·라벨·팝업) ──
     /** 부분 수정(PATCH, 등록자만 — 아니면 서버가 403으로 거절하고 message로 reject). 빠진 키는 그대로, styleConfig ''는 지움. 없으면 스타일 저장 단추가 안 나온다 */
     update?(id: number, patch: MyMapUpdateInput): Promise<void>
+    // ── 주소 변환·내보내기 ──
+    /** 엑셀의 주소를 PNU·표준 주소·좌표로 바꾼 결과 엑셀을 돌려준다(레이어를 만들지 않음, 서버에 저장 안 함). 없으면 업로드 마법사에 `엑셀로만 받기`가 안 나온다. 올린 파일이 없거나 만료(404)면 상태가 보이는 `GisHttpError(404)`로 reject하라 — 마법사가 파일 고르기로 되돌린다. 그 밖의 오류는 같은 uploadId로 다시 시도할 수 있어야 한다 */
+    convertExcel?(input: MyMapConvertInput): Promise<MyMapConvertResult>
+    /** 레이어를 엑셀·GeoJSON으로 내보낸다(소유자·공유받은 사람). `signal`이 abort되면 요청을 취소한다(대화상자를 닫을 때). 없으면 ⋯ 메뉴에 `내보내기…`가 안 나온다 */
+    exportLayer?(id: number, opts: MyMapExportOptions, signal?: AbortSignal): Promise<MyMapExportResult>
 }
 
 export interface GeoTiffSource {

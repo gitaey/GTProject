@@ -2,6 +2,7 @@ package com.gtp.domain.mymap.infra;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 /**
  * {@link TableAddressResolver}가 읽는 주소 자료의 좁은 문. 기본 구현은 도로명주소 건물DB 표를 읽는 {@link JdbcAddressRefReader},
@@ -29,6 +30,50 @@ public interface AddressRefReader {
         public String pnu() {
             return TableAddressResolver.pnu(admCd, mountain, lnbrMain, lnbrSub);
         }
+    }
+
+    /** 지번으로 건물 찾기 키: 법정동코드(10) + 산여부("0" 대지·"1" 산) + 지번본번 + 지번부번 */
+    record JibunKey(String admCd, String mntn, int main, int sub) {
+    }
+
+    /**
+     * 표준 도로명주소의 재료(건물 1건). udgd = 지하여부("0" 지상·"1" 지하·"2" 공중·"3" 수상), emdGb = 도로명코드 표의 읍면동구분
+     * ("0" 읍면·"1" 동·"2" 미부여, 모르면 ""), buildingName = 시군구용 건물명(없으면 "").
+     */
+    record StandardParts(String sido, String sigungu, String emd, String li, String roadName, String udgd, int main, int sub,
+                         boolean apartment, String buildingName, String emdGb) {
+
+        public StandardParts {
+            sido = sido == null ? "" : sido.strip();
+            sigungu = sigungu == null ? "" : sigungu.strip();
+            emd = emd == null ? "" : emd.strip();
+            li = li == null ? "" : li.strip();
+            roadName = roadName == null ? "" : roadName.strip();
+            udgd = udgd == null ? "" : udgd.strip();
+            buildingName = buildingName == null ? "" : buildingName.strip();
+            emdGb = emdGb == null ? "" : emdGb.strip();
+        }
+    }
+
+    /**
+     * 지번 → 건물 조회(색인 ix_ti_spbd_buld_jibun)를 써도 되는가. 건물 표에 (법정동코드, 산여부, 지번본번, 지번부번) 색인이 없으면 이 조회가
+     * 1,000만 행 전체 스캔이라 false여야 한다(그러면 지번 입력 행의 도로명주소 열은 비워 둔다).
+     */
+    default boolean jibunLookupReady() {
+        return false;
+    }
+
+    /** 건물번호(도로 키)로 표준 주소 재료를 찾는다. 같은 키에 건물이 여럿(건물군)이면 지번이 가장 앞선 1건. 폐지 건물 제외. */
+    default Map<BuildingKey, StandardParts> standardPartsByRoad(Collection<BuildingKey> keys) {
+        return Map.of();
+    }
+
+    /**
+     * 지번으로 표준 주소 재료를 찾는다. 건물이 여럿이면 건물본번·부번 오름차순 첫 1건, 없으면 결과에서 빠진다.
+     * {@link #jibunLookupReady()}가 true일 때만 부른다.
+     */
+    default Map<JibunKey, StandardParts> standardPartsByJibun(Collection<JibunKey> keys) {
+        return Map.of();
     }
 
     /** 주소 자료가 읽을 수 있는 상태면 그 기준월(예 "2026-09"), 아니면 null. 기준월이 바뀌면 법정동 사전을 다시 만든다. */

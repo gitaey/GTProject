@@ -2,12 +2,14 @@
 // components/map/panel/MyMapPanel.tsx(목록·상태·삭제), mymap/MyMapUploadModal.tsx(shp·엑셀 업로드), mymap/MyMapShareDialog.tsx(공유)의
 // fetch 호출을 여기로 모았다. 업로드는 FormData라 Content-Type을 직접 넣지 않는다(브라우저가 boundary를 붙임).
 // 1단계: quota·samples·import-report(.xlsx), 엑셀 확인의 mode·pnuColumn·addressColumn.
+import { GisHttpError } from '../../core'
 import type {
-    BulkShareMode, BulkShareResult, ExcelConfirmInput, ExcelPreviewResponse, GeoJsonObject, MyMapConfirmResult, MyMapImportReport,
-    MyMapImportReportQuery, MyMapQuota, MyMapSampleKind, MyMapSource, MyMapUpdateInput, ShareChange, ShareEntryState, ShareSnapshot,
-    ShareTargetSource, ShpUploadInput, SourceContext, UserMapListItem, UserMapShare, UserMapStatus,
+    BulkShareMode, BulkShareResult, ExcelConfirmInput, ExcelPreviewResponse, GeoJsonObject, MyMapConfirmResult, MyMapConvertInput,
+    MyMapConvertPreview, MyMapConvertResult, MyMapExportOptions, MyMapExportResult, MyMapImportReport, MyMapImportReportQuery, MyMapQuota,
+    MyMapSampleKind, MyMapSource, MyMapUpdateInput, ShareChange, ShareEntryState, ShareSnapshot, ShareTargetSource, ShpUploadInput, SourceContext,
+    UserMapListItem, UserMapShare, UserMapStatus,
 } from '../../core'
-import { apiUrl, readBlob, readEnvelope } from './envelope'
+import { apiUrl, base64ToBlob, dispositionFileName, readBlob, readEnvelope } from './envelope'
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' }
 
@@ -25,6 +27,16 @@ function confirmBody(input: ExcelConfirmInput): string {
     add('addressColumn', input.addressColumn)
     add('description', input.description)
     return JSON.stringify(body)
+}
+
+/** POST upload/excel/convert 응답(data). 파일은 base64로 온다 */
+interface ConvertWire {
+    total?: number
+    matched?: number
+    failed?: number
+    fileName?: string
+    fileBase64?: string
+    preview?: Partial<MyMapConvertPreview> | null
 }
 
 /** 공유 응답 한 건(A3·A5). 옛 서버는 userIds·roleCodes만 준다 → 이름·상태 없이 ACTIVE로 채운다 */
@@ -180,6 +192,45 @@ export function restMyMap(ctx: SourceContext): MyMapSource {
                 await ctx.http.fetch(url(`/${id}`), { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(body) }),
                 '저장하지 못했습니다',
             )
+        },
+
+        /** POST upload/excel/convert — 레이어를 만들지 않고 결과 엑셀(base64)을 돌려받아 Blob으로. 오류는 봉투의 message */
+        async convertExcel(input: MyMapConvertInput): Promise<MyMapConvertResult> {
+            const body = JSON.stringify({ uploadId: input.uploadId, addressColumn: input.addressColumn, include: input.include, srid: input.srid })
+            const res = await ctx.http.fetch(url('/upload/excel/convert'), { method: 'POST', headers: JSON_HEADERS, body })
+            // 404 = 올린 파일(uploadId)이 없거나 만료 — 상태가 보이는 GisHttpError로 던져 화면이 파일 고르기로 돌려보낸다. 그 밖의 오류는 봉투의 message
+            if (res.status === 404) {
+                let message = '올린 파일을 찾을 수 없습니다'
+                try {
+                    const json = (await res.json()) as { message?: unknown }
+                    if (typeof json.message === 'string' && json.message) message = json.message
+                } catch {
+                    // 본문이 JSON이 아님 — 기본 문구
+                }
+                throw new GisHttpError(404, message)
+            }
+            const data = await readEnvelope<ConvertWire | null>(res, '주소 변환에 실패했습니다')
+            if (!data || !data.fileBase64) throw new Error('주소 변환에 실패했습니다')
+            return {
+                total: data.total ?? 0,
+                matched: data.matched ?? 0,
+                failed: data.failed ?? 0,
+                fileName: data.fileName || '주소변환결과.xlsx',
+                file: base64ToBlob(data.fileBase64),
+                preview: { columns: data.preview?.columns ?? [], rows: data.preview?.rows ?? [] },
+            }
+        },
+
+        /** GET /{id}/export — 봉투 없는 바이너리. 파일 이름은 Content-Disposition(filename* 우선), 헤더 X-Export-Failed-Skipped: true면 실패 행 못 담음 */
+        async exportLayer(id: number, opts: MyMapExportOptions, signal?: AbortSignal): Promise<MyMapExportResult> {
+            const qs = `format=${opts.format}&srid=${opts.srid}&includeFailed=${opts.includeFailed ? 'true' : 'false'}`
+            const res = await ctx.http.fetch(url(`/${id}/export?${qs}`), signal ? { signal } : undefined)
+            const blob = await readBlob(res, '내보내기에 실패했습니다')
+            return {
+                blob,
+                fileName: dispositionFileName(res.headers.get('Content-Disposition'), `나만의지도_${id}.${opts.format}`),
+                failedSkipped: res.headers.get('X-Export-Failed-Skipped') === 'true',
+            }
         },
     }
 }

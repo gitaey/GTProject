@@ -89,6 +89,7 @@ preflight() {
 # load_one <약칭> <표> <파일 패턴> <최소 파일 수> <COPY 열 목록> <PK 열> <추가 인덱스 접미사> <추가 인덱스 열> <한글 점검 열>
 load_one() {
   local key=$1 t=$2 pattern=$3 minfiles=$4 cols=$5 pk=$6 ixs=$7 ixcols=$8 hcol=$9
+  local ix2s=${10:-} ix2cols=${11:-}   # 두 번째 인덱스(선택) — 건물정보의 지번 → 건물 색인
   CUR=$t
   local new="ref.${t}_new" cur="ref.${t}" files=() f
   shopt -s nullglob
@@ -147,6 +148,8 @@ load_one() {
   log "PK·인덱스 만드는 중"
   local ix_sql=""
   [[ -z "$ixs" ]] || ix_sql="CREATE INDEX ix_${t}_new_${ixs} ON $new ($ixcols);"
+  [[ -z "$ix2s" ]] || ix_sql="$ix_sql
+CREATE INDEX ix_${t}_new_${ix2s} ON $new ($ix2cols);"
   qf <<SQL || return 1
 SET maintenance_work_mem = '$MWM';
 ALTER TABLE $new ADD CONSTRAINT ${t}_new_pkey PRIMARY KEY ($pk);
@@ -158,6 +161,8 @@ SQL
   log "교체 중"
   local ix_rename=""
   [[ -z "$ixs" ]] || ix_rename="ALTER INDEX ref.ix_${t}_new_${ixs} RENAME TO ix_${t}_${ixs};"
+  [[ -z "$ix2s" ]] || ix_rename="$ix_rename
+ALTER INDEX ref.ix_${t}_new_${ix2s} RENAME TO ix_${t}_${ix2s};"
   qf <<SQL || return 1
 BEGIN;
 SET LOCAL lock_timeout = '30s';
@@ -192,7 +197,7 @@ STRET_COLS="sgg_cd,road_no,rn,rn_eng,emd_no,ctp_kor_nm,sig_kor_nm,emd_gb,emd_cd,
 
 # 도로명코드(작음) → 건물정보 → 관련지번 순
 has stret && { load_one stret ti_sprd_stret 'road_code_total.txt' 1 "$STRET_COLS" "sgg_cd, road_no, emd_no" name "ctp_kor_nm, sig_kor_nm, rn" rn || { fail=1; log "실패 — 지난 데이터는 그대로입니다"; }; }
-has buld  && { load_one buld  ti_spbd_buld  'build_*.txt' 16 "$BULD_COLS" "bd_mgt_sn" road "road_cd, udgd_yn, buld_mnnm, buld_slno" rn || { fail=1; log "실패 — 지난 데이터는 그대로입니다"; }; }
+has buld  && { load_one buld  ti_spbd_buld  'build_*.txt' 16 "$BULD_COLS" "bd_mgt_sn" road "road_cd, udgd_yn, buld_mnnm, buld_slno" rn jibun "adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno" || { fail=1; log "실패 — 지난 데이터는 그대로입니다"; }; }
 has mvmn  && { load_one mvmn  ti_scco_mvmn  'jibun_*.txt' 16 "$MVMN_COLS" "road_cd, udgd_yn, buld_mnnm, buld_slno, jibun_seq" "" "" emd_kor_nm || { fail=1; log "실패 — 지난 데이터는 그대로입니다"; }; }
 
 CUR=main

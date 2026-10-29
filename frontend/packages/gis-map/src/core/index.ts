@@ -104,6 +104,7 @@ export type {
     MyMapImportReport, MyMapImportReportRow, MyMapImportReportQuery,
     MyMapDisplay, MyMapStyleClass, MyMapCategorizedStyle, MyMapBreakMethod, MyMapGraduatedStyle, MyMapClassify, MyMapLabelStyle,
     MyMapPopupStyle, MyMapStyleConfig, MyMapColumnInfo, MyMapUpdateInput,
+    MyMapExportSrid, MyMapConvertInclude, MyMapConvertInput, MyMapConvertPreview, MyMapConvertResult, MyMapExportFormat, MyMapExportOptions, MyMapExportResult,
 } from './types/mymap'
 export type { GeoTiffItem, GeoTiffStatus } from './types/geotiff'
 export type { AddressSearchItem, VWorldLegendItem } from './types/search'

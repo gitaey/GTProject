@@ -90,7 +90,8 @@ class UserMapStylePatchTest {
         UserMapShareService shareService = new UserMapShareService(repo, userAccess, permAccess, com.gtp.domain.mymap.FakeShareDirectory.standard());
         UserMapService service = new UserMapService(repo, featureRepo, failureRepo, perm, columns, jdbc, shareService);
         UserMapController controller = new UserMapController(service, mock(UserMapUploadService.class), mock(ImportReportService.class),
-                mock(MyMapQuotaService.class), columns, mock(SampleService.class), user, shareService);
+                mock(MyMapQuotaService.class), columns, mock(SampleService.class), user, shareService,
+                mock(AddressConvertService.class), mock(UserMapExportService.class));
         mvc = MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new GlobalExceptionHandler()).build();
 
         layer = repo.saveAndFlush(UserMap.builder().name("내 레이어").description("설명").ownerId("alice").sourceType("EXCEL").sourceKind("EXCEL_PNU")

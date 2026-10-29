@@ -103,7 +103,7 @@ UNLOGGED 표는 WAL(복구 기록)을 쓰지 않아서 대량 적재가 빠르�
 
 | 표 | 원본 파일 | 행 수(2026-09) | 키·인덱스 |
 |---|---|---|---|
-| `ref.ti_spbd_buld` | `build_*.txt` | 약 1,072만 | PK `bd_mgt_sn`, `ix_ti_spbd_buld_road (road_cd, udgd_yn, buld_mnnm, buld_slno)` |
+| `ref.ti_spbd_buld` | `build_*.txt` | 약 1,072만 | PK `bd_mgt_sn`, `ix_ti_spbd_buld_road (road_cd, udgd_yn, buld_mnnm, buld_slno)`, `ix_ti_spbd_buld_jibun (adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno)`(선택 — 아래 "지번 색인") |
 | `ref.ti_scco_mvmn` | `jibun_*.txt` | 약 177만 | PK `(road_cd, udgd_yn, buld_mnnm, buld_slno, jibun_seq)` |
 | `ref.ti_sprd_stret` | `road_code_total.txt` | 약 37만 | PK `(sgg_cd, road_no, emd_no)`, `ix_ti_sprd_stret_name (ctp_kor_nm, sig_kor_nm, rn)` |
 
@@ -119,4 +119,23 @@ UNLOGGED 표는 WAL(복구 기록)을 쓰지 않아서 대량 적재가 빠르�
 3. 앱 재시작은 필요 없다. 앱은 업로드 때마다 `load_meta`의 `ti_spbd_buld` version을 읽고, 기준월이 바뀌었으면 법정동 사전(메모리, 약 1.9만 건)을 **다시 만든다**.
 4. 연속지적도(`load-parcel.sh`)와 갱신 시기가 달라도 된다 — 주소가 가리킨 PNU가 새 지적도에 없으면 그 행은 `PARCEL_NOT_FOUND`(지번 변경·말소)로 보고된다.
 
-앱 계정에는 `ref` 스키마에 SELECT 권한만 주고, 적재 계정은 따로 쓴다. 새 표·인덱스는 만들지 않는다(법정동 사전은 앱 메모리).
+### 배포 주의 — 주소 변환·내보내기
+- **프록시 읽기 제한 시간**: 주소 변환(`POST /api/mymap/upload/excel/convert`)은 동기 처리다. 처음 보는 PNU 묶음은 필지 대표점 쿼리가 묶음(500개)당 3.5~5.3초라 5,000행이 차가운 DB에서 **35~50초**일 수 있다. 운영 프록시(nginx)에 이 경로의 `proxy_read_timeout`을 **최소 120초**로 둔다(`location /api/mymap/upload/excel/convert { proxy_read_timeout 120s; … }` 또는 `/api/mymap/` 전체에 120s). 기본 60초면 504로 끊긴다.
+- **내보내기 동시 2건**: 내보내기(`GET /api/mymap/{id}/export`)는 스트리밍하는 동안 DB 연결(커서)을 잡는다. 서버가 전체 동시 2건으로 제한해(초과는 429) 연결 풀 고갈을 막는다. 응답 버퍼링을 끄면(`proxy_buffering off`) 느린 클라이언트가 자리를 오래 잡는 것을 막는 데 도움이 된다.
+- **임시 파일**: 변환은 결과를 저장하지 않는다. 올린 임시 파일은 변환 성공 직후 지우고, 실패하면 30분 만료 때 지운다.
+
+### 지번 색인 `ix_ti_spbd_buld_jibun` (주소 변환 엑셀 — 선택)
+주소 변환("엑셀로만 받기")은 결과에 **표준 도로명주소**를 채운다. 도로명으로 입력한 행은 해석 때 찾은 건물로 채우지만, **지번으로 입력한 행**은 건물정보를 `(adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno)`로 다시 찾아야 하고 이 키의 색인이 없으면 1,072만 행 전체 스캔(행 하나에 수 초)이다. 그래서 색인이 있을 때만 채운다.
+
+| | 색인 없음 | 색인 있음 |
+|---|---|---|
+| 도로명 입력 행의 `표준_도로명주소` | 채움(`ix_ti_spbd_buld_road` 사용) | 채움 |
+| 지번 입력 행의 `표준_도로명주소` | **빈 칸**(건물 조회를 아예 하지 않음) | 건물본번·부번 오름차순 첫 건물로 채움 |
+| `표준_지번주소`·PNU·좌표·면적, 업로드·가져오기 | 영향 없음 | 영향 없음 |
+
+- **만드는 법(한 번)**: `psql -v ON_ERROR_STOP=1 -f add-ix-juso-jibun.sql` — 약 300MB(추정, 기존 `ix_ti_spbd_buld_road`가 300MB)·수 분. 이 파일은 `CREATE INDEX IF NOT EXISTS`라 여러 번 실행해도 안전하다. **운영 DB에 쓰기이므로 사용자가 직접 실행한다.**
+- `load-juso.sh`는 새 건물정보 표에도 같은 색인을 만든다 → 월 갱신으로 표가 교체돼도 색인이 유지된다(적재 시간·디스크가 그만큼 늘어난다).
+- 앱은 `to_regclass(ref.ix_ti_spbd_buld_jibun)`로 색인 유무를 확인해 결과를 기억한다: 적재 기준월이 바뀌면 다시 확인하고, "없음"은 5분 뒤 다시 확인한다 → **색인을 만든 뒤 앱 재시작은 필요 없다**(최대 5분 안에 켜진다).
+- 지우면(`DROP INDEX ref.ix_ti_spbd_buld_jibun;`) 지번 입력 행의 도로명주소 열이 다시 빈 칸이 된다.
+
+앱 계정에는 `ref` 스키마에 SELECT 권한만 주고(`to_regclass`·조회 모두 읽기), 적재 계정은 따로 쓴다. 앱은 새 표·인덱스를 만들지 않는다(법정동 사전은 앱 메모리). 색인은 위 SQL을 적재 계정이 실행한다.

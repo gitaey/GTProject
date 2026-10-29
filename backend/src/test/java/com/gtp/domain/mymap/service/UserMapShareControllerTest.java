@@ -69,7 +69,8 @@ class UserMapShareControllerTest {
         MyMapColumnService columns = new MyMapColumnService(repo, perm, jdbc);
         UserMapService service = new UserMapService(repo, featureRepo, failureRepo, perm, columns, jdbc, share);
         UserMapController controller = new UserMapController(service, mock(UserMapUploadService.class), mock(ImportReportService.class),
-                mock(MyMapQuotaService.class), columns, mock(SampleService.class), ctx, share);
+                mock(MyMapQuotaService.class), columns, mock(SampleService.class), ctx, share,
+                mock(AddressConvertService.class), mock(UserMapExportService.class));
         mvc = MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new GlobalExceptionHandler()).build();
 
         mine = repo.saveAndFlush(UserMap.builder().name("내 것").ownerId("alice").sourceType("EXCEL").sourceSrid("EPSG:4326").build());

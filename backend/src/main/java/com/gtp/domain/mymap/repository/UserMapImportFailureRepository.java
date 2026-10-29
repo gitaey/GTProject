@@ -14,6 +14,8 @@ public interface UserMapImportFailureRepository extends JpaRepository<UserMapImp
 
     Page<UserMapImportFailure> findByUserMapId(Long userMapId, Pageable pageable);
 
+    long countByUserMapId(Long userMapId);
+
     Page<UserMapImportFailure> findByUserMapIdAndReasonCode(Long userMapId, String reasonCode, Pageable pageable);
 
     /** [사유 코드, 건수] 목록 */

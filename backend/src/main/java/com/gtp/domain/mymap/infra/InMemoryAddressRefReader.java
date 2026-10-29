@@ -13,6 +13,11 @@ public class InMemoryAddressRefReader implements AddressRefReader {
     private final List<RoadCode> roadCodes = new ArrayList<>();
     private final Map<BuildingKey, List<Building>> buildings = new HashMap<>();
     private volatile String version;
+    /** 표준 주소를 덧입힌 건물: 도로 키 → 재료(공동주택·건물명 등). 없으면 building()으로 넣은 값에서 기본 재료를 만든다 */
+    private final Map<BuildingKey, StandardParts> standardOverrides = new HashMap<>();
+    private volatile boolean jibunReady = true;
+    public int standardByRoadCalls = 0;
+    public int standardByJibunCalls = 0;
 
     public InMemoryAddressRefReader(String version) {
         this.version = version;
@@ -39,6 +44,18 @@ public class InMemoryAddressRefReader implements AddressRefReader {
         BuildingKey key = new BuildingKey(roadCd, underground ? "1" : "0", main, sub);
         buildings.computeIfAbsent(key, k -> new ArrayList<>(1)).add(
                 new Building(key, admCd, mountain, lnbrMain, lnbrSub, sido, sigungu, emd, li, roadName));
+        return this;
+    }
+
+    /** 시험용: 지번 → 건물 색인이 있는 것처럼(true, 기본) 또는 없는 것처럼(false) 동작한다 */
+    public InMemoryAddressRefReader jibunReady(boolean ready) {
+        this.jibunReady = ready;
+        return this;
+    }
+
+    /** 건물의 표준 주소 재료를 직접 정한다(공동주택·건물명·읍면동구분 시험용) */
+    public InMemoryAddressRefReader standard(BuildingKey key, StandardParts parts) {
+        standardOverrides.put(key, parts);
         return this;
     }
 
@@ -77,6 +94,52 @@ public class InMemoryAddressRefReader implements AddressRefReader {
             if (b != null) out.addAll(b);
         }
         return out;
+    }
+
+    @Override
+    public boolean jibunLookupReady() {
+        return version != null && jibunReady;
+    }
+
+    @Override
+    public Map<BuildingKey, StandardParts> standardPartsByRoad(Collection<BuildingKey> keys) {
+        standardByRoadCalls++;
+        Map<BuildingKey, StandardParts> out = new HashMap<>();
+        for (BuildingKey k : new LinkedHashSet<>(keys)) {
+            StandardParts p = standardOverrides.get(k);
+            if (p == null) {
+                List<Building> found = buildings.get(k);
+                if (found != null && !found.isEmpty()) p = defaultParts(found.stream().min(Comparator.comparing(Building::pnu)).get());
+            }
+            if (p != null) out.put(k, p);
+        }
+        return out;
+    }
+
+    @Override
+    public Map<JibunKey, StandardParts> standardPartsByJibun(Collection<JibunKey> keys) {
+        standardByJibunCalls++;
+        Map<JibunKey, StandardParts> out = new HashMap<>();
+        for (JibunKey k : new LinkedHashSet<>(keys)) {
+            Building best = null;
+            for (List<Building> list : buildings.values()) {
+                for (Building b : list) {
+                    if (!b.admCd().equals(k.admCd()) || b.mountain() != "1".equals(k.mntn()) || b.lnbrMain() != k.main() || b.lnbrSub() != k.sub()) continue;
+                    if (best == null || b.key().main() < best.key().main()
+                            || (b.key().main() == best.key().main() && b.key().sub() < best.key().sub())) best = b;
+                }
+            }
+            if (best != null) {
+                StandardParts o = standardOverrides.get(best.key());
+                out.put(k, o != null ? o : defaultParts(best));
+            }
+        }
+        return out;
+    }
+
+    private static StandardParts defaultParts(Building b) {
+        return new StandardParts(b.sido(), b.sigungu(), b.emd(), b.li(), b.roadName(), b.key().udgd(), b.key().main(), b.key().sub(),
+                false, "", "");
     }
 
     /** 공공청사 7곳(parcels.json의 필지와 PNU가 같다) + 모호함 시험용 가짜 동명 지역·도로 */

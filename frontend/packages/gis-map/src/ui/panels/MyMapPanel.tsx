@@ -2,11 +2,11 @@
 
 // 나만의지도 패널 — 스타일: gm-panel(TIFF·나만의지도 공용), gm-mymap-panel
 // 내 레이어 / 공유받은 레이어 두 묶음. 항목은 두 줄(이름 / 종류 칩·개수·공유 수·처리 중·실패 N·보낸 사람) + 위치 이동·⋯ 메뉴.
-// 결과 줄(매칭·실패·기준월)은 툴팁으로만, 실패가 있으면 줄 끝 빨간 `실패 N`(누르면 결과 보고서). ⋯ 메뉴: 스타일·라벨 / 업로드 결과 / 속성 테이블 / 삭제.
+// 결과 줄(매칭·실패·기준월)은 툴팁으로만, 실패가 있으면 줄 끝 빨간 `실패 N`(누르면 결과 보고서). ⋯ 메뉴: 스타일·라벨 / 업로드 결과 / 속성 테이블 / 내보내기 / 삭제.
 // 처리 중은 항목 아래 얇은 진행 막대, 상단 `내 레이어 n/20`(한도는 소스의 quota가 있을 때만). 켜짐·진행률처럼 값에 따라 바뀌는 것만 인라인 style
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Trash2, Upload, Loader2, Share2, Locate, Palette, Users, ClipboardList, Table2 } from 'lucide-react'
+import { Trash2, Upload, Loader2, Share2, Locate, Palette, Users, ClipboardList, Table2, Download } from 'lucide-react'
 import { EMPTY_MYMAP_CATALOG_STATE } from '../../core'
 import type { MyMapCatalogState, MyMapConfirmResult, UserMapListItem, VectorOverlayState } from '../../core'
 import { useGisMap, useMyMapCatalog, useStoreValue, useVectorOverlayState } from '../../react'
@@ -17,6 +17,7 @@ import MyMapImportReportDialog from '../mymap/MyMapImportReport'
 import MyMapStyleDialog from '../mymap/MyMapStyleDialog'
 import MyMapDeleteConfirm from '../mymap/MyMapDeleteConfirm'
 import MyMapTableDialog from '../mymap/MyMapTableDialog'
+import MyMapExportDialog from '../mymap/MyMapExportDialog'
 import MyMapItemMenu from '../mymap/MyMapItemMenu'
 import type { ItemMenuEntry } from '../mymap/MyMapItemMenu'
 import { hasImportResult, itemMenuIds } from '../mymap/itemMenuModel'
@@ -35,6 +36,7 @@ const MENU_DEF: Readonly<Record<ItemMenuId, { label: string; icon: ReactNode }>>
     style: { label: '스타일·라벨', icon: <Palette size={13} /> },
     report: { label: '업로드 결과', icon: <ClipboardList size={13} /> },
     table: { label: '속성 테이블', icon: <Table2 size={13} /> },
+    export: { label: '내보내기…', icon: <Download size={13} /> },
     delete: { label: '삭제', icon: <Trash2 size={13} /> },
 })
 
@@ -49,6 +51,8 @@ export default function MyMapPanel() {
     const reportAvailable = !!map?.sources.myMap?.importReport
     // 스타일 저장(PATCH)을 할 수 있는 소스일 때만 스타일 단추를 보인다(없으면 옛 화면 그대로)
     const styleAvailable = !!map?.sources.myMap?.update
+    // 내보내기(exportLayer)가 있는 소스일 때만 ⋯ 메뉴에 `내보내기…`를 보인다
+    const exportAvailable = !!map?.sources.myMap?.exportLayer
     const catalog = useMyMapCatalog()
     const { items, loading, quota } = useStoreValue(catalog?.store, selectCatalog, EMPTY_MYMAP_CATALOG_STATE)
     const visibleIdList = useVectorOverlayState(selectVisibleIds)
@@ -64,6 +68,7 @@ export default function MyMapPanel() {
     const [reportTarget, setReportTarget] = useState<{ id: number; name: string } | null>(null)
     const [styleTarget, setStyleTarget] = useState<{ id: number; name: string } | null>(null)
     const [tableTarget, setTableTarget] = useState<{ id: number; name: string } | null>(null)
+    const [exportTarget, setExportTarget] = useState<{ id: number; name: string; featureCount: number } | null>(null)
     // 열려 있는 ⋯ 메뉴의 레이어(한 번에 하나만 — 다른 항목의 메뉴를 열면 이전 것이 닫힌다)
     const [openMenuId, setOpenMenuId] = useState<number | null>(null)
     // 삭제 확인창에 띄울 레이어(삭제 단추 → 확인 → 실제 삭제)
@@ -85,7 +90,7 @@ export default function MyMapPanel() {
     const pickedIds = useMemo(() => owned.filter(i => selectedIds.has(i.id)).map(i => i.id), [owned, selectedIds])
     // 선택(공유) 모드로 들어가면 항목 버튼이 사라지므로 열린 메뉴도 닫는다(끝났을 때 다시 열려 있지 않게)
     useEffect(() => { if (selecting) setOpenMenuId(null) }, [selecting])
-    const menuEnv = useMemo(() => ({ styleAvailable, reportAvailable }), [styleAvailable, reportAvailable])
+    const menuEnv = useMemo(() => ({ styleAvailable, reportAvailable, exportAvailable }), [styleAvailable, reportAvailable, exportAvailable])
     const maxLayers = quota?.maxLayers ?? null
     const layerFull = maxLayers !== null && owned.length >= maxLayers
 
@@ -134,6 +139,7 @@ export default function MyMapPanel() {
         if (id === 'style') { if (!styleSavingRef.current) setStyleTarget(target) }
         else if (id === 'report') setReportTarget(target)
         else if (id === 'table') setTableTarget(target)
+        else if (id === 'export') setExportTarget({ ...target, featureCount: item.featureCount })
         else setDeleteTarget(target)
     }
 
@@ -347,6 +353,10 @@ export default function MyMapPanel() {
             )}
             {tableTarget && (
                 <MyMapTableDialog key={tableTarget.id} id={tableTarget.id} name={tableTarget.name} onClose={() => setTableTarget(null)} />
+            )}
+            {exportTarget && (
+                <MyMapExportDialog key={exportTarget.id} id={exportTarget.id} name={exportTarget.name} featureCount={exportTarget.featureCount}
+                    onClose={() => setExportTarget(null)} />
             )}
             {styleTarget && (
                 <MyMapStyleDialog key={styleTarget.id} id={styleTarget.id} name={styleTarget.name} catalog={catalog}

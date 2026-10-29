@@ -39,6 +39,8 @@ public class UserMapController {
     private final SampleService sampleService;
     private final GisUserContext gisUserContext;
     private final UserMapShareService shareService;
+    private final AddressConvertService convertService;
+    private final UserMapExportService exportService;
 
     @GetMapping
     public ApiResponse<List<UserMapListItem>> list() {
@@ -101,6 +103,37 @@ public class UserMapController {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
         userMapService.streamGeoJson(id, response.getWriter());
+    }
+
+    /**
+     * 주소 변환("엑셀로만 받기") — 올려 둔 엑셀(uploadId)의 주소 칸을 풀어 PNU·표준 주소·좌표·면적을 덧붙인 결과 .xlsx를 만든다.
+     * 지도에 레이어를 만들지 않고 결과를 저장하지 않는다. 응답의 fileBase64가 결과 파일, preview가 앞 5행.
+     */
+    @PostMapping("/upload/excel/convert")
+    public ApiResponse<ConvertResult> convertExcel(@RequestBody ConvertRequest req) {
+        return ApiResponse.ok(convertService.convert(req, currentUserId()));
+    }
+
+    /**
+     * 레이어 내보내기(스트리밍 바이너리). format = xlsx | geojson, srid = 4326 | 5186 | 5179 | 3857, includeFailed(엑셀만).
+     * 권한은 geojson과 같다(소유자·공유받은 사람). 검사는 본문을 쓰기 전에 끝내 오류가 JSON 봉투로 나간다.
+     * 보관 기간이 지나 실패 행을 못 붙였으면 응답 헤더 X-Export-Failed-Skipped: true.
+     */
+    @GetMapping("/{id}/export")
+    public void export(@PathVariable Long id,
+                       @RequestParam(defaultValue = "xlsx") String format,
+                       @RequestParam(defaultValue = "4326") String srid,
+                       @RequestParam(defaultValue = "false") boolean includeFailed,
+                       HttpServletResponse response) throws IOException {
+        UserMapExportService.Prepared prepared = exportService.prepare(id, currentUserId(), currentRoleCodes(), format, srid, includeFailed);
+        // 동시 실행 자리를 얻은 뒤에 헤더를 세운다(429면 헤더 없이 JSON 봉투)
+        exportService.stream(prepared, () -> {
+            response.setContentType(prepared.contentType());
+            response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
+                    ContentDisposition.attachment().filename(prepared.fileName(), StandardCharsets.UTF_8).build().toString());
+            response.setHeader(HttpHeaders.CACHE_CONTROL, CacheControl.noStore().getHeaderValue());
+            if (prepared.failedSkipped()) response.setHeader(UserMapExportService.HEADER_FAILED_SKIPPED, "true");
+        }, response.getOutputStream());
     }
 
     @PostMapping(value = "/upload/shp", consumes = "multipart/form-data")

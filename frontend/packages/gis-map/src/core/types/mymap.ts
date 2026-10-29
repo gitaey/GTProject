@@ -278,3 +278,64 @@ export interface MyMapUpdateInput {
     description?: string
     styleConfig?: string
 }
+
+// ── 주소 변환(엑셀로만 받기)·레이어 내보내기 ─────────────────────────────────────────
+// 둘 다 MyMapSource의 선택 메서드(convertExcel·exportLayer)가 있을 때만 화면에 나타난다. 서버에 레이어를 만들지 않고 파일만 돌려준다.
+
+/** 변환·내보내기 좌표계(EPSG 번호) */
+export type MyMapExportSrid = 4326 | 5186 | 5179 | 3857
+
+/** 결과 엑셀에 붙일 열(원본 열은 항상 그대로 남는다) */
+export interface MyMapConvertInclude {
+    /** PNU·법정동코드 */
+    pnu: boolean
+    /** 표준 도로명주소 */
+    roadAddress: boolean
+    /** 표준 지번주소 */
+    jibunAddress: boolean
+    /** 경도·위도(필지 안쪽 대표점, srid 좌표계의 x·y) */
+    lonLat: boolean
+    /** 필지 면적(㎡) */
+    area: boolean
+}
+
+/** 주소 변환 요청(미리보기로 받은 uploadId + 주소 컬럼) */
+export interface MyMapConvertInput {
+    uploadId: string
+    addressColumn: string
+    include: MyMapConvertInclude
+    srid: MyMapExportSrid
+}
+
+/** 변환 결과 미리보기 표(앞 몇 행). 원본 열 + 붙은 열(맨 뒤 쪽에 `매칭상태`부터) */
+export interface MyMapConvertPreview {
+    columns: string[]
+    rows: string[][]
+}
+
+/** 변환 결과. `file`은 결과 엑셀(어댑터가 서버의 base64를 Blob으로 바꿔 준다) */
+export interface MyMapConvertResult {
+    total: number
+    matched: number
+    failed: number
+    fileName: string
+    file: Blob
+    preview: MyMapConvertPreview
+}
+
+export type MyMapExportFormat = 'xlsx' | 'geojson'
+
+/** 레이어 내보내기 옵션 */
+export interface MyMapExportOptions {
+    format: MyMapExportFormat
+    srid: number
+    /** 엑셀에 매칭 실패 행도 담는다(GeoJSON은 무시) */
+    includeFailed?: boolean
+}
+
+/** 레이어 내보내기 결과. failedSkipped = 보관 기간이 지나 실패 행을 담지 못했다 */
+export interface MyMapExportResult {
+    blob: Blob
+    fileName: string
+    failedSkipped: boolean
+}

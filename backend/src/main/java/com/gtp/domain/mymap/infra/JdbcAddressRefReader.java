@@ -34,6 +34,18 @@ public class JdbcAddressRefReader implements AddressRefReader {
     private final String readySql;
     private final String buildingDataset;
     private final String roadDataset;
+    private final String standardByRoadSql;
+    private final String standardByJibunSql;
+    private final String jibunIndexName;
+    private final String jibunIndexSql;
+
+    /** 색인이 없다고 확인한 결과는 이 시간이 지나면 다시 확인한다(운영자가 색인을 만든 뒤 재시작 없이 켜지게) */
+    static final long NEGATIVE_RECHECK_NANOS = 5L * 60 * 1_000_000_000L;
+
+    private record IndexState(String version, boolean ready, long checkedAtNanos) {
+    }
+
+    private volatile IndexState indexState;
 
     public JdbcAddressRefReader(JdbcOperations jdbc, MyMapProperties.Ref ref) {
         this.jdbc = jdbc;
@@ -53,6 +65,113 @@ public class JdbcAddressRefReader implements AddressRefReader {
                 + "WHERE coalesce(b.mv_rs_cd, '') NOT IN ('63', '72')";
         this.readySql = "SELECT dataset, version, status FROM " + PostgisPnuParcelProvider.ident(ref.getLoadMetaTable())
                 + " WHERE dataset IN (?, ?)";
+
+        // 표준 주소 재료: 건물 1건 + 도로명코드 표의 읍면동구분(도로명코드 PK로 찾는다 — 도로명코드 12자리 = 시군구코드 5 + 도로명번호 7)
+        String standardCols = "k.n, b.udgd_yn, b.buld_mnnm, b.buld_slno, b.ctp_kor_nm, b.sig_kor_nm, b.emd_kor_nm, b.li_kor_nm, b.rn, "
+                + "b.apt_yn, b.sgg_buld_nm, s.emd_gb";
+        String standardJoin = " LEFT JOIN " + road + " s ON s.sgg_cd = substr(b.road_cd, 1, 5) AND s.road_no = substr(b.road_cd, 6, 7) "
+                + "AND s.emd_no = b.emd_no WHERE coalesce(b.mv_rs_cd, '') NOT IN ('63', '72') ";
+        this.standardByRoadSql = "SELECT DISTINCT ON (k.n) " + standardCols
+                + " FROM unnest(?::varchar[], ?::varchar[], ?::int[], ?::int[]) WITH ORDINALITY AS k(road_cd, udgd_yn, buld_mnnm, buld_slno, n) "
+                + "JOIN " + building + " b ON b.road_cd = k.road_cd AND b.udgd_yn = k.udgd_yn "
+                + "AND b.buld_mnnm = k.buld_mnnm AND b.buld_slno = k.buld_slno" + standardJoin
+                + "ORDER BY k.n, b.adm_cd, b.mntn_yn, b.lnbr_mnnm, b.lnbr_slno, b.bd_mgt_sn";
+        this.standardByJibunSql = "SELECT DISTINCT ON (k.n) " + standardCols
+                + " FROM unnest(?::varchar[], ?::varchar[], ?::int[], ?::int[]) WITH ORDINALITY AS k(adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno, n) "
+                + "JOIN " + building + " b ON b.adm_cd = k.adm_cd AND b.mntn_yn = k.mntn_yn "
+                + "AND b.lnbr_mnnm = k.lnbr_mnnm AND b.lnbr_slno = k.lnbr_slno" + standardJoin
+                + "ORDER BY k.n, b.buld_mnnm, b.buld_slno, b.udgd_yn, b.bd_mgt_sn";
+        // 지번 → 건물 색인 이름: 건물 표와 같은 스키마의 ix_{표}_jibun (backend/scripts/mymap-ref/add-ix-juso-jibun.sql)
+        int dot = building.indexOf('.');
+        String schemaPrefix = dot < 0 ? "" : building.substring(0, dot + 1);
+        this.jibunIndexName = schemaPrefix + "ix_" + buildingDataset + "_jibun";
+        this.jibunIndexSql = "SELECT to_regclass(?) IS NOT NULL";
+    }
+
+    String standardByRoadSql() {
+        return standardByRoadSql;
+    }
+
+    String standardByJibunSql() {
+        return standardByJibunSql;
+    }
+
+    String jibunIndexName() {
+        return jibunIndexName;
+    }
+
+    /**
+     * 지번 → 건물 색인이 있는가. 결과를 적재 기준월 단위로 기억한다: 기준월이 바뀌면(새 표로 교체) 다시 확인하고,
+     * "없음"은 {@link #NEGATIVE_RECHECK_NANOS}가 지나면 다시 확인한다. 확인하지 못하면(DB 오류) false.
+     */
+    @Override
+    public boolean jibunLookupReady() {
+        String version = readyVersion();
+        if (version == null) return false;
+        IndexState s = indexState;
+        long now = System.nanoTime();
+        if (s != null && s.version().equals(version) && (s.ready() || now - s.checkedAtNanos() < NEGATIVE_RECHECK_NANOS)) {
+            return s.ready();
+        }
+        boolean ready;
+        try {
+            Boolean b = jdbc.queryForObject(jibunIndexSql, Boolean.class, jibunIndexName);
+            ready = Boolean.TRUE.equals(b);
+        } catch (DataAccessException e) {
+            log.warn("[나만의지도] 지번 색인 확인 실패 — 지번 입력 행의 도로명주소는 비웁니다: {}", e.getMessage());
+            ready = false;
+        }
+        indexState = new IndexState(version, ready, now);
+        return ready;
+    }
+
+    @Override
+    public Map<BuildingKey, StandardParts> standardPartsByRoad(Collection<BuildingKey> keys) {
+        List<BuildingKey> all = new ArrayList<>(new java.util.LinkedHashSet<>(keys));
+        Map<BuildingKey, StandardParts> out = new HashMap<>();
+        for (int i = 0; i < all.size(); i += CHUNK) {
+            List<BuildingKey> chunk = all.subList(i, Math.min(i + CHUNK, all.size()));
+            jdbc.query(standardByRoadSql, ps -> bindKeys(ps, chunk), rs -> {
+                out.put(chunk.get(rs.getInt("n") - 1), standardPartsOf(rs));
+            });
+        }
+        return out;
+    }
+
+    @Override
+    public Map<JibunKey, StandardParts> standardPartsByJibun(Collection<JibunKey> keys) {
+        List<JibunKey> all = new ArrayList<>(new java.util.LinkedHashSet<>(keys));
+        Map<JibunKey, StandardParts> out = new HashMap<>();
+        for (int i = 0; i < all.size(); i += CHUNK) {
+            List<JibunKey> chunk = all.subList(i, Math.min(i + CHUNK, all.size()));
+            jdbc.query(standardByJibunSql, ps -> {
+                Connection con = ps.getConnection();
+                int n = chunk.size();
+                String[] adm = new String[n], mntn = new String[n];
+                Integer[] mains = new Integer[n], subs = new Integer[n];
+                for (int j = 0; j < n; j++) {
+                    JibunKey k = chunk.get(j);
+                    adm[j] = k.admCd();
+                    mntn[j] = k.mntn();
+                    mains[j] = k.main();
+                    subs[j] = k.sub();
+                }
+                ps.setArray(1, con.createArrayOf("varchar", adm));
+                ps.setArray(2, con.createArrayOf("varchar", mntn));
+                ps.setArray(3, con.createArrayOf("int4", mains));
+                ps.setArray(4, con.createArrayOf("int4", subs));
+            }, rs -> {
+                out.put(chunk.get(rs.getInt("n") - 1), standardPartsOf(rs));
+            });
+        }
+        return out;
+    }
+
+    private static StandardParts standardPartsOf(java.sql.ResultSet rs) throws SQLException {
+        return new StandardParts(trim(rs.getString("ctp_kor_nm")), trim(rs.getString("sig_kor_nm")), trim(rs.getString("emd_kor_nm")),
+                trim(rs.getString("li_kor_nm")), trim(rs.getString("rn")), trim(rs.getString("udgd_yn")),
+                rs.getInt("buld_mnnm"), rs.getInt("buld_slno"), "1".equals(rs.getString("apt_yn")),
+                trim(rs.getString("sgg_buld_nm")), trim(rs.getString("emd_gb")));
     }
 
     /** "ref.ti_spbd_buld" → "ti_spbd_buld" (적재 기록의 dataset 값) */

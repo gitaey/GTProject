@@ -56,6 +56,9 @@ class SecurityContractTest {
                 "GET /{id}/status", "status",
                 "GET /{id}/columns", "columns",
                 "PATCH /{id}", "update");
+        expected = new java.util.HashMap<>(expected);
+        expected.put("POST /upload/excel/convert", "convertExcel");   // 주소 변환(엑셀로만 받기)
+        expected.put("GET /{id}/export", "export");                   // 레이어 내보내기
         for (Map.Entry<String, String> e : expected.entrySet()) {
             String[] parts = e.getKey().split(" ", 2);
             boolean found = false;

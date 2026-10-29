@@ -2,6 +2,7 @@ package com.gtp.domain.mymap.infra;
 
 import com.gtp.domain.mymap.config.MyMapProperties;
 import com.gtp.domain.mymap.port.Coverage;
+import com.gtp.domain.mymap.port.ParcelPoint;
 import com.gtp.domain.mymap.port.ParcelShape;
 import com.gtp.domain.mymap.port.PnuParcelProvider;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,8 @@ public class PostgisPnuParcelProvider implements PnuParcelProvider {
     private final String selectSql;
     private final String unionSql;
     private final String coverageSql;
+    private final String pointSql;
+    private final String pointAreaSql;
 
     public PostgisPnuParcelProvider(JdbcOperations jdbc, MyMapProperties.Ref ref) {
         this.jdbc = jdbc;
@@ -44,6 +47,12 @@ public class PostgisPnuParcelProvider implements PnuParcelProvider {
         this.selectSql = "SELECT " + pnu + " AS pnu, " + jibun + " AS jibun, ST_AsGeoJSON(" + geomExpr + ", 7) AS geojson" + where;
         this.unionSql = "SELECT " + pnu + " AS pnu, min(" + jibun + ") AS jibun, ST_AsGeoJSON(ST_Union(" + geomExpr + "), 7) AS geojson"
                 + where + " GROUP BY " + pnu;
+        // 대표점·면적: PNU 한 건에 폴리곤이 여럿이면(드묾) 가장 넓은 폴리곤의 안쪽 점 + 면적 합. 면적은 geography(㎡). 모양 전체는 읽지 않는다.
+        String inner = "SELECT " + pnu + " AS pnu, " + geomExpr + " AS g" + where;
+        String pointHead = "SELECT pnu, ST_X(p) AS lon, ST_Y(p) AS lat, a FROM (SELECT pnu, "
+                + "(array_agg(ST_PointOnSurface(g) ORDER BY ST_Area(g) DESC))[1] AS p, ";
+        this.pointSql = pointHead + "NULL::float8 AS a FROM (" + inner + ") s GROUP BY pnu) t";
+        this.pointAreaSql = pointHead + "sum(ST_Area(g::geography)) AS a FROM (" + inner + ") s GROUP BY pnu) t";
         this.coverageSql = "SELECT sido, version, status FROM " + ident(ref.getLoadMetaTable()) + " WHERE dataset = 'parcel'";
     }
 
@@ -61,6 +70,33 @@ public class PostgisPnuParcelProvider implements PnuParcelProvider {
 
     String unionSql() {
         return unionSql;
+    }
+
+    String pointSql(boolean withArea) {
+        return withArea ? pointAreaSql : pointSql;
+    }
+
+    /** 필지 안쪽 대표점(ST_PointOnSurface)과 면적(ST_Area(geography), ㎡ 소수 1자리). PNU 목록으로만 조회한다(500개씩, 시도 파티션 키 포함). */
+    @Override
+    public Map<String, ParcelPoint> findPointsByPnus(Collection<String> pnus, boolean withArea) {
+        TreeSet<String> distinct = new TreeSet<>();
+        for (String p : pnus) {
+            if (p != null && PNU.matcher(p).matches()) distinct.add(p);
+        }
+        Map<String, ParcelPoint> out = new HashMap<>();
+        List<String> all = new ArrayList<>(distinct);
+        String sql = pointSql(withArea);
+        for (int i = 0; i < all.size(); i += CHUNK) {
+            List<String> chunk = all.subList(i, Math.min(i + CHUNK, all.size()));
+            String[] sidos = chunk.stream().map(p -> p.substring(0, 2)).distinct().toArray(String[]::new);
+            String[] pnuArr = chunk.toArray(String[]::new);
+            jdbc.query(sql, ps -> bind(ps, sidos, pnuArr), rs -> {
+                double a = rs.getDouble("a");
+                Double area = withArea && !rs.wasNull() ? Math.round(a * 10.0) / 10.0 : null;
+                out.put(rs.getString("pnu"), new ParcelPoint(rs.getString("pnu"), rs.getDouble("lon"), rs.getDouble("lat"), area));
+            });
+        }
+        return out;
     }
 
     @Override

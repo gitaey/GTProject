@@ -168,6 +168,8 @@ GTProject 저장소의 `.claude/skills/map-module-export/references/`에 있다.
 | `importReport?(id, {page, size, reason})` | 소유자 전용 결과 보고서 `{total, matched, failed, byReason, rows:[{rowNo, reason, message, input, candidates}], page, size, totalRows}` | 항목의 빨간 `실패 N`이 링크 대신 글자, ⋯ 메뉴에 `업로드 결과`가 없다 |
 | `downloadImportFailures?(id)` | 실패 행 xlsx 바이트 | 보고서에 "실패 행 엑셀 받기"가 없다 |
 | `update?(id, {name?, description?, styleConfig?})` | 부분 수정(PATCH, **등록자만** — 아니면 서버가 403 + message로 reject). 빠진 키는 그대로, `styleConfig: ''`는 지움 | 항목 ⋯ 메뉴에 `스타일·라벨`이 없다 — 스타일은 읽기만 한다 |
+| `convertExcel?(input)` | 주소 변환(엑셀로만 받기). `{uploadId, addressColumn, include:{pnu, roadAddress, jibunAddress, lonLat, area}, srid}` → `{total, matched, failed, fileName, file: Blob, preview:{columns, rows}}`. 레이어를 만들지 않고 파일만 돌려준다 | 업로드 창에 `결과 받는 방법`(`엑셀로만 받기`)이 없다 — 주소 모드도 옛 화면 그대로 |
+| `exportLayer?(id, {format, srid, includeFailed?})` | 레이어 내보내기. `format`은 `'xlsx' | 'geojson'`, `srid`는 EPSG 번호(4326·5186·5179·3857). `{blob, fileName, failedSkipped}` — `failedSkipped`면 보관 기간이 지나 실패 행을 못 담았다 | ⋯ 메뉴에 `내보내기…`가 없다 |
 
 - `confirmExcel(input)`은 `{ id }`를 돌려줄 수 있다(처리는 비동기 — 패널이 목록 폴링으로 진행률을 본다). 옛 소스처럼 아무것도 안 돌려줘도 된다. 입력의 `mode`(`'PNU' | 'ADDRESS' | 'COORD'`)·`pnuColumn`·`addressColumn`은 선택이고
   없으면 좌표(`latColumn`·`lonColumn`·`sourceSrid`)다. 업로드 창은 PNU·주소·좌표 세 방식을 보여 주고, 주소 모드의 후보(`AMBIGUOUS`)는 보고서의 `candidates`로 나온다.
@@ -182,19 +184,22 @@ GTProject 저장소의 `.claude/skills/map-module-export/references/`에 있다.
 - 목록 항목 `errorMessage`(실패한 레이어의 이유)는 패널에 그대로 보이고, `status(id)` 응답의 `parcelVersion`·`geomType`은 끝났을 때 목록에 합친다(목록을 다시 받지 않아도 "지적도 YYYY-MM"이 나온다).
 - `confirmExcel`의 반환 `MyMapConfirmResult { id, parcelVersion? }`: PNU 모드의 "예정" 기준월이면 패널이 처리 중인 동안 툴팁 "지적도 2026-10 예정"으로 보이고, 끝나면 상태·목록의 확정값으로 바뀐다. `importReport`의 `duplicatePnuCount`(같은 PNU가 여러 행이라 피처가 겹친 수)가 0보다 크면 보고서에 "중복 PNU N건" 한 줄.
 - 서버가 거절하면(5,001행부터 미리보기 400, 미리보기·확정·shp 동시 실행 429 등) 서버 `message`를 업로드 창에 그대로 보여 준다. 파일 고르는 단계에는 "수식은 값으로 붙여넣은 파일" 안내 한 줄이 있다(서버가 수식 셀을 엑셀이 저장한 계산값으로 읽는다).
+- **주소 변환(엑셀로만 받기)** — 업로드 마법사 2단계에서 **주소 모드이고 소스에 `convertExcel`이 있을 때만** 주소 컬럼 아래에 `결과 받는 방법: 지도에 올리기 / 엑셀로만 받기`가 나온다(없는 호스트는 지금 화면 그대로, 하위 호환). `엑셀로만 받기`를 고르면 `지도 이름` 칸이 사라지고 `결과 엑셀에 붙일 열`(PNU·법정동코드 / 표준 도로명주소·지번주소 / 경도·위도(필지 안쪽 대표점) 기본 켜짐, 필지 면적(㎡) 기본 꺼짐)과 `좌표계`(4326 기본·5186·5179·3857)가 보이며 제출 단추는 `변환하고 엑셀 받기`다. 끝나면 같은 모달이 **결과 화면**(전체·성공·실패 카드, 미리보기 앞 5행 — 붙은 열 주황 머리글·`매칭상태`가 `실패`인 행 연한 빨강, `엑셀 다시 받기` = 메모리의 Blob을 다시 저장하고 서버를 다시 부르지 않음)으로 바뀌고 파일은 **자동으로 한 번 내려받아진다**. `고친 행만 다시 올리기`는 마법사 처음으로 돌아간다. 변환 요청이 도는 동안에는 모드·주소 컬럼·좌표계·붙일 열·`결과 받는 방법`·`다른 파일`·`이전`·제출 단추가 모두 잠긴다(닫기 X·Esc·바깥 클릭은 가능 — 닫으면 응답을 버린다). 오류는 모달에 문구로 보이고 **같은 `uploadId`로 다시 시도**할 수 있다(503·413·500·429 등). 단 소스가 `GisHttpError(404)`로 reject하면(올린 파일이 없거나 만료) "올린 파일을 다시 선택해 주세요" 안내와 함께 파일 고르기 단계로 되돌아간다(`adapters/rest`는 변환 응답 404를 그렇게 던진다). 모드·컬럼·옵션을 바꾸면 이전 결과는 버린다. 붙은 열은 `preview.columns`에서 마지막 `매칭상태` 또는 `매칭상태 (숫자)`(원본에 같은 이름의 열이 있으면 서버가 번호를 붙인다) 열부터 끝까지로 본다(없으면 강조 없음).
+- **내보내기** — ⋯ 메뉴 `내보내기…`(소유자는 `속성 테이블` 아래·`삭제` 위, 공유받은 항목은 `속성 테이블` 아래; 처리 중·실패 항목에는 없음). 대화상자에서 형식(엑셀·GeoJSON)·좌표계(기본 4326)·`매칭 실패 행도 포함`(엑셀만, 기본 꺼짐)을 골라 `exportLayer`를 부르고 받은 파일을 저장한다. 진행 중에는 `내려받기`만 잠기고, 오류는 대화상자 안에 보인다. 대화상자를 닫으면 진행 중 요청을 `AbortSignal`로 취소한다(`exportLayer(id, opts, signal?)` — 어댑터는 `ctx.http.fetch`에 그대로 넘기고, 취소된 요청은 오류 문구를 띄우지 않는다). `failedSkipped`면 파일은 내려받되 "보관 기간이 지나 실패 행은 포함하지 못했습니다" 안내를 보여 주고 창을 닫지 않는다.
 - 파일 저장(샘플·실패 행 엑셀)은 `<a download>`를 클릭하고 **30초 뒤에** `URL.revokeObjectURL`한다(Firefox가 클릭 직후 해제를 취소로 처리하는 것을 피함). 실패 행이 보관 기간(30일)이 지나 지워진 레이어는 보고서가 안내만 보여 준다.
 - `adapters/rest`: 응답 본문이 JSON이 아니면(프록시의 413·502 HTML 등) "Unexpected token" 대신 호출부의 기본 문구, 413은 "파일이 너무 큽니다(서버 한도)"로 던진다.
 - 엔진: `map.vector.openCatalog()`의 상태(`MyMapCatalogState`)에 `quota: MyMapQuota | null`이 늘었다. 훅은 새로 만들지 않았다(`useMyMapCatalog()`로 같은 상태). 패널은 내 레이어 / 공유받은 레이어 두 묶음으로 나눠 그린다
   (공유받은 항목이 있을 때만 묶음 제목이 나온다).
 - 패널 항목은 **두 줄**이다: 1줄 이름(체크 켜짐이면 굵게, 실패는 빨강), 2줄 `종류 칩 · N개 · (공유 수) · (처리 중 n/m | 처리 실패 · 오류 메시지) · (실패 N) · (보낸 사람)`.
   결과 줄(매칭·실패·기준월)은 평소 숨기고 1·2줄의 `title` 툴팁으로만 보인다. 오른쪽 단추는 `위치로 이동`과 `⋯`(더보기) 둘뿐이다(선택 모드에서는 둘 다 숨김).
-  `⋯` 메뉴(소유자): `스타일·라벨`(`update` + 완료) / `업로드 결과`(`importReport` + 건수가 있거나 끝난 엑셀 — **실패 0이어도** 요약이 열린다) / `속성 테이블`(완료) / `삭제`(확인창을 거침).
-  처리 중·실패 항목은 해당되는 것만(삭제는 항상), 공유받은 항목은 `속성 테이블` 하나(없으면 `⋯` 자체가 없다). 공유는 `⋯` 메뉴에 없고 패널 상단 `공유`(선택 모드) 하나로만 한다 — 상단 `공유`는 **항상 보이고**(내 레이어가 0개면 비활성), 일괄 공유(`shareTarget.bulk`)가 없는 옛 소스(`getShare/setShare`)에서는 한 번에 1개만 고르고(전체 선택 없음, 안내문 없음) 단일 공유 창이 열린다.
+  `⋯` 메뉴(소유자): `스타일·라벨`(`update` + 완료) / `업로드 결과`(`importReport` + 건수가 있거나 끝난 엑셀 — **실패 0이어도** 요약이 열린다) / `속성 테이블`(완료) / `내보내기…`(`exportLayer` + 완료) / `삭제`(확인창을 거침).
+  처리 중·실패 항목은 해당되는 것만(삭제는 항상), 공유받은 항목은 `속성 테이블`(+ `exportLayer`가 있으면 `내보내기…`)(없으면 `⋯` 자체가 없다). 공유는 `⋯` 메뉴에 없고 패널 상단 `공유`(선택 모드) 하나로만 한다 — 상단 `공유`는 **항상 보이고**(내 레이어가 0개면 비활성), 일괄 공유(`shareTarget.bulk`)가 없는 옛 소스(`getShare/setShare`)에서는 한 번에 1개만 고르고(전체 선택 없음, 안내문 없음) 단일 공유 창이 열린다.
   메뉴는 `position: fixed` + 단추 좌표로 놓아(`ui/mymap/menuPosition.ts`) 패널 스크롤 영역에 잘리지 않고, 아래가 모자라면 위로 뜬다. 닫기: 바깥 클릭·Esc(단추로 포커스 복귀)·Tab·스크롤·창 크기 변경·항목 선택, 한 번에 하나만. 키보드는 `ui/menuNav.ts`(UserMenu와 공용).
 - 속성 테이블(`ui/mymap/MyMapTableDialog`): 소스의 `geojson(id)`를 한 번 받아 `features[].properties`를 표로 — 열 = 모든 피처 속성 키 합집합(처음 나온 순서, 최대 200열) + 맨 앞 `#`(원래 행 번호), 값은 null→빈 칸·객체→JSON·긴 값→말줄임+`title`, 숫자는 오른쪽 정렬.
   큰 레이어(shp 최대 10만 피처)에서도 멈추지 않게 현재 쪽 100행만 그리고, 필터(전체 열·대소문자 무시, 입력 250ms 뒤 적용)·열 머리글 정렬(오름 → 내림 → 원래, 숫자/글자 구분, 빈 값은 항상 뒤)은 행 번호 배열만 만든다(`ui/mymap/tableModel.ts`).
   숫자 정렬은 값이 모두 숫자(또는 `007`·19자리 PNU가 아닌 숫자 글자)인 열만, 그 밖은 대소문자 무시 글자 순서(로캘 비의존). 공유받은 레이어도 열 수 있다(서버가 권한을 판단, 실패하면 오류 문구). 새 소스·서버 변경 없음.
 - 어댑터: `restSources()`의 `myMap`이 위 메서드를 `/api/mymap/{quota, samples/{kind}, {id}/import-report(.xlsx)}`로 구현한다. 파일 응답은 봉투가 없고, 오류 본문의 `message`가 있으면 그 글을 `Error`로 던진다.
+  `convertExcel`은 `POST /api/mymap/upload/excel/convert`(JSON 봉투 `data`의 `fileBase64`를 `atob`+`Uint8Array` 청크 변환으로 Blob — 새 의존성 없음), `exportLayer`는 `GET /api/mymap/{id}/export?format&srid&includeFailed`(파일 이름은 `Content-Disposition`의 `filename*` 우선, 없으면 `나만의지도_{id}.xlsx|geojson`; 응답 헤더 `X-Export-Failed-Skipped: true` → `failedSkipped`). **다른 출처**(`apiBaseUrl`이 화면과 다른 주소 — GTProject도 `NEXT_PUBLIC_API_URL`로 8080을 직접 부른다)이면 서버가 `Access-Control-Expose-Headers: Content-Disposition, X-Export-Failed-Skipped`를 줘야 파일 이름·`failedSkipped` 안내가 읽힌다(없으면 기본 이름·안내 없음).
 
 ### 공유 (`MyMapSource.shareTarget` · `GisMapSources.shareDirectory`)
 

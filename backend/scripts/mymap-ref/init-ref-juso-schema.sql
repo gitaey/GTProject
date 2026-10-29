@@ -163,7 +163,8 @@ COMMENT ON COLUMN ref.ti_sprd_stret.ntfc_de        IS '고시일자 (도로명�
 COMMENT ON COLUMN ref.ti_sprd_stret.ersr_de        IS '말소일자 (도로명코드 말소일자, YYYYMMDD)';
 
 -- 인덱스·PK는 여기서 만들지 않는다 — load-juso.sh가 새 표에 만든 뒤 교체한다(적재 속도). 교체 후 이름:
---   ti_spbd_buld  : ti_spbd_buld_pkey (bd_mgt_sn), ix_ti_spbd_buld_road (road_cd, udgd_yn, buld_mnnm, buld_slno)
+--   ti_spbd_buld  : ti_spbd_buld_pkey (bd_mgt_sn), ix_ti_spbd_buld_road (road_cd, udgd_yn, buld_mnnm, buld_slno),
+--                   ix_ti_spbd_buld_jibun (adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno) — 지번 → 건물 조회(주소 변환의 지번 입력 행 도로명주소). 이미 적재된 표에는 add-ix-juso-jibun.sql
 --   ti_scco_mvmn  : ti_scco_mvmn_pkey (road_cd, udgd_yn, buld_mnnm, buld_slno, jibun_seq)
 --   ti_sprd_stret : ti_sprd_stret_pkey (sgg_cd, road_no, emd_no), ix_ti_sprd_stret_name (ctp_kor_nm, sig_kor_nm, rn)
 -- 적재 기록은 ref.load_meta에 dataset = 'ti_spbd_buld' | 'ti_scco_mvmn' | 'ti_sprd_stret', sido = '00'(전국 단위)로 남는다.
