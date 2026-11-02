@@ -10,7 +10,7 @@ import type { PrintPage, PrintState, PrintWarning } from '../../core'
 import { useGisMap, useRegionState, useStoreValue } from '../../react'
 import { cx } from '../cx'
 import {
-    DPI_CHOICES, DPI_NOTE, ELEMENT_CHOICES, PAPER_CHOICES, PREVIEW_DELAY_MS, PREVIEW_DPI, defaultPrintForm, mapDpiNote, printErrorMessage, scaleNote,
+    DPI_CHOICES, DPI_NOTE, ELEMENT_CHOICES, PAPER_CHOICES, PREVIEW_DELAY_MS, PREVIEW_DPI, PRINT_HINT, defaultPrintForm, mapDpiNote, printErrorMessage, scaleNote,
     printFileName, scaleChoices, taintMessage, toPrintOptions,
 } from './printModel'
 import type { PrintForm } from './printModel'
@@ -212,8 +212,10 @@ export default function PrintPanel({ onClose }: PrintPanelProps) {
                         {previewing && <span className="gm-print-panel__preview-busy"><Loader2 size={14} className="gm-loader" /></span>}
                     </div>
                     <div className="gm-print-panel__meta">
-                        <span>{info && info.denominator > 0 ? '축척 약 1:' + Math.round(info.denominator).toLocaleString('en-US') : ''}</span>
-                        <span>{info ? mapDpiNote(info.mapDpi) : ''}</span>
+                        {info && info.denominator > 0 && (
+                            <span className="gm-print-panel__meta-scale">축척 약 1:{Math.round(info.denominator).toLocaleString('en-US')}</span>
+                        )}
+                        {info && mapDpiNote(info.mapDpi) !== '' && <span>{mapDpiNote(info.mapDpi)}</span>}
                     </div>
                 </div>
 
@@ -223,7 +225,7 @@ export default function PrintPanel({ onClose }: PrintPanelProps) {
                         {info.warnings.map((w, i) => <li key={w.code + i}>{w.message}</li>)}
                     </ul>
                 )}
-                <p className="gm-print-panel__hint">축척을 맞추려면 PDF를 &quot;실제 크기(100%)&quot;로 인쇄하세요. 측정값은 그려지지만 팝업·지역명 표시는 빠집니다.</p>
+                <p className="gm-print-panel__hint">{PRINT_HINT}</p>
                 {error && <div className="gm-print-panel__error">{error}</div>}
             </div>
 

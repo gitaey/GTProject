@@ -82,18 +82,21 @@ export function taintMessage(suspects: readonly string[]): string {
 export function mapDpiNote(mapDpi: number): string {
     if (!(mapDpi > 0)) return ''
     const v = Math.round(mapDpi)
-    return '지도 해상도 약 ' + v + ' dpi' + (v < 120 ? ' (낮음 — 작은 용지를 고르거나 브라우저 창을 키우세요)' : '')
+    return '지도 해상도 약 ' + v + ' dpi' + (v < 120 ? '\n낮음 — 작은 용지를 고르거나 브라우저 창을 키우세요' : '')
 }
 
 /** 축척이 "화면 그대로"일 때만: 용지를 바꿔도 지도 범위가 같다는 안내. 축척을 지정하면 빈 문자열 */
 export function scaleNote(scale: number | null): string {
     return scale === null
-        ? '"화면 그대로"는 용지를 바꿔도 지도 범위가 같고 크기만 달라집니다. 범위를 다르게 하려면 축척을 지정하세요.'
+        ? '"화면 그대로"는 용지를 바꿔도 지도 범위가 같습니다.\n범위를 바꾸려면 축척을 지정하세요.'
         : ''
 }
 
-/** 해상도(dpi) 안내: 종이 그림의 픽셀 수만 정하고 지도 그림은 화면 픽셀 그대로 */
-export const DPI_NOTE = '해상도는 글자·범례·테두리의 선명도와 파일 크기를 정합니다. 지도 그림은 화면 해상도가 정해서 dpi를 올려도 더 선명해지지 않습니다.'
+/** 해상도(dpi) 안내: 종이 그림의 픽셀 수만 정하고 지도 그림은 화면 픽셀 그대로. 줄바꿈(\n)은 CSS pre-line으로 보인다 */
+export const DPI_NOTE = '글자·범례·테두리의 선명도와 파일 크기를 정합니다.\n지도 그림은 화면 해상도가 정하므로 dpi를 올려도 더 선명해지지 않습니다.'
+
+/** 패널 맨 아래 안내(줄바꿈은 CSS pre-line) */
+export const PRINT_HINT = '축척을 맞추려면 PDF를 "실제 크기(100%)"로 인쇄하세요.\n측정값은 그려지지만 팝업·지역명 표시는 빠집니다.'
 
 export function printErrorMessage(e: unknown): string {
     if (e instanceof GisPrintError) return e.message

@@ -4700,13 +4700,23 @@
     color: var(--gm-primary);
 }
 
+/* 미리보기 아래: 축척은 한 줄(줄바꿈 금지), 해상도 안내는 그 아래 줄에. \n은 pre-line으로 줄바꿈 */
 .gm-print-panel__meta {
     display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    margin-top: 4px;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 6px;
     font-size: 10.5px;
+    line-height: 1.5;
     color: var(--gm-color-gray-400);
+    white-space: pre-line;
+}
+
+.gm-print-panel__meta-scale {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gm-color-gray-600);
+    white-space: nowrap;
 }
 
 .gm-print-panel__warn {
@@ -4732,6 +4742,7 @@
     font-size: 10.5px;
     line-height: 1.5;
     color: var(--gm-color-gray-400);
+    white-space: pre-line;
 }
 
 .gm-print-panel__error {
