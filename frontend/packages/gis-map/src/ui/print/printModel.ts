@@ -78,12 +78,22 @@ export function taintMessage(suspects: readonly string[]): string {
     return '다른 출처의 지도 그림' + who + '이 섞여 PNG·PDF로 저장할 수 없습니다. 인쇄 창에서 "PDF로 저장"은 됩니다.'
 }
 
-/** 지도 해상도 안내: 낮으면(120dpi 미만) 경고 문구를 덧붙인다 */
+/** 지도 해상도 안내: 낮으면(120dpi 미만) 경고 문구를 덧붙인다. 지도 해상도 = 틀의 화면 픽셀 ÷ 용지 너비라 확대로는 안 오른다 */
 export function mapDpiNote(mapDpi: number): string {
     if (!(mapDpi > 0)) return ''
     const v = Math.round(mapDpi)
-    return '지도 해상도 약 ' + v + ' dpi' + (v < 120 ? ' (낮음 — 지도를 더 확대하거나 작은 용지를 고르세요)' : '')
+    return '지도 해상도 약 ' + v + ' dpi' + (v < 120 ? ' (낮음 — 작은 용지를 고르거나 브라우저 창을 키우세요)' : '')
 }
+
+/** 축척이 "화면 그대로"일 때만: 용지를 바꿔도 지도 범위가 같다는 안내. 축척을 지정하면 빈 문자열 */
+export function scaleNote(scale: number | null): string {
+    return scale === null
+        ? '"화면 그대로"는 용지를 바꿔도 지도 범위가 같고 크기만 달라집니다. 범위를 다르게 하려면 축척을 지정하세요.'
+        : ''
+}
+
+/** 해상도(dpi) 안내: 종이 그림의 픽셀 수만 정하고 지도 그림은 화면 픽셀 그대로 */
+export const DPI_NOTE = '해상도는 글자·범례·테두리의 선명도와 파일 크기를 정합니다. 지도 그림은 화면 해상도가 정해서 dpi를 올려도 더 선명해지지 않습니다.'
 
 export function printErrorMessage(e: unknown): string {
     if (e instanceof GisPrintError) return e.message

@@ -4578,11 +4578,27 @@
     color: var(--gm-primary);
 }
 
+.gm-print-panel__head-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
 .gm-print-panel__close {
     background: none;
     border: none;
     cursor: pointer;
     color: var(--gm-color-gray-400);
+}
+
+/* 접힘: 헤더만 남겨 지도를 가리지 않는다(body·foot은 hidden 속성 — display:flex가 UA [hidden]을 덮으므로 다시 숨김) */
+.gm-print-panel[hidden],
+.gm-print-panel [hidden] {
+    display: none;
+}
+
+.gm-print-panel.gm-is-collapsed {
+    width: 190px;
 }
 
 .gm-print-panel__body {
