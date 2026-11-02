@@ -69,8 +69,13 @@
 (빌드 결과를 파싱해 대조: 번들의 `ol` 모듈 경로 26개 + 이름 내보내기 34개 = 소스의 값 import, 차이 0). 클래스 `Map`·`Feature`·`Overlay`·
 `layer.{Tile,Vector,Image,Layer}`·`source.{Vector,XYZ,ImageWMS}`·`format.GeoJSON`·`interaction.{Draw,Modify,Select}`·`geom.{Point,LineString,Polygon}`·
 `style.{Style,Fill,Stroke,Circle,Icon,Text}`·`renderer.canvas.Layer`, 함수 `interaction.Draw.createBox`·`geom.Polygon.{fromCircle,circular}`·`proj.*`(9)·
-`proj.proj4.register`·`sphere.{getArea,getLength}`·`extent.*`(6)·`transform.*`(5)·`loadingstrategy.bbox`·`events.condition.click`. `View`는 엔진이 지도를
+`proj.proj4.register`·`proj.getPointResolution`(지도 출력의 축척 계산 — 공식 full build 7.1 이상에 있다. 7.1~10.10 브라우저 시험은 아래 "지도 출력")·`sphere.{getArea,getLength}`·`extent.*`(6)·`transform.*`(5)·`loadingstrategy.bbox`·`events.condition.click`. `View`는 엔진이 지도를
 만들 때(`createGisMap`)만 쓰므로 attach 목록에 없다.
+
+## 지도 출력(`map.print`) — 확인 항목
+
+지도 합성은 `.ol-layers`(뷰포트 안 레이어 컨테이너, ol 6.x 이후 `renderer/Composite`가 `ol-layers` 클래스를 단다 — 설치된 9.2.4 소스에서 확인) 아래 모든 `canvas`의 `style.transform`(`matrix(a,b,c,d,e,f)`)·부모 `opacity`·`backgroundColor`를 읽는다.
+`.ol-layers`가 없으면 뷰포트 전체에서 canvas를 찾는다. **7.1.0·8.2.0·10.10.0 공식 full build에서 `.ol-layers` 존재와 합성 결과(위치·투명도)는 브라우저로 직접 확인하지 못했다** — 호스트가 쓰는 ol 버전에서 `gis.print.render()` 한 번으로 확인한다(위치가 어긋나거나 빈 지도면 이 항목).
 
 ## 다른 버전을 시험하려면
 

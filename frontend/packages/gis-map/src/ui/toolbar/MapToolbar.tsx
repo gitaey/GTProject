@@ -2,9 +2,9 @@
 
 // 지도 우측 도구 모음: 줌 · 바람길 · 그리기/측정/반경 · 전체 초기화 (스타일: styles/gis-map-ui.css의 gm-toolbar)
 // FE-5b-2: 그리기 패널·반경 패널·활성 도구 연결을 DrawPanel.tsx·RadiusPanel.tsx·activeTool.ts로 떼어 냈다(본문 그대로)
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
-    PenLine, Ruler, Trash2, Plus, Minus, SquareDashed, CircleDot, Wind,
+    PenLine, Ruler, Trash2, Plus, Minus, SquareDashed, CircleDot, Wind, Printer,
 } from 'lucide-react'
 import { useGisHost, useGisMap, useWindPlugin, useWindState } from '../../react'
 import type { WindState } from '../../core'
@@ -12,6 +12,7 @@ import { cx } from '../cx'
 import { isDrawMode, isSelectMode, useActiveTool } from './activeTool'
 import DrawPanel from './DrawPanel'
 import RadiusPanel from './RadiusPanel'
+import PrintPanel from '../print/PrintPanel'
 
 // ── 툴팁 ──────────────────────────────────────────────────────────────────────
 
@@ -47,7 +48,12 @@ function TBtn({ active, onClick, children, cls = '' }: {
 
 const selectWindVisible = (s: WindState) => s.visible
 
-export default function MapToolbar() {
+export interface MapToolbarProps {
+    /** 출력(PNG·PDF·인쇄) 단추와 패널. 기본 true(메뉴 권한 map.tool.print도 통과해야 보인다) */
+    showPrint?: boolean
+}
+
+export default function MapToolbar({ showPrint = true }: MapToolbarProps = {}) {
     // 바람길 토글은 엔진의 바람길 플러그인(설치: app/map/page.tsx의 setup)
     const wind = useWindPlugin()
     const windLayerVisible = useWindState(selectWindVisible)
@@ -59,9 +65,27 @@ export default function MapToolbar() {
     const gis = useGisMap()
     const map = gis ? gis.olMap : null
     const [drawOpen, setDrawOpen] = useState(false)
+    const [printOpen, setPrintOpen] = useState(false)
     const panelRef = useRef<HTMLDivElement>(null)
 
     const isAnyDraw = isDrawMode(activeTool) || isSelectMode(activeTool)
+
+    // 그리기·반경 패널과 출력 패널은 같은 자리(도구 모음 왼쪽)를 쓴다 → 하나를 열면 다른 하나를 닫는다
+    function toggleDraw() {
+        const next = !drawOpen
+        setDrawOpen(next)
+        if (next) setPrintOpen(false)
+    }
+    function togglePrint() {
+        const next = !printOpen
+        setPrintOpen(next)
+        if (!next) return
+        setDrawOpen(false)
+        if (activeTool === 'radius-search') setActiveTool('none')
+    }
+    useEffect(() => {
+        if (activeTool === 'radius-search') setPrintOpen(false)
+    }, [activeTool])
 
     // loaded가 false(미로그인/미로드)면 전부 표시
     const show = (menuId: string) => !loaded || isAllowed(menuId)
@@ -71,6 +95,7 @@ export default function MapToolbar() {
     const showMeasA   = show('map.tool.measure-area')
     const showRadius  = show('map.tool.radius-search')
     const showWind    = show('map.tool.wind')
+    const showPrintBtn = showPrint && show('map.tool.print')
     const showToolGrp = showDraw || showMeasD || showMeasA || showRadius
 
     function zoom(delta: number) {
@@ -106,7 +131,7 @@ export default function MapToolbar() {
                 <div ref={panelRef} className="gm-toolbar__tools">
                     {showDraw && (
                         <Tip label={drawOpen ? '' : '그리기'}>
-                            <TBtn active={isAnyDraw || drawOpen} onClick={() => setDrawOpen(p => !p)}
+                            <TBtn active={isAnyDraw || drawOpen} onClick={toggleDraw}
                                 cls={cx('gm-toolbar__btn--first', (showMeasD || showMeasA || showRadius) ? 'gm-toolbar__btn--divided' : 'gm-toolbar__btn--last')}>
                                 <PenLine size={15} />
                             </TBtn>
@@ -146,6 +171,22 @@ export default function MapToolbar() {
                             <RadiusPanel />
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* ── 출력 ── */}
+            {showPrintBtn && (
+                <div className="gm-toolbar__group">
+                    <Tip label={printOpen ? '' : '출력'}>
+                        <TBtn active={printOpen} onClick={togglePrint} cls="gm-toolbar__btn--single">
+                            <Printer size={15} />
+                        </TBtn>
+                    </Tip>
+                </div>
+            )}
+            {showPrintBtn && printOpen && (
+                <div className="gm-toolbar__print-slot">
+                    <PrintPanel onClose={() => setPrintOpen(false)} />
                 </div>
             )}
 

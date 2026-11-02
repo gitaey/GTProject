@@ -14,7 +14,7 @@ import type { BasemapMode, LayerDef, LayerGroupDef, LayerTree } from '../types/l
 import { deriveBasemapMode, getBasemapVisibility, isBasemapLayer } from './basemap'
 import type { BasemapModeNames } from './basemap'
 import { createOlLayer } from './createOlLayer'
-import type { LayerUrlResolver } from './resolveLayerUrl'
+import type { LayerCrossOriginResolver, LayerUrlResolver } from './resolveLayerUrl'
 import { allTreeLayers, flattenGroupLayers, getLayerOpacity, getLayerVisible } from './treeUtils'
 
 export interface LayerTreeState {
@@ -83,6 +83,7 @@ export interface LayerTreeControllerOptions {
     wfs?: WfsSource
     zIndex: number
     resolveUrl: LayerUrlResolver
+    crossOrigin?: LayerCrossOriginResolver
     basemapModes: BasemapModeNames
     expandedStorage?: LayerExpandedStorage
 }
@@ -282,6 +283,7 @@ export class LayerTreeControllerImpl implements LayerTreeController {
                 zIndex: this.opts.zIndex,
                 host,
                 resolveUrl: this.opts.resolveUrl,
+                crossOrigin: this.opts.crossOrigin,
                 http: this.opts.http,
                 wfs: this.opts.wfs,
             })

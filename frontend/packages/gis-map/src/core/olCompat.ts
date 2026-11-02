@@ -15,7 +15,7 @@ export const REQUIRED_OL_API: readonly string[] = Object.freeze([
     'style.Style', 'style.Fill', 'style.Stroke', 'style.Circle', 'style.Icon', 'style.Text',
     // 함수
     'interaction.Draw.createBox',
-    'proj.fromLonLat', 'proj.toLonLat', 'proj.transform', 'proj.transformExtent', 'proj.get',
+    'proj.fromLonLat', 'proj.toLonLat', 'proj.transform', 'proj.transformExtent', 'proj.get', 'proj.getPointResolution',
     'proj.proj4.register',
     'sphere.getArea', 'sphere.getLength',
     'extent.getCenter',

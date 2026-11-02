@@ -5,6 +5,8 @@ import type { MapTool } from './types/draw'
 import type { BasemapMode, LayerDef } from './types/layer'
 import type { LayerExpandedStorage } from './layers/LayerTreeController'
 import { normalizeHexColor } from './lib/color'
+import type { LayerCrossOriginResolver } from './layers/resolveLayerUrl'
+import type { PrintLayoutConfig } from './print/types'
 
 export interface GisMapViewConfig {
     /** [lon, lat] EPSG:4326 */
@@ -37,6 +39,12 @@ export interface GisMapLayersConfig {
     basemapModes?: Partial<Record<Exclude<BasemapMode, 'none'>, string[]>>
     /** 레이어 URL/파라미터 가공(선택). 기본: '{VWORLD_KEY}' 치환 + vworld.kr WMS에 key 파라미터 */
     resolveUrl?: (layer: LayerDef, host: GisMapHost) => { url: string; params?: Record<string, string> }
+    /**
+     * 레이어 이미지의 crossOrigin(선택). 지도를 캔버스로 합성해 파일로 저장(PNG·PDF)하려면 다른 출처 이미지에 'anonymous'가 있어야 하고,
+     * 서버가 CORS(Access-Control-Allow-Origin)를 안 주는데 켜면 그 레이어가 아예 안 보인다. 기본 defaultLayerCrossOrigin = VWorld XYZ 배경지도만 'anonymous'.
+     * GeoServer 등에 CORS를 켠 호스트는 이 함수를 바꿔 그 주소만 'anonymous'를 돌려준다. 끄려면 () => null
+     */
+    crossOrigin?: LayerCrossOriginResolver
     /** 그룹 펼침 상태 저장소(선택). 없으면 메모리에만 둔다(새로고침하면 전부 펼침). 코어는 브라우저 저장소를 직접 쓰지 않는다 */
     expandedStorage?: LayerExpandedStorage
 }
@@ -79,6 +87,8 @@ export interface GisMapConfig {
     ui?: GisMapUiConfig
     /** 추가 proj4 정의. EPSG:5186, 5179, 5185, 5187, 5188은 기본 등록. false면 좌표계 등록을 전혀 안 함 */
     projections?: Record<string, string> | false
+    /** 지도 출력(map.print)의 기관명·로고·출처·글꼴·축척 선택지 */
+    print?: PrintLayoutConfig
     /** 엔진이 추가하는 레이어 zIndex. 붙이기 모드에서 호스트 레이어와 겹치지 않게 조정 */
     zIndex?: Partial<GisMapZIndex>
 }

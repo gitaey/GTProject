@@ -31,7 +31,7 @@ import { RadiusTool } from './tools/RadiusTool'
 import { LayerTreeControllerImpl } from './layers/LayerTreeController'
 import type { LayerTreeController } from './layers/LayerTreeController'
 import { resolveBasemapModes } from './layers/basemap'
-import { defaultResolveLayerUrl } from './layers/resolveLayerUrl'
+import { defaultLayerCrossOrigin, defaultResolveLayerUrl } from './layers/resolveLayerUrl'
 import { RasterOverlayControllerImpl } from './overlays/RasterOverlayController'
 import type { RasterOverlayController } from './overlays/RasterOverlayController'
 import { VectorOverlayControllerImpl } from './overlays/VectorOverlayController'
@@ -40,6 +40,8 @@ import { ParcelHighlighterImpl } from './features/ParcelHighlighter'
 import type { ParcelHighlighter } from './features/ParcelHighlighter'
 import { RegionWatcherImpl } from './features/RegionWatcher'
 import type { RegionWatcher } from './features/RegionWatcher'
+import { PrintControllerImpl } from './print/PrintController'
+import type { PrintController } from './print/types'
 
 /** zoom 기본 16, 600ms */
 export interface FlyToRequest {
@@ -77,6 +79,8 @@ export interface GisMap {
     readonly parcel: ParcelHighlighter
     /** 지도 중심 지역명(구독자가 있을 때만 조회) */
     readonly region: RegionWatcher
+    /** 지도 출력(PNG·PDF·인쇄). 틀·iframe은 처음 쓸 때만 만든다 */
+    readonly print: PrintController
 
     /** owned=false면 아무것도 안 함(경고) */
     mount(target: HTMLElement | string): void
@@ -120,6 +124,7 @@ class GisMapEngine implements GisMap {
     readonly vector: VectorOverlayController
     readonly parcel: ParcelHighlighter
     readonly region: RegionWatcher
+    readonly print: PrintController
 
     /** FE-3·FE-4 컨트롤러가 쓸 설정값 */
     protected readonly zIndex: Readonly<GisMapZIndex>
@@ -137,6 +142,7 @@ class GisMapEngine implements GisMap {
     private readonly vectorController: VectorOverlayControllerImpl
     private readonly parcelHighlighter: ParcelHighlighterImpl
     private readonly regionWatcher: RegionWatcherImpl
+    private readonly printController: PrintControllerImpl
     private destroyed = false
 
     constructor(olMap: OlMap, owned: boolean, options: GisMapAttachOptions) {
@@ -175,6 +181,7 @@ class GisMapEngine implements GisMap {
         ]
         new ToolHintView(olMap, this.resources, this.toolManager.store, resolveToolHints(options.ui?.toolHints))
 
+        const basemapModes = resolveBasemapModes(options.layers?.basemapModes)
         // 레이어 트리: 트리가 도착하면 OL 레이어를 그때 붙인다(도구 레이어 뒤). layerTree 소스가 있으면 바로 로드
         this.layerController = new LayerTreeControllerImpl({
             resources: this.resources,
@@ -184,7 +191,8 @@ class GisMapEngine implements GisMap {
             wfs: this.sources.wfs,
             zIndex: this.zIndex.tree,
             resolveUrl: options.layers?.resolveUrl ?? defaultResolveLayerUrl,
-            basemapModes: resolveBasemapModes(options.layers?.basemapModes),
+            crossOrigin: options.layers?.crossOrigin ?? defaultLayerCrossOrigin,
+            basemapModes,
             expandedStorage: options.layers?.expandedStorage,
         })
         this.layers = this.layerController
@@ -206,6 +214,11 @@ class GisMapEngine implements GisMap {
         this.parcel = this.parcelHighlighter
         this.regionWatcher = new RegionWatcherImpl({ olMap, source: this.sources.regionName })
         this.region = this.regionWatcher
+        this.printController = new PrintControllerImpl({
+            olMap, config: options.print, theme: this.theme, layers: this.layers, basemapModes,
+            vector: this.vector, raster: this.raster, region: this.region, legend: this.sources.legend,
+        })
+        this.print = this.printController
     }
 
     mount(target: HTMLElement | string): void {
@@ -310,6 +323,7 @@ class GisMapEngine implements GisMap {
         // 도구는 전환 없이 끊고(핸들러·구독 해제), 붙인 interaction·레이어·DOM·리스너는 releaseAll이 한 번에 뗀다
         this.toolManager.destroy()
         this.layerController.destroy()
+        this.printController.destroy()
         this.regionWatcher.destroy()
         this.parcelHighlighter.destroy()
         this.vectorController.destroy()

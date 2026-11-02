@@ -4,4 +4,4 @@
 export type GisFeatureId =
     | 'map.panel.layer' | 'map.panel.image' | 'map.panel.mymap' | 'map.panel.etc'
     | 'map.tool.zoom' | 'map.tool.draw' | 'map.tool.measure-distance' | 'map.tool.measure-area'
-    | 'map.tool.radius-search' | 'map.tool.wind' | 'map.tool.clear'
+    | 'map.tool.radius-search' | 'map.tool.wind' | 'map.tool.print' | 'map.tool.clear'

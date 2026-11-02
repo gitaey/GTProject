@@ -17,6 +17,21 @@ export function isVWorldUrl(url: string): boolean {
     return url.includes('vworld.kr')
 }
 
+/** 레이어 이미지 요청의 crossOrigin 값(null = 안 붙임). url = 가공이 끝난(resolveUrl 적용 후) 요청 주소 */
+export type LayerCrossOriginResolver = (layer: LayerDef, url: string) => 'anonymous' | 'use-credentials' | null
+
+/** VWorld 타일(XYZ/WMTS) 주소인가 — api.vworld.kr/req/wmts · xdworld.vworld.kr */
+export function isVWorldTileUrl(url: string): boolean {
+    return url.includes('api.vworld.kr/req/wmts') || url.includes('xdworld.vworld.kr')
+}
+
+/**
+ * 기본 규칙: VWorld 타일(XYZ)만 'anonymous'(서버가 Access-Control-Allow-Origin: *를 준다) — 출력(PNG·PDF) 저장이 되게 한다.
+ * WMS(VWorld·GeoServer)는 서버 CORS를 모르므로 안 붙인다(붙였는데 서버가 안 주면 레이어가 사라진다). 바꾸려면 config.layers.crossOrigin
+ */
+export const defaultLayerCrossOrigin: LayerCrossOriginResolver = (layer, url) =>
+    layer.type !== 'WMS' && layer.type !== 'WFS' && isVWorldTileUrl(url) ? 'anonymous' : null
+
 export const defaultResolveLayerUrl: LayerUrlResolver = (layer, host) => {
     const url = layer.url.replace('{VWORLD_KEY}', host.keys.vworld)
     if (layer.type === 'WMS' && isVWorldUrl(url)) return { url, params: { key: host.keys.vworld } }

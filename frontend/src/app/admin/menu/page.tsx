@@ -111,6 +111,7 @@ const MENU_CATALOG: CatalogArea[] = [
                     { id: 'map.tool.measure-area', label: '면적 측정' },
                     { id: 'map.tool.radius-search', label: '반경 검색' },
                     { id: 'map.tool.wind', label: '바람길' },
+                    { id: 'map.tool.print', label: '출력' },
                     { id: 'map.tool.clear', label: '전체 초기화' },
                 ],
             },

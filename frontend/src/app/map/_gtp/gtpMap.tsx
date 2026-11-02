@@ -3,7 +3,8 @@
 // GTProject /map 전용 지도 설정(지도 패키지 밖 — 이식하지 않는다). page.tsx는 이 값으로 조립만 한다.
 // 모두 모듈 상수·모듈 함수라 렌더마다 참조가 바뀌지 않는다(Provider config는 최초 1회만 읽고, setup은 엔진마다 1번).
 import { Earth, MoreHorizontal } from 'lucide-react'
-import type { GisMap, GisMapConfig } from '@gtp/gis-map/core'
+import { defaultLayerCrossOrigin, isVWorldUrl } from '@gtp/gis-map/core'
+import type { GisMap, GisMapConfig, LayerCrossOriginResolver } from '@gtp/gis-map/core'
 import { createWindPlugin } from '@gtp/gis-map/core/wind'
 import { browserExpandedStorage } from '@gtp/gis-map/react'
 import { restSources } from '@gtp/gis-map/adapters/rest'
@@ -19,6 +20,21 @@ import { readMapSession, rememberMapPanel, restoreMapSession } from './mapSessio
 const SESSION = 'gtp-map'
 
 /**
+ * GeoServer WMS 중 CORS(Access-Control-Allow-Origin)를 허용하는 것을 확인한 출처(2026-10-30 GetCapabilities·preflight 확인).
+ * 지도 출력(PNG·PDF 저장)은 이 출처의 레이어에 crossOrigin 'anonymous'를 줘야 캔버스 저장이 된다.
+ * 허용하지 않는 출처(예: 로컬 localhost:8600)에 켜면 그 레이어가 안 보이므로 목록에 있는 출처만 적용한다.
+ */
+const CORS_GEOSERVER_ORIGINS: readonly string[] = Object.freeze(['https://geo.gitaey-dev.com'])
+
+/** 기본 규칙(VWorld 타일) + CORS를 확인한 GeoServer WMS. VWorld WMS는 CORS 미확인이라 끈다 */
+const gtpLayerCrossOrigin: LayerCrossOriginResolver = (layer, url) => {
+    const base = defaultLayerCrossOrigin(layer, url)
+    if (base) return base
+    if (layer.type === 'WMS' && !isVWorldUrl(url) && CORS_GEOSERVER_ORIGINS.some(o => url.startsWith(o + '/'))) return 'anonymous'
+    return null
+}
+
+/**
  * 엔진 설정 — 세종특별자치시청 부근 중심, 줌 10(7~21), 브랜드 주 색.
  * 데이터는 sources(어댑터): 짝 백엔드 REST(레이어 트리·개인 레이어 설정·나만의지도·GeoTIFF·바람길) + 호스트 프록시(주소 검색·필지·지역명·범례·WFS).
  * 레이어 그룹 펼침 상태는 localStorage 'layer-group-expanded'(/map-admin/layer와 같은 키 → 펼침 상태 공유)
@@ -27,7 +43,9 @@ export const GTP_MAP_CONFIG: Omit<GisMapConfig, 'target' | 'host'> = {
     view: { center: [127.289, 36.48], zoom: 10, minZoom: 7, maxZoom: 21 },
     theme: { primary: '#F26722' },
     sources: [restSources(), proxySources()],
-    layers: { expandedStorage: browserExpandedStorage('layer-group-expanded') },
+    layers: { expandedStorage: browserExpandedStorage('layer-group-expanded'), crossOrigin: gtpLayerCrossOrigin },
+    // 지도 출력: 머리줄 기관명. 출처는 켜진 레이어에 vworld.kr이 있으면 기본 문구('배경지도: 브이월드(국토교통부)')가 자동으로 붙는다
+    print: { organization: 'SIS-Map' },
 }
 
 /** 머리줄 로고 영역 */

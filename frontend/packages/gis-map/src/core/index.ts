@@ -20,8 +20,8 @@ export type { LayerTreeController, LayerTreeState, LayerExpandedStorage } from '
 export { flattenGroupLayers, allTreeLayers, filterTreeByIds, getLayerVisible, getLayerOpacity } from './layers/treeUtils'
 export { DEFAULT_BASEMAP_MODES, resolveBasemapModes, isBasemapLayer, getBasemapVisibility, deriveBasemapMode } from './layers/basemap'
 export type { BasemapModeNames } from './layers/basemap'
-export { defaultResolveLayerUrl, isVWorldUrl } from './layers/resolveLayerUrl'
-export type { LayerUrlResolver, ResolvedLayerUrl } from './layers/resolveLayerUrl'
+export { defaultResolveLayerUrl, defaultLayerCrossOrigin, isVWorldUrl, isVWorldTileUrl } from './layers/resolveLayerUrl'
+export type { LayerUrlResolver, ResolvedLayerUrl, LayerCrossOriginResolver } from './layers/resolveLayerUrl'
 export { createOlLayer } from './layers/createOlLayer'
 export type { CreateOlLayerOptions } from './layers/createOlLayer'
 // 오버레이(GeoTIFF 타일·나만의지도 GeoJSON)와 그 목록(패널 한 번 열림 = 목록 하나, 상태 폴링)
@@ -59,6 +59,21 @@ export type { WindColorStop } from './lib/windColorScale'
 export { formatLength, formatArea, formatRadius } from './lib/format'
 // 색 입력 규칙(#rgb·#rrggbb → #rrggbb, 그 밖은 null) — config.theme.primary와 ui 테마 CSS 변수가 같이 쓴다
 export { normalizeHexColor, parseHexColor } from './lib/color'
+
+// 지도 출력(PNG·PDF·인쇄) — map.print. 순수 계산·PDF 생성도 함께 공개(호스트가 자기 양식을 만들 때)
+export { GisPrintError } from './print/types'
+export type {
+    PrintController, PrintState, PrintOptions, PrintPage, PrintElements, PrintLayoutConfig, PrintPaperSize, PrintOrientation,
+    PrintWarning, PrintWarningCode, GisPrintErrorCode,
+} from './print/types'
+export {
+    DEFAULT_PRINT_FONT_FAMILY, DEFAULT_PRINT_SCALES, DEFAULT_VWORLD_ATTRIBUTION, DEFAULT_PRINT_DPI, DEFAULT_PRINT_ELEMENTS, INITIAL_PRINT_STATE,
+} from './print/PrintController'
+export { PAPER_PORTRAIT_MM, paperSizeMm, paperLabel, computeLayout, clampDpi, MIN_DPI, MAX_DPI } from './print/paper'
+export { scaleDenominator, framePxWidthForScale, niceBarMeters, planScaleBar, formatBarLabel, formatScaleRatio } from './print/scaleBar'
+export { formatPrintDate } from './print/renderPage'
+export { minimalPdf } from './lib/minimalPdf'
+export { saveBlob } from './lib/saveBlob'
 
 // 설정
 export { DEFAULT_VIEW, DEFAULT_THEME, DEFAULT_ZINDEX, resolveView, resolveTheme, resolveZIndex } from './config'

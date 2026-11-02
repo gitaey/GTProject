@@ -47,3 +47,6 @@ function scaleLine(map: GisMap, options?: ScaleLineOptions): () => void {
 
 /** 엔진 밖 OL 컨트롤 도우미(번들 ol 사본으로 만든다) */
 export const controls = Object.freeze({ scaleLine })
+
+/** 출력(map.print.exportPng/exportPdf)이 돌려준 Blob을 파일로 저장: GisMap.saveBlob(blob, '위치도.pdf'). 출력 오류 클래스(code: TAINTED·BUSY·TOO_LARGE·NO_MAP_SIZE·DESTROYED) */
+export { saveBlob, GisPrintError } from './core'

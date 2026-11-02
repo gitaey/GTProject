@@ -122,6 +122,43 @@ export default function MapPage() {
 엔진은 업무 지도의 target·View·기존 레이어를 건드리지 않는다. 버전별 결과는 **`COMPATIBILITY.md`**, 붙이기 규칙·좌표계 주의는 `examples/jsp/README.md` 6절.
 ES 모듈 ol만 쓰는 업무 화면(webpack·vite)은 attach UMD 대신 패키지 소스의 `attachGisMap`을 번들러로 쓴다.
 
+## 지도 출력 — PNG · PDF · 인쇄 (`map.print`)
+
+지금 보이는 지도를 제목·범례·축척 막대·방위표·출력일·출처가 들어간 A4/A3 한 장으로 내보낸다. 엔진 인스턴스의 `print` 컨트롤러(React 없음)가 기본이고,
+React 위젯 `PrintPanel`(도구 모음 "출력" 단추)은 그 위의 선택형 화면이다. 지도를 캔버스로 합성하므로 **호스트 책임이 하나 있다 — 아래 "crossOrigin·CORS"**.
+
+```ts
+// React: MapShell 도구 모음에 "출력" 단추가 기본으로 있다(showPrint={false}로 끔, 메뉴 권한 'map.tool.print'로 숨김)
+<MapShell /* … */ showPrint />
+// 직접 쓰기(React·UMD (a)·UMD (b) 공통): 엔진 인스턴스의 print
+gis.print.showFrame({ paper: 'A4', orientation: 'landscape' })   // 지도 위 용지 비율 틀(지도는 계속 움직일 수 있다)
+gis.print.setScale(5000)                                          // 용지에서 1:5,000이 되도록 틀 크기(필요하면 줌 한 단계씩)를 맞춘다. null = 화면 그대로
+const blob = await gis.print.exportPdf({ title: '민원 위치도' })   // exportPng 도 같다. 오염되면 GisPrintError('TAINTED')
+saveBlob(blob, '위치도.pdf')                                       // UMD: GisMap.saveBlob(blob, '위치도.pdf')
+await gis.print.print({ title: '현황도' })                         // 브라우저 인쇄 창(숨은 iframe). 인쇄 창이 닫히면 resolve. 오염돼도 된다
+const page = await gis.print.render({ dpi: 72 })                  // 파일로 내보내지 않고 캔버스만(미리보기·직접 처리) — page.tainted·taintSuspects·warnings
+```
+
+- 옵션(`PrintOptions`): `paper`(A4·A3)·`orientation`·`dpi`(72~200, 기본 150)·`title`·`subtitle`(생략 = 지도 중심 지역명, `null`·`''` = 없음)·`show`(legend·scaleBar·northArrow·date·attribution·logo).
+- 엔진 설정 `print`(`PrintLayoutConfig`): `organization`(기관명)·`logo`(URL·data URI)·`attributions`(항상 붙일 출처)·`vworldAttribution`(켜진 레이어에 vworld.kr이 있으면 자동으로 붙는 문구, 기본 "배경지도: 브이월드(국토교통부)", `false` = 끔)·`fontFamily`·`defaultDpi`·`scales`·`renderTimeoutMs`.
+  UMD: `GisMap.attach(map, { print: { organization: 'OO시' } })`.
+- PDF는 의존성 없는 최소 PDF(그림 1장 임베드)라 글자는 그림이다(선택·검색 안 됨). 지도 그림 해상도는 **화면에 그려진 픽셀 그대로**(기기 픽셀 배율 포함)라 틀이 작으면 낮다(패널이 "지도 해상도 약 N dpi"를 보여 준다). 300dpi 고해상도는 후속.
+- 안 찍히는 것: 나만의지도 팝업·호스트 HTML 오버레이·지역명 배지·바람 범례(측정값 툴팁은 상자로 다시 그린다). 바람 입자는 그 순간 정지 화면.
+- 축척은 지도 중심 기준(웹 메르카토르는 위아래가 다르다). 용지 축척은 PDF를 "실제 크기(100%)"로 인쇄해야 맞다. 방위표는 뷰 회전만 반영한다.
+- 새 ol API: `proj.getPointResolution`(COMPATIBILITY.md). 그 밖은 DOM·Canvas API.
+
+### crossOrigin·CORS — 호스트 책임
+
+브라우저는 CORS 허락 없이 다른 출처에서 받은 그림이 섞인 캔버스를 "오염(tainted)"으로 막아 **PNG·PDF 저장이 `GisPrintError('TAINTED')`로 실패**한다(화면 표시·인쇄 창은 무관).
+`PrintPage.taintSuspects`가 원인 후보 레이어 이름(다른 출처 주소 + crossOrigin 없음)을 알려 준다. 인쇄 창에서 "PDF로 저장"은 오염과 상관없이 된다.
+
+- 기본(`defaultLayerCrossOrigin`): **VWorld 타일(XYZ) 배경지도에만 `crossOrigin: 'anonymous'`**(VWorld가 `Access-Control-Allow-Origin: *`를 준다). VWorld가 CORS를 내리면 배경지도가 안 보이게 되므로 `layers: { crossOrigin: () => null }`로 끌 수 있다(옛 동작).
+- WMS(VWorld WMS·GeoServer)는 서버 CORS를 모르므로 **기본 끔** — 서버가 CORS를 안 주는데 켜면 그 레이어가 아예 안 보인다. CORS를 켠 서버만 호스트가 지정한다:
+  `layers: { crossOrigin: (layer, url) => url.indexOf('https://geo.example.com/') === 0 ? 'anonymous' : defaultLayerCrossOrigin(layer, url) }`
+  (`layer` = LayerDef, `url` = resolveUrl이 끝난 요청 주소.) GeoServer는 기본으로 CORS가 꺼져 있다 — CORS 필터를 켜거나(web.xml) 같은 출처 경로(nginx)로 내보낸다.
+- 로고·범례 이미지는 `crossOrigin='anonymous'`로 읽는다. CORS가 없으면 그 그림만 빼고 경고(`LOGO_SKIPPED`·`LEGEND_IMAGE_SKIPPED`)가 나온다(캔버스는 오염되지 않는다).
+- attach 호스트의 자기 레이어(`ol.source.*`)는 호스트가 소스를 만들 때 `crossOrigin`을 준다. 엔진은 호스트 레이어를 바꾸지 않는다(오염 후보로만 알려 준다).
+
 ## 호스트 주입 — `GisMapHost` 요약
 
 지도 패키지는 인증·주소·키·권한을 스스로 읽지 않고 호스트에게 받는다. 일부만 넘기면 나머지는 기본값(`DEFAULT_HOST`)이다.

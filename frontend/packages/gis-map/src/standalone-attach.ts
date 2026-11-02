@@ -50,3 +50,6 @@ export const adapters = Object.freeze({ rest: restSources, proxy: proxySources }
 
 /** 호환 검사 오류 클래스(instanceof 확인용) */
 export { GisOlCompatError }
+
+/** 출력(gis.print.exportPng/exportPdf)이 돌려준 Blob을 파일로 저장: GisMap.saveBlob(blob, '현황도.png'). 출력 오류 클래스(code: TAINTED·BUSY·TOO_LARGE·NO_MAP_SIZE·DESTROYED) */
+export { saveBlob, GisPrintError } from './core'

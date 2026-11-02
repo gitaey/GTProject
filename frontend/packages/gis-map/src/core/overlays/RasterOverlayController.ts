@@ -49,6 +49,8 @@ export interface RasterOverlayController {
     hide(id: number): void
     isVisible(id: number): boolean
     getOlLayer(id: number): TileLayer<XYZ> | null
+    /** 올린 GeoTIFF의 표시 이름(원본 파일 이름). 지도에 없으면 null — 출력 범례가 쓴다 */
+    nameOf(id: number): string | null
     /** 목록 하나를 연다(패널 한 번 열림). autoLoad 기본 true. 엔진 destroy 때 열린 목록도 전부 dispose */
     openCatalog(opts?: { autoLoad?: boolean }): GeoTiffCatalog
 }
@@ -128,6 +130,7 @@ export class RasterOverlayControllerImpl implements RasterOverlayController {
     private readonly state: WritableStore<RasterOverlayState>
     private readonly opts: RasterOverlayControllerOptions
     private readonly layers = new Map<number, TileLayer<XYZ>>()
+    private readonly layerNames = new Map<number, string>()
     private readonly catalogs = new Set<GeoTiffCatalog>()
     private destroyed = false
 
@@ -151,6 +154,7 @@ export class RasterOverlayControllerImpl implements RasterOverlayController {
         })
         resources.addLayer(layer)
         this.layers.set(item.id, layer)
+        this.layerNames.set(item.id, item.originalName)
         this.state.setState({ visibleIds: [...this.state.getState().visibleIds, item.id] })
 
         // 백엔드에서 받은 WGS84 범위로 지도 이동
@@ -165,6 +169,7 @@ export class RasterOverlayControllerImpl implements RasterOverlayController {
         if (layer) {
             this.opts.resources.removeLayer(layer)
             this.layers.delete(id)
+            this.layerNames.delete(id)
         }
         const ids = this.state.getState().visibleIds
         if (ids.includes(id)) this.state.setState({ visibleIds: ids.filter(x => x !== id) })
@@ -176,6 +181,10 @@ export class RasterOverlayControllerImpl implements RasterOverlayController {
 
     getOlLayer(id: number): TileLayer<XYZ> | null {
         return this.layers.get(id) ?? null
+    }
+
+    nameOf(id: number): string | null {
+        return this.layerNames.get(id) ?? null
     }
 
     openCatalog(opts?: { autoLoad?: boolean }): GeoTiffCatalog {
@@ -203,6 +212,7 @@ export class RasterOverlayControllerImpl implements RasterOverlayController {
         this.catalogs.clear()
         this.layers.forEach(l => this.opts.resources.removeLayer(l))
         this.layers.clear()
+        this.layerNames.clear()
         this.state.destroy()
     }
 }

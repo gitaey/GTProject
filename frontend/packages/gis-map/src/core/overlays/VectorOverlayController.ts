@@ -85,6 +85,8 @@ export interface VectorOverlayController {
     /** 체크 상태(받는 중 포함) */
     isVisible(id: number): boolean
     getOlLayer(id: number): VectorLayer<Feature<Geometry>> | null
+    /** 목록(openCatalog)에서 본 레이어 이름. 모르면 null — 출력 범례가 쓴다 */
+    nameOf(id: number): string | null
     /** 목록 하나를 연다(패널 한 번 열림). autoLoad 기본 true. 엔진 destroy 때 열린 목록도 전부 dispose */
     openCatalog(opts?: { autoLoad?: boolean }): MyMapCatalog
 
@@ -366,6 +368,10 @@ export class VectorOverlayControllerImpl implements VectorOverlayController {
 
     getOlLayer(id: number): VectorLayer<Feature<Geometry>> | null {
         return this.entries.get(id)?.layer ?? null
+    }
+
+    nameOf(id: number): string | null {
+        return this.names.get(id) ?? null
     }
 
     // ── 스타일 ──────────────────────────────────────────────────────────────

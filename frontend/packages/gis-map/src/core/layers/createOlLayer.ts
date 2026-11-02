@@ -15,7 +15,7 @@ import type { HttpClient } from '../http'
 import type { WfsSource } from '../sources'
 import type { LayerDef } from '../types/layer'
 import { isVWorldUrl } from './resolveLayerUrl'
-import type { LayerUrlResolver } from './resolveLayerUrl'
+import type { LayerCrossOriginResolver, LayerUrlResolver } from './resolveLayerUrl'
 
 export interface CreateOlLayerOptions {
     visible: boolean
@@ -24,14 +24,24 @@ export interface CreateOlLayerOptions {
     zIndex: number
     host: GisMapHost
     resolveUrl: LayerUrlResolver
+    /** 이미지 crossOrigin 규칙(없으면 안 붙임 — 옛 동작) */
+    crossOrigin?: LayerCrossOriginResolver
     http: HttpClient
     /** 없으면 WFS 레이어는 비어 있는 채로 만든다(요청 안 함) */
     wfs?: WfsSource
 }
 
+/**
+ * crossOrigin을 안 붙이는 이미지 레이어의 className. OL은 className이 같은 레이어를 한 캔버스에 겹쳐 그리는데,
+ * CORS 없는 그림이 한 번 닿은 캔버스는 레이어를 꺼도 오염(저장 불가)된 채 남는다 → 따로 두면 레이어와 함께 캔버스도 사라진다.
+ */
+const NO_CORS_CLASS = 'ol-layer gm-nocors'
+
 export function createOlLayer(layer: LayerDef, opts: CreateOlLayerOptions): BaseLayer {
     const resolved = opts.resolveUrl(layer, opts.host)
     const url = resolved.url
+    const crossOrigin = opts.crossOrigin?.(layer, url) ?? null
+    const layerClass = crossOrigin ? {} : { className: NO_CORS_CLASS }
 
     if (layer.type === 'WMS') {
         const isVWorld = isVWorldUrl(url)
@@ -44,11 +54,12 @@ export function createOlLayer(layer: LayerDef, opts: CreateOlLayerOptions): Base
         if (!isVWorld) wmsParams['STYLES'] = layer.styleName ?? ''
         Object.assign(wmsParams, resolved.params)
 
-        return new ImageLayer({
+        const wms = new ImageLayer({
             source: new ImageWMS({
                 url,
                 params: wmsParams,
                 ratio: 1,
+                ...(crossOrigin ? { crossOrigin } : {}),
                 ...(isVWorld ? {} : { serverType: 'geoserver' as const }),
             }),
             visible: opts.visible,
@@ -56,7 +67,10 @@ export function createOlLayer(layer: LayerDef, opts: CreateOlLayerOptions): Base
             zIndex: opts.zIndex,
             minZoom: layer.minZoom ?? undefined,
             maxZoom: layer.maxZoom ?? undefined,
+            ...layerClass,
         })
+        wms.set('gmLayerName', layer.name)
+        return wms
     }
 
     if (layer.type === 'WFS') {
@@ -90,14 +104,18 @@ export function createOlLayer(layer: LayerDef, opts: CreateOlLayerOptions): Base
     }
 
     // XYZ, WMTS, TMS (그 밖의 종류도 옛날처럼 여기로). projection이 없으면 OL XYZ 기본값(웹 메르카토르 타일)
-    return new TileLayer({
+    const tile = new TileLayer({
         source: new XYZ({
             url,
             projection: layer.projection ?? undefined,
             maxZoom: layer.maxZoom ?? 19,
+            ...(crossOrigin ? { crossOrigin } : {}),
         }),
         visible: opts.visible,
         opacity: opts.opacity,
         minZoom: layer.minZoom ?? undefined,
+        ...layerClass,
     })
+    tile.set('gmLayerName', layer.name)
+    return tile
 }
