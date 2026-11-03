@@ -48,12 +48,14 @@ export interface MapShellProps {
     userMenuItems?: readonly MapUserMenuItem[]
     /** 왼쪽 네비(태블릿 이상). 기본 true. 끄면 패널을 열 버튼이 없다 — defaultPanel={null}과 함께 쓴다 */
     showNavRail?: boolean
-    /** 지도 오른쪽 위 도구 모음(줌·바람길·그리기·측정·반경·영역 분석·출력·초기화). 기본 true */
+    /** 지도 오른쪽 위 도구 모음(줌·바람길·그리기·측정·반경·필지 정보·영역 분석·출력·초기화). 기본 true */
     showToolbar?: boolean
     /** 도구 모음의 출력(PNG·PDF·인쇄) 단추. 기본 true — 메뉴 권한 map.tool.print도 통과해야 보인다 */
     showPrint?: boolean
     /** 도구 모음의 영역 분석 단추. 기본 true — 메뉴 권한 map.tool.area-analysis도 통과해야 보인다 */
     showAreaAnalysis?: boolean
+    /** 도구 모음의 필지 정보 단추(필지를 눌러 속성·건물 보기). 기본 true — 메뉴 권한 map.tool.parcel-info도 통과하고 parcel.infoAt 소스가 있어야 보인다 */
+    showParcelInfo?: boolean
     /** 지도 위 가운데 지역명 배지. 기본 true */
     showRegionBadge?: boolean
     /** 모바일(768px 미만) 레이어 버튼·시트. 기본 true */
@@ -77,7 +79,7 @@ function initialPanelId(panels: readonly MapPanelDef[], defaultPanel: string | n
 export default function MapShell({
     className, brand, panels = defaultPanels, defaultPanel, onPanelChange,
     showHeader = true, showSearch = true, showBasemapSwitcher = true, showUser = true, headerRight, userMenuItems,
-    showNavRail = true, showToolbar = true, showPrint = true, showAreaAnalysis = true, showRegionBadge = true, showMobileLayerButton = true, showWindLegend = true,
+    showNavRail = true, showToolbar = true, showPrint = true, showAreaAnalysis = true, showParcelInfo = true, showRegionBadge = true, showMobileLayerButton = true, showWindLegend = true,
     showStatusBar = true, statusBarProjection, children,
 }: MapShellProps) {
     const map = useGisMap()
@@ -117,7 +119,7 @@ export default function MapShell({
                     <GisMapView className="gm-map-view__map" />
                     {showRegionBadge && <RegionBadge />}
 
-                    {showToolbar && <MapToolbar showPrint={showPrint} showAreaAnalysis={showAreaAnalysis} />}
+                    {showToolbar && <MapToolbar showPrint={showPrint} showAreaAnalysis={showAreaAnalysis} showParcelInfo={showParcelInfo} />}
                     {showMobileLayerButton && <MobileLayerButton />}
                     {showWindLegend && <WindLegend />}
                     {children}

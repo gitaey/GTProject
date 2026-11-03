@@ -56,6 +56,52 @@ public interface AddressRefReader {
     }
 
     /**
+     * 필지 한 곳의 건물 한 줄(필지 정보 카드용). udgd = 지하여부, emdGb = 도로명코드 표의 읍면동구분(모르면 ""),
+     * relation = "MAIN"(대표지번이 이 필지) | "RELATED"(관련지번으로만 찾음). 빈 값은 모두 ""로 정규화한다.
+     */
+    record BuildingRow(String id, String sido, String sigungu, String emd, String li, String roadName, String roadCd, String udgd,
+                       int main, int sub, String name, String detailName, String sggName, boolean apartment, String zipCode,
+                       String emdGb, String relation) {
+
+        public BuildingRow {
+            id = nz(id);
+            sido = nz(sido);
+            sigungu = nz(sigungu);
+            emd = nz(emd);
+            li = nz(li);
+            roadName = nz(roadName);
+            roadCd = nz(roadCd);
+            udgd = nz(udgd);
+            name = nz(name);
+            detailName = nz(detailName);
+            sggName = nz(sggName);
+            zipCode = nz(zipCode);
+            emdGb = nz(emdGb);
+            relation = "RELATED".equals(relation) ? "RELATED" : "MAIN";
+        }
+
+        /** 표준 도로명주소 조립 재료 */
+        public StandardParts standardParts() {
+            return new StandardParts(sido, sigungu, emd, li, roadName, udgd, main, sub, apartment, sggName, emdGb);
+        }
+
+        private static String nz(String s) {
+            return s == null ? "" : s.strip();
+        }
+    }
+
+    /**
+     * 필지 건물 조회 결과: total = limit과 무관한 전체 건수(폐지 제외), rows = 정해진 순서로 잘린 건물,
+     * relatedIncluded = 관련지번(ti_scco_mvmn)으로도 찾았다.
+     */
+    record BuildingPage(int total, boolean relatedIncluded, List<BuildingRow> rows) {
+
+        public static BuildingPage empty() {
+            return new BuildingPage(0, false, List.of());
+        }
+    }
+
+    /**
      * 지번 → 건물 조회(색인 ix_ti_spbd_buld_jibun)를 써도 되는가. 건물 표에 (법정동코드, 산여부, 지번본번, 지번부번) 색인이 없으면 이 조회가
      * 1,000만 행 전체 스캔이라 false여야 한다(그러면 지번 입력 행의 도로명주소 열은 비워 둔다).
      */
@@ -74,6 +120,22 @@ public interface AddressRefReader {
      */
     default Map<JibunKey, StandardParts> standardPartsByJibun(Collection<JibunKey> keys) {
         return Map.of();
+    }
+
+    /**
+     * 관련지번 → 건물 조회(색인 ix_ti_scco_mvmn_jibun)를 써도 되는가. 없으면 {@link #buildingsByJibun}이 대표지번으로만 찾는다
+     * (관련지번 표를 전체 스캔하지 않는다).
+     */
+    default boolean relatedJibunLookupReady() {
+        return false;
+    }
+
+    /**
+     * 필지(지번 키) 한 곳에 걸린 건물을 최대 limit건 찾는다(필지 정보 카드). 건물이 없으면 total 0.
+     * {@link #jibunLookupReady()}가 true일 때만 부른다(아니면 건물 표 전체 스캔).
+     */
+    default BuildingPage buildingsByJibun(JibunKey key, int limit) {
+        return BuildingPage.empty();
     }
 
     /** 주소 자료가 읽을 수 있는 상태면 그 기준월(예 "2026-09"), 아니면 null. 기준월이 바뀌면 법정동 사전을 다시 만든다. */

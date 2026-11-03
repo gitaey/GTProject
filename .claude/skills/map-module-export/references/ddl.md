@@ -163,7 +163,7 @@ CREATE INDEX ix_umap_fail_map ON tbl_user_map_import_failure (user_map_id, row_n
 -- 원본: 행정안전부 주소기반산업지원서비스 > 건물DB(전체분, 파이프 구분 MS949). 전체 DDL·열 코멘트: `backend/scripts/mymap-ref/init-ref-juso-schema.sql`
 -- 적재·교체: `backend/scripts/mymap-ref/load-juso.sh`(표별 새 표 → 검증 → PK·인덱스 → 한 트랜잭션 교체, 기록은 ref.load_meta dataset=표 이름·sido='00'·status='READY')
 -- 로드 순서: ① init-ref-schema.sql(ref 스키마·load_meta) → ② init-ref-juso-schema.sql(빈 틀 3표) → ③ load-juso.sh --version YYYY-MM <폴더> (건물정보 → 관련지번 → 도로명코드)
--- 앱이 쓰는 표는 둘: ti_spbd_buld(법정동 사전·도로명주소 → 지번), ti_sprd_stret(도로명 → road_cd). ti_scco_mvmn(관련지번)은 적재만 하고 아직 쓰지 않는다.
+-- 앱이 쓰는 표는 둘: ti_spbd_buld(법정동 사전·도로명주소 → 지번), ti_sprd_stret(도로명 → road_cd). ti_scco_mvmn(관련지번)은 필지 정보 카드(U25)가 선택 색인 ix_ti_scco_mvmn_jibun이 있을 때만 읽는다.
 
 CREATE TABLE ref.ti_spbd_buld (                   -- 건물정보, 건물 1건 = 1행, 약 1,072만 행(2026-09)
     adm_cd varchar(10),                           -- 법정동코드 10자리  ← PNU 앞 10자리
@@ -181,7 +181,7 @@ CREATE TABLE ref.ti_spbd_buld (                   -- 건물정보, 건물 1건 =
     CONSTRAINT ti_spbd_buld_pkey PRIMARY KEY (bd_mgt_sn)
 );
 CREATE INDEX ix_ti_spbd_buld_road ON ref.ti_spbd_buld (road_cd, udgd_yn, buld_mnnm, buld_slno);   -- 도로명주소 → 지번 조회가 타는 인덱스
--- (선택) 지번 → 건물 조회용 — 주소 변환 엑셀의 지번 입력 행 도로명주소. 없으면 앱이 그 열을 비운다(전체 스캔 방지). 약 300MB 추정.
+-- 지번 → 건물 조회용 — 주소 변환 엑셀의 지번 입력 행 도로명주소(선택: 없으면 앱이 그 열을 비운다) + **필지 정보 카드 U25(필수: 없으면 503, 조회 안 함)**. 전체 스캔 방지. 약 300MB 추정.
 --   SQL 파일: backend/scripts/mymap-ref/add-ix-juso-jibun.sql (load-juso.sh가 새 표에도 만든다). 앱은 to_regclass('ref.ix_ti_spbd_buld_jibun')로 확인.
 CREATE INDEX IF NOT EXISTS ix_ti_spbd_buld_jibun ON ref.ti_spbd_buld (adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno);
 
@@ -197,11 +197,14 @@ CREATE TABLE ref.ti_sprd_stret (                  -- 도로명코드, 도로명 
 );
 CREATE INDEX ix_ti_sprd_stret_name ON ref.ti_sprd_stret (ctp_kor_nm, sig_kor_nm, rn);
 
-CREATE TABLE ref.ti_scco_mvmn (                   -- 관련지번(건물에 딸린 추가 필지), 약 177만 행 — 앱 미사용(후순위)
+CREATE TABLE ref.ti_scco_mvmn (                   -- 관련지번(건물에 딸린 추가 필지), 약 177만 행 — 필지 정보 카드(U25b)만 사용
     road_cd varchar(12) NOT NULL, udgd_yn varchar(1) NOT NULL, buld_mnnm integer NOT NULL, buld_slno integer NOT NULL, jibun_seq integer NOT NULL,
     adm_cd varchar(10), mntn_yn varchar(1), lnbr_mnnm integer, lnbr_slno integer,
     CONSTRAINT ti_scco_mvmn_pkey PRIMARY KEY (road_cd, udgd_yn, buld_mnnm, buld_slno, jibun_seq)
 );
+-- (선택) 관련지번 → 건물 조회용 — 필지 정보 카드 U25b. 없으면 대표지번 건물만 보인다. 약 50MB 추정.
+--   SQL 파일: backend/scripts/mymap-ref/add-ix-juso-related-jibun.sql (load-juso.sh가 새 표에도 만든다). 앱은 to_regclass('ref.ix_ti_scco_mvmn_jibun')로 확인.
+CREATE INDEX IF NOT EXISTS ix_ti_scco_mvmn_jibun ON ref.ti_scco_mvmn (adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno);
 -- 앱 계정은 위 표와 ref.load_meta에 SELECT만. 법정동 사전용 새 표·인덱스는 만들지 않는다(앱이 ti_spbd_buld의 distinct로 메모리에 만든다, 약 1.9만 건).
 -- Oracle/Tibero: ANY(?::varchar[])·unnest는 PostgreSQL 전용 → query-spec U7a의 IN 목록 또는 임시 키 표 JOIN으로 바꾼다. 계산 열은 가상 열(GENERATED ALWAYS AS (…) VIRTUAL).
 

@@ -198,7 +198,7 @@ STRET_COLS="sgg_cd,road_no,rn,rn_eng,emd_no,ctp_kor_nm,sig_kor_nm,emd_gb,emd_cd,
 # 도로명코드(작음) → 건물정보 → 관련지번 순
 has stret && { load_one stret ti_sprd_stret 'road_code_total.txt' 1 "$STRET_COLS" "sgg_cd, road_no, emd_no" name "ctp_kor_nm, sig_kor_nm, rn" rn || { fail=1; log "실패 — 지난 데이터는 그대로입니다"; }; }
 has buld  && { load_one buld  ti_spbd_buld  'build_*.txt' 16 "$BULD_COLS" "bd_mgt_sn" road "road_cd, udgd_yn, buld_mnnm, buld_slno" rn jibun "adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno" || { fail=1; log "실패 — 지난 데이터는 그대로입니다"; }; }
-has mvmn  && { load_one mvmn  ti_scco_mvmn  'jibun_*.txt' 16 "$MVMN_COLS" "road_cd, udgd_yn, buld_mnnm, buld_slno, jibun_seq" "" "" emd_kor_nm || { fail=1; log "실패 — 지난 데이터는 그대로입니다"; }; }
+has mvmn  && { load_one mvmn  ti_scco_mvmn  'jibun_*.txt' 16 "$MVMN_COLS" "road_cd, udgd_yn, buld_mnnm, buld_slno, jibun_seq" "" "" emd_kor_nm jibun "adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno" || { fail=1; log "실패 — 지난 데이터는 그대로입니다"; }; }
 
 CUR=main
 if [[ $fail -ne 0 ]]; then log "일부 표가 실패했습니다(위 로그 확인). 임시 표 ref.*_new는 다음 실행 때 지워집니다."; exit 1; fi

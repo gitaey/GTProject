@@ -39,6 +39,8 @@
 | `instanceof` 패턴, `var`, `sealed`/`permits`, `String.formatted`, `strip`, `repeat` | 0건 | - |
 
 
+**필지 정보 카드(U25) 추가분** — 새 `record` 2개: `mymap/infra/AddressRefReader.java`의 `BuildingRow`(compact 생성자의 null → "" 정리와 `relation` 정규화, 컴포넌트 17개)·`BuildingPage`(컴포넌트 3개) → `final class` + final 필드 + 생성자 + getter(`total()` 같은 접근자 이름은 getter로). `JdbcAddressRefReader`의 `IndexState`는 이미 목록에 있다. 새 서비스 `ParcelBuildingService`의 자연 정렬 비교기는 JDK 8 문법(정규식·`Comparator`)만 쓴다(`String.isBlank`는 JDK 11). 응답 DTO는 Lombok 클래스라 변경 없음. MyBatis로 옮길 때는 U25a(+U25b) SQL 하나만 매퍼로 바꾸고 묶기·주소 조립 자바는 그대로 쓴다.
+
 **주소 엑셀(2단계) 추가분** — 새·수정 파일 4곳이 Java 16 `record`를 쓴다(대체는 위 `record` 행과 같다: `final class` + final 필드 + 생성자 + getter):
 `mymap/util/AddressNormalizer.java`(`Parsed` — 필드 11개), `mymap/infra/AddressRefReader.java`(`LegalDong`·`RoadCode`·`BuildingKey`·`Building` — `BuildingKey`는 `Map` 키라 `equals`·`hashCode`를 직접 써야 한다), `mymap/service/UserMapImportJob.java`(`PnuRow`, `Request`의 보조 생성자 — 이미 있던 `record`에 필드 1개 추가), `mymap/port/AddressMatch.java`(옛 record 유지). 화살표 `switch`는 `UserMapImportJob.resolveAddresses`의 `switch (m.status())` 하나가 늘었다. 새 코드에 `Stream.toList()`·텍스트 블록·`instanceof` 패턴·`var`는 없다(`List.copyOf`·`String.strip`·`toArray(String[]::new)`는 JDK 11에서 된다). `AddressNormalizer`는 한글 식별자가 없지만 `InMemoryAddressRefReader.samples()`에는 한글 지역 변수 이름이 있다(시험·fake 전용, 이식 불필요).
 

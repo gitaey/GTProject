@@ -4,7 +4,7 @@
 // FE-5b-2: 그리기 패널·반경 패널·활성 도구 연결을 DrawPanel.tsx·RadiusPanel.tsx·activeTool.ts로 떼어 냈다(본문 그대로)
 import { useState, useRef, useEffect } from 'react'
 import {
-    PenLine, Ruler, Trash2, Plus, Minus, SquareDashed, CircleDot, Wind, Printer, ChartPie,
+    PenLine, Ruler, Trash2, Plus, Minus, SquareDashed, CircleDot, Wind, Printer, ChartPie, LandPlot,
 } from 'lucide-react'
 import { useGisHost, useGisMap, useWindPlugin, useWindState } from '../../react'
 import type { WindState } from '../../core'
@@ -14,6 +14,7 @@ import DrawPanel from './DrawPanel'
 import RadiusPanel from './RadiusPanel'
 import PrintPanel from '../print/PrintPanel'
 import AreaAnalysisPanel from '../areaAnalysis/AreaAnalysisPanel'
+import ParcelInfoCard from '../parcelInfo/ParcelInfoCard'
 
 // ── 툴팁 ──────────────────────────────────────────────────────────────────────
 
@@ -54,9 +55,11 @@ export interface MapToolbarProps {
     showPrint?: boolean
     /** 영역 분석(영역을 정하고 레이어별 개수·면적·열별 집계) 단추와 패널. 기본 true(메뉴 권한 map.tool.area-analysis도 통과해야 보인다) */
     showAreaAnalysis?: boolean
+    /** 필지 정보(필지를 눌러 속성·건물 보기) 단추와 카드. 기본 true(메뉴 권한 map.tool.parcel-info도 통과하고, 지도에 parcel.infoAt 소스가 있어야 보인다) */
+    showParcelInfo?: boolean
 }
 
-export default function MapToolbar({ showPrint = true, showAreaAnalysis = true }: MapToolbarProps = {}) {
+export default function MapToolbar({ showPrint = true, showAreaAnalysis = true, showParcelInfo = true }: MapToolbarProps = {}) {
     // 바람길 토글은 엔진의 바람길 플러그인(설치: app/map/page.tsx의 setup)
     const wind = useWindPlugin()
     const windLayerVisible = useWindState(selectWindVisible)
@@ -74,16 +77,25 @@ export default function MapToolbar({ showPrint = true, showAreaAnalysis = true }
 
     const isAnyDraw = isDrawMode(activeTool) || isSelectMode(activeTool)
 
-    // 그리기·반경 패널, 출력 패널, 영역 분석 패널은 같은 자리(도구 모음 왼쪽)를 쓴다 → 하나를 열면 나머지를 닫는다
-    // (닫히는 영역 분석 패널은 언마운트되며 영역·결과·강조를 지운다). 반경 도구가 켜지면 출력·영역 분석 패널이 닫히고,
-    // 출력·영역 분석 패널을 열면 켜져 있던 반경 도구가 꺼진다
+    // 그리기·반경 패널, 출력 패널, 영역 분석 패널, 필지 정보 카드는 같은 자리(도구 모음 왼쪽)를 쓴다 → 하나를 열면 나머지를 닫는다
+    // (닫히는 영역 분석 패널은 언마운트되며 영역·결과·강조를 지운다). 반경·필지 정보 도구가 켜지면 출력·영역 분석(·그리기) 패널이 닫히고,
+    // 출력·영역 분석·그리기 패널을 열면 켜져 있던 반경·필지 정보 도구가 꺼진다(필지 정보 도구가 꺼지면 카드·강조도 엔진이 지운다)
     function toggleDraw() {
         const next = !drawOpen
         setDrawOpen(next)
         if (next) {
             setPrintOpen(false)
             setAnalysisOpen(false)
+            if (activeTool === 'parcel-info') setActiveTool('none')
         }
+    }
+    function toggleParcel() {
+        if (activeTool !== 'parcel-info') {
+            setDrawOpen(false)
+            setPrintOpen(false)
+            setAnalysisOpen(false)
+        }
+        setActiveTool('parcel-info')
     }
     function togglePrint() {
         const next = !printOpen
@@ -91,7 +103,7 @@ export default function MapToolbar({ showPrint = true, showAreaAnalysis = true }
         if (!next) return
         setDrawOpen(false)
         setAnalysisOpen(false)
-        if (activeTool === 'radius-search') setActiveTool('none')
+        if (activeTool === 'radius-search' || activeTool === 'parcel-info') setActiveTool('none')
     }
     function toggleAnalysis() {
         const next = !analysisOpen
@@ -99,13 +111,14 @@ export default function MapToolbar({ showPrint = true, showAreaAnalysis = true }
         if (!next) return
         setDrawOpen(false)
         setPrintOpen(false)
-        if (activeTool === 'radius-search') setActiveTool('none')
+        if (activeTool === 'radius-search' || activeTool === 'parcel-info') setActiveTool('none')
     }
     useEffect(() => {
-        if (activeTool === 'radius-search') {
+        if (activeTool === 'radius-search' || activeTool === 'parcel-info') {
             setPrintOpen(false)
             setAnalysisOpen(false)
         }
+        if (activeTool === 'parcel-info') setDrawOpen(false)
     }, [activeTool])
 
     // loaded가 false(미로그인/미로드)면 전부 표시
@@ -118,6 +131,7 @@ export default function MapToolbar({ showPrint = true, showAreaAnalysis = true }
     const showWind    = show('map.tool.wind')
     const showPrintBtn = showPrint && show('map.tool.print')
     const showAnalysisBtn = showAreaAnalysis && show('map.tool.area-analysis')
+    const showParcelBtn = showParcelInfo && show('map.tool.parcel-info') && !!gis?.parcelInfo.available
     const showToolGrp = showDraw || showMeasD || showMeasA || showRadius
 
     function zoom(delta: number) {
@@ -193,6 +207,22 @@ export default function MapToolbar({ showPrint = true, showAreaAnalysis = true }
                             <RadiusPanel />
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* ── 필지 정보 ── */}
+            {showParcelBtn && (
+                <div className="gm-toolbar__group">
+                    <Tip label={activeTool === 'parcel-info' ? '' : '필지 정보'}>
+                        <TBtn active={activeTool === 'parcel-info'} onClick={toggleParcel} cls="gm-toolbar__btn--single">
+                            <LandPlot size={15} />
+                        </TBtn>
+                    </Tip>
+                </div>
+            )}
+            {showParcelBtn && activeTool === 'parcel-info' && (
+                <div className="gm-toolbar__parcel-slot">
+                    <ParcelInfoCard />
                 </div>
             )}
 

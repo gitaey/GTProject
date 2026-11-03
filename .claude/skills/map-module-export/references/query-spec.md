@@ -48,6 +48,8 @@
 | `INVALID_EXCEL_FILE` | 400 | 엑셀(.xlsx) 파일만 업로드 가능합니다. | excel preview (확장자, 헤더 행 없음) |
 | `EXCEL_UPLOAD_NOT_FOUND` | 404 | 엑셀 업로드 세션을 찾을 수 없습니다(만료되었을 수 있습니다). | excel confirm |
 | `INVALID_COORDINATE_COLUMN` | 400 | 선택한 위도/경도 컬럼에서 좌표를 읽을 수 없습니다. | excel confirm (헤더에 컬럼 없음) |
+| `PARCEL_QUERY_INVALID` | 400 | 요청 값이 올바르지 않습니다(PNU 19자리 숫자, limit 1~1000). | U25 |
+| `PARCEL_BUILDINGS_UNAVAILABLE` | 503 | 건물 자료(지번 색인)가 아직 준비되지 않았습니다. | U25 (지번 색인 없음·적재 교체 중) |
 
 ### 1.3 JSON 직렬화
 
@@ -98,6 +100,7 @@ GTProject 구현은 JWT principal 문자열을 읽는다(`SecurityContextGisUser
 | U7 | POST `/api/mymap/upload/excel/confirm` | 로그인 | A | 선택: 업로드 |
 | U23 | POST `/api/mymap/upload/excel/convert` | 로그인 | A | 선택: 주소 변환(엑셀로만 받기) |
 | U24 | GET `/api/mymap/{id}/export` | 로그인 | A | 선택: 내보내기(엑셀·GeoJSON) |
+| U25 | GET `/api/mymap/ref/parcels/{pnu}/buildings` | 로그인 | A | 선택: 필지 정보 카드의 건물 목록(건물DB 읽기, 지번 색인 필수) |
 | U8 | GET `/api/mymap/{id}/share` | 로그인 | A | 선택: 공유 |
 | U9 | PUT `/api/mymap/{id}/share` | 로그인 | A | 선택: 공유 |
 | U10 | PATCH `/api/mymap/{id}` | 소유자만 | A | 선택: 스타일·이름·표시 수정 |
@@ -145,6 +148,7 @@ L7~L12, G2~G4는 로그인한 아무 사용자나 호출할 수 있다. **이식
 | 선택: 나만의지도 보기 | U1~U4 | `tbl_user_map*` 4개 | `restMyMap` |
 | 선택: 나만의지도 업로드 | U5~U7 | 같음 + 업로드 폴더 | GeoTools·POI 의존성 필요(`egov-jdk11-checklist.md` 4·5절) |
 | 선택: 나만의지도 공유 | U8, U9 | 공유 2개 테이블 | |
+| 선택: 필지 정보 카드(건물 칸) | U25 | 건물DB `ref.ti_spbd_buld`·`ref.ti_sprd_stret`·`ref.load_meta` (+ 선택 `ref.ti_scco_mvmn`) | `restSources()`의 `parcelBuildings`(= `restParcelBuildings`). 없으면 카드의 건물 칸이 없다. 필지 속성은 호스트 프록시 `/vworld/data`(`proxySources()`의 `parcel.infoAt`) |
 | 선택: 항공영상 | T1~T3 (보기), T4~T6 (업로드) | `geo_tiff_files` | GDAL + titiler 인프라 필요 |
 | 선택: 바람길 | W1~W3·W5 + 스케줄러 | `tbl_wind_frame`, `tbl_wind_scalar` | 기상청 API 키(`KMA_API_KEY`) 필요 |
 | 선택: VWorld 검색·필지·지역명·WFS·범례 | 호스트 프록시 5종(9절) | 없음 | `proxySources()`. 백엔드 API가 아니라 **호스트가 제공하는 프록시** |
@@ -536,6 +540,43 @@ SELECT * FROM tbl_user_map_import_failure WHERE user_map_id = #{id} ORDER BY row
 4. **엑셀 열**: 속성 열(`column_schema.columns[].name` 순서) + [`PNU`·`표준_지번주소` — 레이어 `source_kind`가 EXCEL_PNU·EXCEL_ADDRESS일 때만, 지번주소는 PNU로 법정동 사전에서] + `경도`·`위도`(srid 4326) 또는 `X좌표`·`Y좌표`(m; 점은 그 점, 그 밖은 모양 안쪽 점 = JTS getInteriorPoint) + (`includeFailed`) `매칭상태`·`실패사유`. 이름이 겹치면 `이름 (2)`. 수식 주입 방지·머리글·첫 행 고정은 U23과 같다.
    `includeFailed=true`면 보관 중인 실패 행(`tbl_user_map_import_failure`, 30일)을 **성공 행 뒤에** 덧붙인다(원본 값 + `실패` + 사유 라벨(+ 후보)). 실패가 있었는데(`failed_count > 0`) 보관 기간이 지나 행이 없으면 건너뛰고(열도 붙이지 않음) 응답 헤더 `X-Export-Failed-Skipped: true`. GeoJSON에서는 `includeFailed`를 무시한다.
 5. **GeoJSON**: 저장된 피처 그대로(`{"type":"Feature","geometry":<geometry_json>,"properties":<properties_json 또는 {}>}`). srid가 4326이 아니면 geometry의 모든 좌표를 순변환(미터 좌표계는 소수 3자리, 높이 값은 그대로)하고 `FeatureCollection`에 `"crs":{"type":"name","properties":{"name":"urn:ogc:def:crs:EPSG::5186"}}`를 넣는다(4326이면 생략).
+
+### U25. GET `/api/mymap/ref/parcels/{pnu}/buildings?limit=200` — 필지 정보 카드의 건물 목록 (구현: `mymap/controller/ParcelRefController` + `mymap/service/ParcelBuildingService` + `JdbcAddressRefReader.buildingsByJibun`)
+
+- 권한: 로그인(`/api/mymap/**` 규칙 안 — SecurityConfig 변경 없음). 응답 헤더 `Cache-Control: private, max-age=300`(200일 때만).
+- 요청: `pnu` = 정규식 `^\d{10}[12]\d{8}$`(19자리, 11번째 1=대지·2=산), `limit` 1~1000(기본 200, 숫자가 아니어도 400이라 문자열로 받아 서비스가 검사). 키는 PNU에서: `adm_cd = substr(pnu,1,10)`, `mntn = (11번째='2' ? '1' : '0')`, `main = int(substr 12~15)`, `sub = int(substr 16~19)`.
+- 응답 `ApiResponse<{ pnu, referenceVersion(건물DB 적재 기준월|null), buildingCount(폐지 제외 전체, limit 무관), truncated(돌려준 수 < buildingCount), relatedIncluded(관련지번 색인이 있어 관련지번 건물도 합쳤나), addresses:[{ roadAddress, underground, zipCode|null, name|null, apartment, relation:"MAIN"|"RELATED", buildings:[{ id(bd_mgt_sn), name|null, detailName|null, sggName|null }] }] }>`. 빈 문자열은 모두 null, 건물 0건은 200 + `buildingCount 0`·`addresses []`.
+- 오류: 400 `요청 값이 올바르지 않습니다(PNU 19자리 숫자, limit 1~1000).`(`GisErrorCode.PARCEL_QUERY_INVALID`) · 503 `건물 자료(지번 색인)가 아직 준비되지 않았습니다.`(`PARCEL_BUILDINGS_UNAVAILABLE` — 지번 색인 없음 또는 적재 교체 중(`load_meta` 상태가 READY가 아님), **조회하지 않는다**) · 비로그인 403 빈 본문 · DB 오류 500.
+- **필수 색인** `ix_ti_spbd_buld_jibun (adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno)` — 없으면 1,072만 행 전체 스캔이라 호출 자체를 막는다(`to_regclass('ref.ix_ti_spbd_buld_jibun')`, 결과는 적재 기준월 단위로 기억·"없음"은 5분 뒤 재확인). 선택 색인 `ix_ti_scco_mvmn_jibun (adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno)`가 있으면 관련지번 건물도 합친다(없으면 대표지번 건물만, `relatedIncluded=false`).
+
+```sql
+-- U25a 대표지번 (키 4열 등호 → ix_ti_spbd_buld_jibun). ?는 adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno, limit 순
+SELECT x.*, count(*) OVER () AS total FROM (
+  SELECT b.bd_mgt_sn, b.ctp_kor_nm, b.sig_kor_nm, b.emd_kor_nm, b.li_kor_nm, b.rn, b.road_cd, b.udgd_yn,
+         b.buld_mnnm, b.buld_slno, b.buld_nm, b.buld_nm_dc, b.sgg_buld_nm, b.apt_yn, b.zip_cd, s.emd_gb,
+         'MAIN' AS relation, 0 AS rel_ord
+  FROM ref.ti_spbd_buld b
+  LEFT JOIN ref.ti_sprd_stret s ON s.sgg_cd = substr(b.road_cd, 1, 5) AND s.road_no = substr(b.road_cd, 6, 7) AND s.emd_no = b.emd_no
+  WHERE b.adm_cd = ? AND b.mntn_yn = ? AND b.lnbr_mnnm = ? AND b.lnbr_slno = ?
+    AND coalesce(b.mv_rs_cd, '') NOT IN ('63', '72')) x
+ORDER BY x.rn, x.udgd_yn, x.buld_mnnm, x.buld_slno, x.buld_nm_dc, x.bd_mgt_sn LIMIT ?;
+
+-- U25b 관련지번 포함 (ix_ti_scco_mvmn_jibun 이 있을 때만). 같은 건물은 대표지번(rel_ord 0)이 우선, 건물당 1줄
+SELECT d.*, count(*) OVER () AS total FROM (
+  SELECT DISTINCT ON (u.bd_mgt_sn) u.* FROM (
+    <U25a의 안쪽 SELECT (MAIN, rel_ord 0)>
+    UNION ALL
+    SELECT <같은 열>, 'RELATED' AS relation, 1 AS rel_ord
+    FROM ref.ti_scco_mvmn m
+    JOIN ref.ti_spbd_buld b ON b.road_cd = m.road_cd AND b.udgd_yn = m.udgd_yn AND b.buld_mnnm = m.buld_mnnm AND b.buld_slno = m.buld_slno
+    LEFT JOIN ref.ti_sprd_stret s ON s.sgg_cd = substr(b.road_cd, 1, 5) AND s.road_no = substr(b.road_cd, 6, 7) AND s.emd_no = b.emd_no
+    WHERE m.adm_cd = ? AND m.mntn_yn = ? AND m.lnbr_mnnm = ? AND m.lnbr_slno = ?
+      AND coalesce(m.mv_rs_cd, '') <> '63' AND coalesce(b.mv_rs_cd, '') NOT IN ('63', '72')) u
+  ORDER BY u.bd_mgt_sn, u.rel_ord) d
+ORDER BY d.rel_ord, d.rn, d.udgd_yn, d.buld_mnnm, d.buld_slno, d.buld_nm_dc, d.bd_mgt_sn LIMIT ?;   -- ? 9개: 키 4 + 키 4 + limit
+```
+
+서비스 규칙(MyBatis로 옮겨도 자바에서 그대로): ① 도로 키 `(road_cd, udgd_yn, buld_mnnm, buld_slno)`별 묶음 → 묶음 정렬 `MAIN 먼저 → 도로명 → 지하여부 → 본번 → 부번`, 묶음 안 건물은 `buld_nm_dc` 자연 정렬("2동" < "10동", 빈 값은 맨 뒤) → `bd_mgt_sn` ② `roadAddress` = 표준 도로명주소 조립(U7a와 같은 `StandardAddressFormatter.road`, 묶음의 대표 건물 = 시군구용 건물명이 있는 공동주택이 있으면 그것, 없으면 첫 건물) ③ `name` = 공동주택이면 `sgg_buld_nm`(없으면 `buld_nm`), 아니면 `buld_nm`(없으면 `sgg_buld_nm`) 중 첫 비지 않은 값 ④ `underground` = 대표 건물 `udgd_yn='1'`(공중·수상은 `roadAddress` 글자에만 반영) ⑤ `relation` = 묶음에 대표지번 건물이 하나라도 있으면 MAIN. 지번 주소는 만들지 않는다(법정동 사전 첫 구성이 수 초~수십 초라 — 화면은 VWorld의 지번 주소를 쓴다). 한계: 건물DB는 건물마다 대표지번이 하나뿐이고, 관련지번은 도로 키(건물번호) 단위라 같은 건물번호 묶음의 다른 동도 함께 나올 수 있다.
 
 ### U19 이후(아직 없음) · U11·U12
 

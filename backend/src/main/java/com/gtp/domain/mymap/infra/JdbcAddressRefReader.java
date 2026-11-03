@@ -37,7 +37,10 @@ public class JdbcAddressRefReader implements AddressRefReader {
     private final String standardByRoadSql;
     private final String standardByJibunSql;
     private final String jibunIndexName;
+    private final String relatedIndexName;
     private final String jibunIndexSql;
+    private final String buildingsByJibunSql;
+    private final String buildingsByJibunRelatedSql;
 
     /** 색인이 없다고 확인한 결과는 이 시간이 지나면 다시 확인한다(운영자가 색인을 만든 뒤 재시작 없이 켜지게) */
     static final long NEGATIVE_RECHECK_NANOS = 5L * 60 * 1_000_000_000L;
@@ -45,7 +48,8 @@ public class JdbcAddressRefReader implements AddressRefReader {
     private record IndexState(String version, boolean ready, long checkedAtNanos) {
     }
 
-    private volatile IndexState indexState;
+    /** 색인 이름별 확인 결과(지번 색인·관련지번 색인). 인스턴스 필드 — 모듈 전역 상태 아님 */
+    private final Map<String, IndexState> indexStates = new java.util.concurrent.ConcurrentHashMap<>();
 
     public JdbcAddressRefReader(JdbcOperations jdbc, MyMapProperties.Ref ref) {
         this.jdbc = jdbc;
@@ -86,6 +90,42 @@ public class JdbcAddressRefReader implements AddressRefReader {
         String schemaPrefix = dot < 0 ? "" : building.substring(0, dot + 1);
         this.jibunIndexName = schemaPrefix + "ix_" + buildingDataset + "_jibun";
         this.jibunIndexSql = "SELECT to_regclass(?) IS NOT NULL";
+
+        // 필지 정보 카드: 필지(지번 키) 한 곳의 건물. 대표지번(U25a)은 ix_ti_spbd_buld_jibun의 4열 등호로만 찾는다.
+        String related = PostgisPnuParcelProvider.ident(ref.getAddress().getRelatedJibunTable());
+        int rdot = related.indexOf('.');
+        this.relatedIndexName = (rdot < 0 ? "" : related.substring(0, rdot + 1)) + "ix_" + datasetOf(related) + "_jibun";
+        String cols = "b.bd_mgt_sn, b.ctp_kor_nm, b.sig_kor_nm, b.emd_kor_nm, b.li_kor_nm, b.rn, b.road_cd, b.udgd_yn, "
+                + "b.buld_mnnm, b.buld_slno, b.buld_nm, b.buld_nm_dc, b.sgg_buld_nm, b.apt_yn, b.zip_cd, s.emd_gb";
+        String roadJoin = " LEFT JOIN " + road + " s ON s.sgg_cd = substr(b.road_cd, 1, 5) AND s.road_no = substr(b.road_cd, 6, 7) "
+                + "AND s.emd_no = b.emd_no";
+        String active = "coalesce(b.mv_rs_cd, '') NOT IN ('63', '72')";
+        String mainSelect = "SELECT " + cols + ", 'MAIN' AS relation, 0 AS rel_ord FROM " + building + " b" + roadJoin
+                + " WHERE b.adm_cd = ? AND b.mntn_yn = ? AND b.lnbr_mnnm = ? AND b.lnbr_slno = ? AND " + active;
+        String order = "ORDER BY %s.rn, %s.udgd_yn, %s.buld_mnnm, %s.buld_slno, %s.buld_nm_dc, %s.bd_mgt_sn LIMIT ?";
+        this.buildingsByJibunSql = "SELECT x.*, count(*) OVER () AS total FROM (" + mainSelect + ") x "
+                + order.replace("%s", "x");
+        // U25b: 관련지번 표를 같은 4열로 찾고(ix_ti_scco_mvmn_jibun) 건물 표는 도로 키 색인으로 잇는다 → UNION ALL 뒤 건물당 1줄(대표지번 우선)
+        String relatedSelect = "SELECT " + cols + ", 'RELATED' AS relation, 1 AS rel_ord FROM " + related + " m JOIN " + building
+                + " b ON b.road_cd = m.road_cd AND b.udgd_yn = m.udgd_yn AND b.buld_mnnm = m.buld_mnnm AND b.buld_slno = m.buld_slno"
+                + roadJoin + " WHERE m.adm_cd = ? AND m.mntn_yn = ? AND m.lnbr_mnnm = ? AND m.lnbr_slno = ? "
+                + "AND coalesce(m.mv_rs_cd, '') <> '63' AND " + active;
+        this.buildingsByJibunRelatedSql = "SELECT d.*, count(*) OVER () AS total FROM ("
+                + "SELECT DISTINCT ON (u.bd_mgt_sn) u.* FROM (" + mainSelect + " UNION ALL " + relatedSelect + ") u "
+                + "ORDER BY u.bd_mgt_sn, u.rel_ord) d "
+                + "ORDER BY d.rel_ord, d.rn, d.udgd_yn, d.buld_mnnm, d.buld_slno, d.buld_nm_dc, d.bd_mgt_sn LIMIT ?";
+    }
+
+    String buildingsByJibunSql() {
+        return buildingsByJibunSql;
+    }
+
+    String buildingsByJibunRelatedSql() {
+        return buildingsByJibunRelatedSql;
+    }
+
+    String relatedIndexName() {
+        return relatedIndexName;
     }
 
     String standardByRoadSql() {
@@ -108,21 +148,64 @@ public class JdbcAddressRefReader implements AddressRefReader {
     public boolean jibunLookupReady() {
         String version = readyVersion();
         if (version == null) return false;
-        IndexState s = indexState;
+        return indexReady(jibunIndexName, version);
+    }
+
+    /** 관련지번 색인(ix_ti_scco_mvmn_jibun)이 있는가 — 지번 색인과 같은 방식으로 기억한다 */
+    @Override
+    public boolean relatedJibunLookupReady() {
+        String version = readyVersion();
+        if (version == null) return false;
+        return indexReady(relatedIndexName, version);
+    }
+
+    private boolean indexReady(String indexName, String version) {
+        IndexState s = indexStates.get(indexName);
         long now = System.nanoTime();
         if (s != null && s.version().equals(version) && (s.ready() || now - s.checkedAtNanos() < NEGATIVE_RECHECK_NANOS)) {
             return s.ready();
         }
         boolean ready;
         try {
-            Boolean b = jdbc.queryForObject(jibunIndexSql, Boolean.class, jibunIndexName);
+            Boolean b = jdbc.queryForObject(jibunIndexSql, Boolean.class, indexName);
             ready = Boolean.TRUE.equals(b);
         } catch (DataAccessException e) {
-            log.warn("[나만의지도] 지번 색인 확인 실패 — 지번 입력 행의 도로명주소는 비웁니다: {}", e.getMessage());
+            log.warn("[나만의지도] 색인 확인 실패({}) — 해당 기능은 건너뜁니다: {}", indexName, e.getMessage());
             ready = false;
         }
-        indexState = new IndexState(version, ready, now);
+        indexStates.put(indexName, new IndexState(version, ready, now));
         return ready;
+    }
+
+    /**
+     * 필지 한 곳의 건물. 대표지번 4열 등호(색인 ix_ti_spbd_buld_jibun)로만 찾고, 관련지번 색인이 있으면 관련지번으로 걸린 건물도 합친다.
+     * 방금 {@link #jibunLookupReady()}를 통과한 기준월을 재사용해 적재 기록을 또 읽지 않는다.
+     */
+    @Override
+    public BuildingPage buildingsByJibun(JibunKey key, int limit) {
+        IndexState known = indexStates.get(jibunIndexName);
+        String version = known != null ? known.version() : readyVersion();
+        boolean related = version != null && indexReady(relatedIndexName, version);
+        List<BuildingRow> rows = new ArrayList<>();
+        int[] total = {0};
+        jdbc.query(related ? buildingsByJibunRelatedSql : buildingsByJibunSql, ps -> {
+            int i = 1;
+            for (int pass = 0; pass < (related ? 2 : 1); pass++) {
+                ps.setString(i++, key.admCd());
+                ps.setString(i++, key.mntn());
+                ps.setInt(i++, key.main());
+                ps.setInt(i++, key.sub());
+            }
+            ps.setInt(i, limit);
+        }, rs -> {
+            total[0] = rs.getInt("total");
+            rows.add(new BuildingRow(rs.getString("bd_mgt_sn"), rs.getString("ctp_kor_nm"), rs.getString("sig_kor_nm"),
+                    rs.getString("emd_kor_nm"), rs.getString("li_kor_nm"), rs.getString("rn"), rs.getString("road_cd"),
+                    rs.getString("udgd_yn"), rs.getInt("buld_mnnm"), rs.getInt("buld_slno"), rs.getString("buld_nm"),
+                    rs.getString("buld_nm_dc"), rs.getString("sgg_buld_nm"), "1".equals(rs.getString("apt_yn")),
+                    rs.getString("zip_cd"), rs.getString("emd_gb"), rs.getString("relation")));
+        });
+        return new BuildingPage(total[0], related, List.copyOf(rows));
     }
 
     @Override

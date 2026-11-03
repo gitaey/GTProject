@@ -159,6 +159,35 @@ A.clear()                                                  // 영역·결과·�
 - 엔진 설정 `areaAnalysis`(`GisMapAreaAnalysisConfig`): `highlightMax`(5000)·`categoryTop`(범주표 값 수, 8)·`chunkMs`(12)·`maxFeaturesPerLayer`(5000)·`areaWarnKm2`(25)·`maxConcurrent`(2). 새 ol API: `proj.getTransform`(COMPATIBILITY.md).
 - 한계: 영역 꼭짓점 5,000개까지(꼬임 검사·삼각 분할이 O(n²)). 서버 필터는 경위도 직선, 브라우저 판정은 뷰 좌표계 직선이라 대각선 변에서 수십 cm 어긋날 수 있다(경계에 겨우 닿는 피처 누락 가능). 쪼갠 변이 경위도에서 곡선이라 같은 피처를 격자로 잘라 더한 값과 원래 면적이 ppm 단위로 다르다(ol getArea도 같은 성질).
 
+## 필지 정보 — 필지를 눌러 속성·건물 보기 (`map.parcelInfo`)
+
+도구 모음의 **"필지 정보"** 도구를 켜고 필지를 누르면 PNU·지번 주소·지목(약어 + 정식 명칭 28종)·면적·공시지가·고시년월과 **그 필지의 건물 목록**(도로명주소별 묶음·건물명·동·공동주택·기초구역번호)이 카드로 뜬다. 필지 경계는 지도에 강조된다(핀 없음).
+엔진의 `parcelInfo` 컨트롤러(React 없음)가 기본이고, React 위젯 `ParcelInfoCard`(도구 모음 단추 — 출력·영역 분석 패널과 같은 자리의 카드, 모바일은 아래 시트)는 그 위의 선택형 화면이다.
+
+```js
+// React: MapShell 도구 모음에 "필지 정보" 단추가 기본으로 있다(showParcelInfo={false}로 끔, 메뉴 권한 'map.tool.parcel-info'로 숨김,
+//        sources.parcel.infoAt이 없으면 단추 자체가 없다)
+
+// 직접 쓰기(React·UMD (a)·UMD (b) 공통): 엔진 인스턴스의 parcelInfo
+gis.tools.activate('parcel-info')              // 켜져 있는 동안만 지도 클릭을 듣는다(토글). 다른 도구(그리기·측정·반경·영역 분석)와 서로 배타
+const P = gis.parcelInfo
+P.available                                    // sources.parcel.infoAt이 있다
+P.store.subscribe(state => render(state))      // { open, point, parcel:{status,info,areaM2,error}, buildings:{status,result,error,loadingAll} }
+await P.lookupAt(lon, lat)                     // 클릭과 같은 동작(도구 없이도). 같은 필지 안이면 요청하지 않는다
+P.retry()                                      // 필지 오류면 다시 조회, 건물 오류·준비 중이면 건물만 다시
+P.loadAllBuildings()                           // 잘린 목록(truncated)을 limit 1000으로 다시 받는다
+P.close()                                      // 카드·강조·진행 중 요청을 지운다(도구는 켜진 채). map.clearAll()도 함께 지운다
+GisMap.jimokName('도')                         // → '도로'  (UMD. ESM은 core의 jimokName)
+```
+
+- **소스 둘**: 필지 속성·경계 = `sources.parcel.infoAt(lon, lat, signal)`(오류는 throw — 키·한도·네트워크 문구가 카드에 그대로 보인다. `proxySources()`의 VWorld 점 질의 `LP_PA_CBND_BUBUN`, 호스트 프록시 `/vworld/data` — 기존 프록시 그대로, 수정 없음) · 건물 = `sources.parcelBuildings.byPnu(pnu, { limit, signal })`(`restSources()` = 짝 백엔드 `GET /api/mymap/ref/parcels/{pnu}/buildings?limit=`, 로그인 필요, query-spec **U25**). `parcelBuildings`가 없으면 카드에 건물 칸이 없고, 서버가 404면(이식처에 U25가 없음) 이후 건물 조회를 끈다. 403은 "로그인이 필요합니다", 503은 "자료 준비 중".
+- **조회 흐름**: 클릭 → 필지 1건(VWorld 1번) → 경계 강조·면적 → 건물 목록(PNU별로 최근 30건·5분 캐시). 연속 클릭은 앞 요청을 취소하고 늦게 온 응답은 버린다. 같은 필지 안을 다시 누르면 요청 0.
+- **면적**은 받은 경계로 면적 측정 도구와 같은 구면 공식(`ol/sphere getArea`, 뷰 좌표계)으로 잰 "지도 도형 기준" 값이다 — 토지대장 면적과 다를 수 있다(카드에 그렇게 표시).
+- **건물은 대표지번 기준**이다: 건물DB는 건물마다 대표지번이 하나뿐이라 여러 필지에 걸친 단지는 대표 필지에서만 보인다. 백엔드에 관련지번 색인(`ix_ti_scco_mvmn_jibun`)이 있으면 나머지 필지에서도 "관련지번"으로 보인다. 건물DB에는 층수·주용도·사용승인일이 없다(후속: VWorld `LT_C_SPBD`·건축물대장). 소유자는 개인정보라 다루지 않는다.
+- **호스트가 갖춰야 할 것**: VWorld 점 질의 프록시(`/vworld/data`, 영역 분석과 같음) + (건물 칸을 쓰면) 백엔드 U25와 건물DB 표·**지번 색인 `ix_ti_spbd_buld_jibun`(필수 — 없으면 503, 조회 안 함)** — `.claude/skills/map-module-export/references/{ddl,query-spec}.md`.
+- **UMD**: 1차는 코어 상태 API만 있다(카드 DOM은 React 위젯 — JSP 예제는 `store.subscribe`로 간단 DOM 출력). 새 ol API 0, 새 npm 0.
+- 한계: 건물 칸은 필지 속성과 기준월이 다를 수 있다(분할·합병 직후 0건 가능). 필지 정보 도구가 켜진 동안에는 나만의지도 팝업·영역 분석 선택이 동작하지 않는다(도구가 하나만 켜지므로).
+
 ## 지도 출력 — PNG · PDF · 인쇄 (`map.print`)
 
 지금 보이는 지도를 제목·범례·축척 막대·방위표·출력일·출처가 들어간 A4/A3 한 장으로 내보낸다. 엔진 인스턴스의 `print` 컨트롤러(React 없음)가 기본이고,
@@ -223,7 +252,8 @@ React에서는 `<GisMapProvider host={…}>`가 바뀔 때마다 `map.setHost`�
 | `layerTree` (+ `userSelection`) | 그릴 레이어 트리 / 개인 레이어 선택 저장 | `restSources()` |
 | `myMap` · `geoTiff` · `wind` | 나만의지도(목록·업로드·결과 보고서·샘플·스타일 저장·공유) · GeoTIFF 타일 · 바람장 | `restSources()` |
 | `shareDirectory` | 공유 상대 검색(사용자)·공유 가능한 그룹(역할·세부권한) 목록 — 자원 공통 | `restSources()` |
-| `addressSearch` · `parcel` · `regionName` · `legend` · `wfs` | 주소 검색 · 필지 폴리곤 · 지역명 · 범례 · WFS URL | `proxySources()` |
+| `addressSearch` · `parcel` · `regionName` · `legend` · `wfs` | 주소 검색 · 필지 폴리곤(+ 필지 정보 카드의 `parcel.infoAt` 속성·경계) · 지역명 · 범례 · WFS URL | `proxySources()` |
+| `parcelBuildings` | 필지 정보 카드의 건물 칸: PNU → 그 필지의 건물 목록(도로명주소별 묶음) | `restSources()` |
 
 짝 백엔드 응답 형식이 다르면 해당 소스만 직접 구현해 배열 뒤쪽에 넣는다. 백엔드(Spring·MyBatis)로 옮길 때의 테이블 DDL·쿼리 명세는
 GTProject 저장소의 `.claude/skills/map-module-export/references/`에 있다.
@@ -396,6 +426,7 @@ const setup = (map) => { map.use(createWindPlugin({ monoColor: (mode) => (mode =
 - 기본이 아닌 `theme.primary`는 엔진이 생긴 뒤 들어가 서버 렌더 첫 프레임은 기본색이다. 깜빡임이 싫으면 CSS(`.gm-root { --gm-primary: … }`)로 준다.
   호스트가 `--gm-*`나 위젯 모양을 덮으려면 패키지 CSS **뒤에**, `@layer` 밖에서 선언한다.
 - 바람길 표시는 ol 버전별로 시험하지 않았다(설치·제거만).
+- 필지 정보 카드의 실제 PostgreSQL 실행 계획·VWorld 점 질의 응답·브라우저 레이아웃은 구현 때 직접 확인하지 못했다(운영 DB 접근 금지).
 
 ## 라이선스 고지
 

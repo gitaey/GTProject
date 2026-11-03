@@ -1,6 +1,7 @@
 package com.gtp.domain.mymap.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gtp.domain.mymap.infra.AddressRefReader;
 import com.gtp.domain.mymap.infra.FakePnuParcelProvider;
 import com.gtp.domain.mymap.infra.InMemoryAddressRefReader;
 import com.gtp.domain.mymap.infra.JdbcAddressRefReader;
@@ -42,16 +43,22 @@ public class MyMapConfig {
     }
 
     /**
-     * 주소 → PNU. postgis면 도로명주소 건물DB 표를 읽는 {@link TableAddressResolver}, fake면 샘플 청사 7곳 메모리 자료.
+     * 주소 자료 읽기(건물DB). postgis면 {@link JdbcAddressRefReader}, fake면 샘플 메모리 자료. 주소 변환({@link #addressResolver})과
+     * 필지 정보 카드(ParcelBuildingService)가 같은 인스턴스를 쓴다 — 색인 확인 결과 기억이 하나.
      * provider 검사는 {@link #pnuParcelProvider}가 기동 때 이미 했다(모르는 값이면 거기서 실패).
      */
     @Bean
-    public AddressResolver addressResolver(MyMapProperties props, MyMapRefJdbc refJdbc) {
+    public AddressRefReader addressRefReader(MyMapProperties props, MyMapRefJdbc refJdbc) {
         MyMapProperties.Ref ref = props.getRef();
-        int max = ref.getAddress().getMaxCandidates();
         if ("fake".equalsIgnoreCase(ref.getProvider())) {
-            return new TableAddressResolver(InMemoryAddressRefReader.samples(), max);
+            return InMemoryAddressRefReader.samples();
         }
-        return new TableAddressResolver(new JdbcAddressRefReader(refJdbc.template(), ref), max);
+        return new JdbcAddressRefReader(refJdbc.template(), ref);
+    }
+
+    /** 주소 → PNU. 도로명주소 건물DB 표를 읽는 {@link TableAddressResolver}(fake면 샘플 청사 7곳 메모리 자료). */
+    @Bean
+    public AddressResolver addressResolver(MyMapProperties props, AddressRefReader addressRefReader) {
+        return new TableAddressResolver(addressRefReader, props.getRef().getAddress().getMaxCandidates());
     }
 }

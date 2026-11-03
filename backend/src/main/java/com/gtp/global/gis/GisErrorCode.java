@@ -48,6 +48,10 @@ public enum GisErrorCode implements BaseErrorCode {
     MYMAP_EXPORT_BUSY(HttpStatus.TOO_MANY_REQUESTS, "내보내기가 많아 잠시 후 다시 시도해 주세요."),
     MYMAP_EXPORT_FORMAT_INVALID(HttpStatus.BAD_REQUEST, "내보내기 형식은 xlsx 또는 geojson이어야 합니다."),
 
+    // 필지 정보 카드(필지의 건물 목록)
+    PARCEL_QUERY_INVALID(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다(PNU 19자리 숫자, limit 1~1000)."),
+    PARCEL_BUILDINGS_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "건물 자료(지번 색인)가 아직 준비되지 않았습니다."),
+
     // 공유(공유 상대 검색·공유 저장) — 전역 ErrorCode를 쓰지 않는다
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."),
     SHARE_QUERY_INVALID(HttpStatus.BAD_REQUEST, "검색어는 2~50자로 입력하세요."),

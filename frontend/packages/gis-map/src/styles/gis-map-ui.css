@@ -5443,3 +5443,490 @@
         border-radius: var(--gm-radius-xl) var(--gm-radius-xl) 0 0;
     }
 }
+
+/* ── 필지 정보 카드 (ui/parcelInfo/*) — 도구 모음 왼쪽에 붙는 떠 있는 카드. 출력·영역 분석 패널과 같은 자리 ── */
+.gm-toolbar__parcel-slot {
+    position: absolute;
+    right: calc(var(--gm-spacing) * 11);
+    top: 0;
+    z-index: 50;
+}
+
+.gm-parcel-card {
+    display: flex;
+    flex-direction: column;
+    width: 320px;
+    max-height: calc(100vh - 140px);
+    overflow: hidden;
+    background-color: var(--gm-color-white);
+    border-radius: var(--gm-radius-xl);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, .2);
+    font-size: 12px;
+    color: var(--gm-color-gray-700);
+}
+
+/* 접힘: 머리줄 + 한 줄 요약만(body는 hidden 속성 — display:flex가 UA [hidden]을 덮으므로 다시 숨김) */
+.gm-parcel-card [hidden] {
+    display: none;
+}
+
+.gm-parcel-card.gm-is-collapsed {
+    width: 280px;
+}
+
+.gm-parcel-card__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-bottom: 2px solid var(--gm-primary);
+    flex: none;
+}
+
+.gm-parcel-card.gm-is-collapsed .gm-parcel-card__head {
+    border-bottom: 0;
+}
+
+.gm-parcel-card__title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gm-primary);
+}
+
+.gm-parcel-card__head-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.gm-parcel-card__icon-btn {
+    display: inline-flex;
+    align-items: center;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: var(--gm-color-gray-400);
+}
+
+.gm-parcel-card__icon-btn:hover {
+    color: var(--gm-color-gray-700);
+}
+
+.gm-parcel-card__summary {
+    flex: none;
+    padding: 0 12px 10px;
+    font-size: 11.5px;
+    color: var(--gm-color-gray-700);
+}
+
+/* 본문: 스크롤은 여기서만. 자식은 눌려서 잘리지 않게 줄어들지 않는다(flex-shrink 0) */
+.gm-parcel-card__body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 10px 12px 12px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.gm-parcel-card__body > * {
+    flex-shrink: 0;
+}
+
+.gm-parcel-card__addr {
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--gm-color-gray-800);
+}
+
+.gm-parcel-card__kv {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    row-gap: 5px;
+    column-gap: 8px;
+    margin: 8px 0 0;
+    font-size: 11.5px;
+}
+
+.gm-parcel-card__kv dt {
+    color: var(--gm-color-gray-500);
+}
+
+.gm-parcel-card__kv dd {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    min-width: 0;
+    color: var(--gm-color-gray-800);
+}
+
+.gm-parcel-card__mono {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 11.5px;
+    letter-spacing: .2px;
+    word-break: break-all;
+}
+
+.gm-parcel-card__copy {
+    flex: none;
+}
+
+.gm-parcel-card__chip {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 10px;
+    background-color: rgba(var(--gm-primary-rgb), .1);
+    color: var(--gm-primary);
+    font-size: 10.5px;
+    font-weight: 700;
+}
+
+.gm-parcel-card__note,
+.gm-parcel-card__muted {
+    font-size: 10px;
+    color: var(--gm-color-gray-400);
+}
+
+.gm-parcel-card__badge {
+    display: inline-block;
+    padding: 0 5px;
+    border-radius: 4px;
+    font-size: 9.5px;
+    font-weight: 700;
+    line-height: 16px;
+    white-space: nowrap;
+}
+
+.gm-parcel-card__badge--apt {
+    background-color: #eff6ff;
+    color: #2563eb;
+}
+
+.gm-parcel-card__badge--sub {
+    background-color: var(--gm-color-gray-100);
+    color: var(--gm-color-gray-600);
+}
+
+.gm-parcel-card__badge--rel {
+    background-color: #fffbeb;
+    color: #b45309;
+}
+
+.gm-parcel-card__sec-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gm-color-gray-700);
+}
+
+.gm-parcel-card__sec-head em {
+    font-style: normal;
+    font-weight: 400;
+    font-size: 10.5px;
+    color: var(--gm-color-gray-400);
+}
+
+.gm-parcel-card__sec-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.gm-parcel-card__groups {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.gm-parcel-card__group {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    gap: 3px;
+    padding: 8px 9px;
+    border: 1px solid var(--gm-color-gray-200);
+    border-radius: 8px;
+}
+
+.gm-parcel-card__road {
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--gm-color-gray-800);
+}
+
+.gm-parcel-card__name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    color: var(--gm-color-gray-700);
+}
+
+.gm-parcel-card__dongs {
+    font-size: 11px;
+    color: var(--gm-color-gray-500);
+}
+
+.gm-parcel-card__meta {
+    font-size: 10.5px;
+    color: var(--gm-color-gray-400);
+}
+
+.gm-parcel-card__more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: 100%;
+    margin-top: 8px;
+    padding: 6px 0;
+    border: 1px solid var(--gm-color-gray-200);
+    border-radius: 6px;
+    background-color: var(--gm-color-white);
+    color: var(--gm-primary);
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.gm-parcel-card__more:hover {
+    background-color: var(--gm-color-gray-50);
+}
+
+.gm-parcel-card__state {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 8px;
+    background-color: var(--gm-color-gray-50);
+    color: var(--gm-color-gray-500);
+    font-size: 11.5px;
+    line-height: 1.5;
+}
+
+.gm-parcel-card__state > svg {
+    flex: none;
+    margin-top: 2px;
+}
+
+.gm-parcel-card__state--error {
+    background-color: #fef2f2;
+    color: #b91c1c;
+}
+
+.gm-parcel-card__state--warn {
+    background-color: #fffbeb;
+    color: #b45309;
+}
+
+.gm-parcel-card__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin: 4px 0 0 0;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--gm-primary);
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.gm-parcel-card__state .gm-parcel-card__link {
+    display: flex;
+}
+
+.gm-parcel-card__foot {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    padding-top: 8px;
+    border-top: 1px solid var(--gm-color-gray-100);
+    font-size: 10px;
+    line-height: 1.5;
+    color: var(--gm-color-gray-400);
+}
+
+.gm-parcel-card__foot > svg {
+    flex: none;
+    margin-top: 2px;
+}
+
+/* 건물 전체 보기 대화상자 (모달 껍데기는 gm-modal·gm-modal__header 재사용) */
+.gm-parcel-dialog {
+    display: flex;
+    flex-direction: column;
+    width: 560px;
+    max-width: calc(100vw - 24px);
+    max-height: 80vh;
+    overflow: hidden;
+    font-size: 12px;
+    color: var(--gm-color-gray-700);
+}
+
+.gm-parcel-dialog__count {
+    margin-left: 6px;
+    font-weight: 400;
+    color: var(--gm-color-gray-500);
+}
+
+.gm-parcel-dialog__tool {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--gm-color-gray-100);
+    flex: none;
+}
+
+.gm-parcel-dialog__search {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border: 1px solid var(--gm-color-gray-200);
+    border-radius: 6px;
+    color: var(--gm-color-gray-400);
+}
+
+.gm-parcel-dialog__search input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: none;
+    font-size: 11.5px;
+    color: var(--gm-color-gray-800);
+}
+
+.gm-parcel-dialog__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--gm-color-gray-500);
+    white-space: nowrap;
+}
+
+.gm-parcel-dialog__error {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background-color: #fef2f2;
+    color: #b91c1c;
+    font-size: 11px;
+    flex: none;
+}
+
+.gm-parcel-dialog__note {
+    padding: 6px 14px;
+    background-color: #fffbeb;
+    color: #b45309;
+    font-size: 11px;
+    flex: none;
+}
+
+.gm-parcel-dialog__list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 4px 14px 12px;
+}
+
+.gm-parcel-dialog__empty {
+    padding: 24px 0;
+    text-align: center;
+    color: var(--gm-color-gray-400);
+}
+
+.gm-parcel-dialog__group {
+    flex-shrink: 0;
+}
+
+.gm-parcel-dialog__addr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    padding: 8px 0 5px;
+    border-bottom: 1px solid var(--gm-color-gray-100);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gm-color-gray-800);
+}
+
+.gm-parcel-dialog__addr small {
+    font-size: 10.5px;
+    font-weight: 400;
+    color: var(--gm-color-gray-400);
+}
+
+.gm-parcel-dialog__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11.5px;
+}
+
+.gm-parcel-dialog__table th {
+    padding: 4px;
+    text-align: left;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--gm-color-gray-500);
+}
+
+.gm-parcel-dialog__table td {
+    padding: 4px;
+    border-bottom: 1px solid var(--gm-color-gray-50);
+}
+
+.gm-parcel-dialog__table td.gm-is-empty {
+    color: var(--gm-color-gray-300);
+}
+
+.gm-parcel-dialog__table .gm-parcel-dialog__id {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 10.5px;
+    color: var(--gm-color-gray-400);
+    text-align: right;
+}
+
+/* 같은 클래스가 머리글(th, 한글)에도 붙어 고정폭 글꼴로 깨져 보이던 것 — 고정폭은 번호 값(td)에만 */
+.gm-parcel-dialog__table th.gm-parcel-dialog__id {
+    font-family: inherit;
+}
+
+/* 모바일(768px 미만): 아래 시트. 강조된 필지가 지도에서 보이게 높이를 낮춘다 */
+@media (max-width: 47.99rem) {
+    .gm-toolbar__parcel-slot {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: auto;
+    }
+
+    .gm-parcel-card,
+    .gm-parcel-card.gm-is-collapsed {
+        width: 100%;
+        max-height: 55vh;
+        border-radius: var(--gm-radius-xl) var(--gm-radius-xl) 0 0;
+    }
+}

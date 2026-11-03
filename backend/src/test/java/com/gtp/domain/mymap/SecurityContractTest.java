@@ -105,6 +105,21 @@ class SecurityContractTest {
                 .containsExactly("/api/gis/share-directory");
     }
 
+    @Test
+    void 필지_건물_엔드포인트는_api_mymap_아래에_계약대로_있다() {
+        // /api/mymap/ref/** 는 /api/mymap/** authenticated 규칙 안(SecurityConfig 변경 없음) — 이 밖으로 나가면 permitAll로 열린다
+        assertThat(com.gtp.domain.mymap.controller.ParcelRefController.class.getAnnotation(RequestMapping.class).value())
+                .containsExactly("/api/mymap/ref");
+        boolean found = false;
+        for (Method m : com.gtp.domain.mymap.controller.ParcelRefController.class.getDeclaredMethods()) {
+            for (String p : pathsOf(m)) {
+                assertThat(p).as(m.getName()).doesNotStartWith("/api");
+                if (m.getName().equals("buildings") && p.equals("/parcels/{pnu}/buildings") && verbOf(m).equals("GET")) found = true;
+            }
+        }
+        assertThat(found).as("GET /api/mymap/ref/parcels/{pnu}/buildings").isTrue();
+    }
+
     private static List<String> pathsOf(Method m) {
         if (m.isAnnotationPresent(GetMapping.class)) return List.of(m.getAnnotation(GetMapping.class).value());
         if (m.isAnnotationPresent(PostMapping.class)) return List.of(m.getAnnotation(PostMapping.class).value());

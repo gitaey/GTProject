@@ -112,8 +112,8 @@ export function restoreMapSession(map: GisMap, name: string, owner?: string): vo
     }
 
     // 되살린 뒤에 구독한다(되살리기·되돌리기 자체는 다시 적지 않는다). 되살리기가 실패해도 구독은 한다 → 그 뒤 바꾼 값은 기억된다
-    // 영역 분석 그리기 도구는 패널이 있어야 쓸 수 있으므로 기억하지 않는다(돌아왔을 때 패널 없이 그리기만 켜져 있으면 안 됨)
-    const offTools = map.tools.store.subscribe(s => remember(name, owner, { activeTool: s.activeTool.startsWith('analysis-') ? 'none' : s.activeTool, radiusMeters: s.radiusMeters }))
+    // 영역 분석 그리기 도구는 패널이 있어야 쓸 수 있으므로 기억하지 않는다(돌아왔을 때 패널 없이 그리기만 켜져 있으면 안 됨). 필지 정보 도구도 같다(카드 없이 클릭만 기다리면 안 됨)
+    const offTools = map.tools.store.subscribe(s => remember(name, owner, { activeTool: s.activeTool.startsWith('analysis-') || s.activeTool === 'parcel-info' ? 'none' : s.activeTool, radiusMeters: s.radiusMeters }))
     const offDraw = map.draw.store.subscribe((s, prev) => {
         if (s.style !== prev.style) remember(name, owner, { drawStyle: s.style })
     })

@@ -144,6 +144,71 @@ export interface AddressSearchSource {
 export interface ParcelSource {
     /** 해당 지점 필지 폴리곤(EPSG:4326 GeoJSON Feature 배열). 없으면 [] */
     featuresAt(lon: number, lat: number): Promise<GeoJsonObject[]>
+    /**
+     * 필지 정보 카드용: 그 지점 필지 1건의 속성·경계(없으면 null). `featuresAt`와 달리 오류를 삼키지 않는다 — 키·한도·네트워크 오류는
+     * throw(메시지는 화면에 그대로). `signal`이 abort되면 요청을 취소한다. 없으면 "필지 정보" 도구 단추가 나오지 않는다
+     */
+    infoAt?(lon: number, lat: number, signal?: AbortSignal): Promise<ParcelInfo | null>
+}
+
+/** 필지 한 곳의 속성(소스가 정규화한 값 — 코어·위젯은 VWorld 열 이름을 모른다) */
+export interface ParcelInfo {
+    /** 19자리 */
+    pnu: string
+    /** 지번 주소(소스 원문, 예 VWorld addr) */
+    address: string | null
+    /** "708", "산 12-3" (지목 글자를 뗀 지번) */
+    lotNumber: string | null
+    /** PNU 11번째 자리 = 2 */
+    mountain: boolean
+    /** 지목 약어 한 글자("대"). 정식 명칭은 `jimokName()` */
+    jimok: string | null
+    /** 공시지가(원/㎡) */
+    officialPrice: number | null
+    priceYear: string | null
+    priceMonth: string | null
+    /** 필지 경계 GeoJSON Feature(EPSG:4326). 없으면 강조·면적을 생략한다 */
+    geometry: GeoJsonObject | null
+}
+
+export interface ParcelBuilding {
+    /** 건물관리번호 */
+    id: string
+    name: string | null
+    detailName: string | null
+    sggName: string | null
+}
+
+export interface ParcelAddressGroup {
+    roadAddress: string
+    underground: boolean
+    zipCode: string | null
+    name: string | null
+    apartment: boolean
+    /** MAIN = 대표지번이 이 필지, RELATED = 관련지번으로만 걸림 */
+    relation: 'MAIN' | 'RELATED'
+    buildings: ParcelBuilding[]
+}
+
+export interface ParcelBuildingsResult {
+    pnu: string
+    /** 건물DB 적재 기준월("2026-09") */
+    referenceVersion: string | null
+    /** 이 필지에 걸린 건물 전체 수(돌려준 수와 다를 수 있다) */
+    buildingCount: number
+    /** 돌려준 건물 수 < buildingCount */
+    truncated: boolean
+    /** 관련지번으로도 찾았나 */
+    relatedIncluded: boolean
+    addresses: ParcelAddressGroup[]
+}
+
+export interface ParcelBuildingSource {
+    /**
+     * PNU로 그 필지의 건물 목록. 상태가 보이는 `GisHttpError`로 reject: 403 로그인 필요, 404 서버가 이 기능을 모름, 503 자료 준비 중.
+     * `limit`은 1~1000. `signal`이 abort되면 요청을 취소한다
+     */
+    byPnu(pnu: string, opts?: { limit?: number; signal?: AbortSignal }): Promise<ParcelBuildingsResult>
 }
 
 export interface RegionNameSource {
@@ -207,6 +272,8 @@ export interface GisMapSources {
     wind?: WindSource
     addressSearch?: AddressSearchSource
     parcel?: ParcelSource
+    /** 필지 정보 카드의 건물 칸(PNU → 건물 목록). 없으면 카드에 건물 칸이 없다 */
+    parcelBuildings?: ParcelBuildingSource
     regionName?: RegionNameSource
     legend?: LegendSource
     wfs?: WfsSource

@@ -98,13 +98,13 @@ UNLOGGED 표는 WAL(복구 기록)을 쓰지 않아서 대량 적재가 빠르�
 ## 도로명주소 건물DB (주소 엑셀용)
 
 주소 엑셀(도로명주소·지번주소 → PNU → 연속지적도 폴리곤)이 읽는 표다. 원본은 행정안전부 주소기반산업지원서비스(business.juso.go.kr) > 주소정보 자료제공 > **건물DB(전체분)**.
-앱이 읽는 표는 `ref.ti_spbd_buld`(건물정보 — 법정동 사전과 도로명주소→지번)와 `ref.ti_sprd_stret`(도로명코드). `ref.ti_scco_mvmn`(관련지번)은 적재만 하고 아직 쓰지 않는다.
+앱이 읽는 표는 `ref.ti_spbd_buld`(건물정보 — 법정동 사전과 도로명주소→지번)와 `ref.ti_sprd_stret`(도로명코드). `ref.ti_scco_mvmn`(관련지번)은 필지 정보 카드(`GET /api/mymap/ref/parcels/{pnu}/buildings`)가 "이 필지를 관련지번으로 가진 건물"을 찾을 때만 읽는다(색인 `ix_ti_scco_mvmn_jibun`이 있을 때 — 아래 "관련지번 색인").
 **PNU 만들기**: `adm_cd || (mntn_yn::int + 1) || lpad(lnbr_mnnm,4,'0') || lpad(lnbr_slno,4,'0')`. 연속지적도(`load_meta.dataset='parcel'`)와 별개로 적재·기록되며 서로 영향이 없다.
 
 | 표 | 원본 파일 | 행 수(2026-09) | 키·인덱스 |
 |---|---|---|---|
-| `ref.ti_spbd_buld` | `build_*.txt` | 약 1,072만 | PK `bd_mgt_sn`, `ix_ti_spbd_buld_road (road_cd, udgd_yn, buld_mnnm, buld_slno)`, `ix_ti_spbd_buld_jibun (adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno)`(선택 — 아래 "지번 색인") |
-| `ref.ti_scco_mvmn` | `jibun_*.txt` | 약 177만 | PK `(road_cd, udgd_yn, buld_mnnm, buld_slno, jibun_seq)` |
+| `ref.ti_spbd_buld` | `build_*.txt` | 약 1,072만 | PK `bd_mgt_sn`, `ix_ti_spbd_buld_road (road_cd, udgd_yn, buld_mnnm, buld_slno)`, `ix_ti_spbd_buld_jibun (adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno)`(주소 변환의 지번 입력 행은 선택, **필지 정보 카드는 필수** — 아래 "지번 색인") |
+| `ref.ti_scco_mvmn` | `jibun_*.txt` | 약 177만 | PK `(road_cd, udgd_yn, buld_mnnm, buld_slno, jibun_seq)`, `ix_ti_scco_mvmn_jibun (adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno)`(선택 — 아래 "관련지번 색인") |
 | `ref.ti_sprd_stret` | `road_code_total.txt` | 약 37만 | PK `(sgg_cd, road_no, emd_no)`, `ix_ti_sprd_stret_name (ctp_kor_nm, sig_kor_nm, rn)` |
 
 ### 처음 적재
@@ -137,5 +137,17 @@ UNLOGGED 표는 WAL(복구 기록)을 쓰지 않아서 대량 적재가 빠르�
 - `load-juso.sh`는 새 건물정보 표에도 같은 색인을 만든다 → 월 갱신으로 표가 교체돼도 색인이 유지된다(적재 시간·디스크가 그만큼 늘어난다).
 - 앱은 `to_regclass(ref.ix_ti_spbd_buld_jibun)`로 색인 유무를 확인해 결과를 기억한다: 적재 기준월이 바뀌면 다시 확인하고, "없음"은 5분 뒤 다시 확인한다 → **색인을 만든 뒤 앱 재시작은 필요 없다**(최대 5분 안에 켜진다).
 - 지우면(`DROP INDEX ref.ix_ti_spbd_buld_jibun;`) 지번 입력 행의 도로명주소 열이 다시 빈 칸이 된다.
+
+### 관련지번 색인 `ix_ti_scco_mvmn_jibun` (필지 정보 카드 — 선택)
+필지 정보 카드의 건물 칸은 필지의 건물을 **대표지번**(`ref.ti_spbd_buld`의 `adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno`)으로 찾는다 — 위 지번 색인 `ix_ti_spbd_buld_jibun`이 **필수**이고, 없으면 카드는 건물 칸에 "자료 준비 중"(503)을 보이고 조회하지 않는다. 건물은 대표지번이 하나뿐이라 여러 필지에 걸친 단지는 대표 필지에서만 보인다. 관련지번 표(`ref.ti_scco_mvmn`)를 같은 4열로 찾는 이 색인이 있으면 나머지 필지에서도 그 건물이 "관련지번"으로 보인다.
+
+| | 색인 없음 | 색인 있음 |
+|---|---|---|
+| 대표지번이 이 필지인 건물 | 보임 | 보임 |
+| 관련지번으로만 걸린 건물 | **안 보임**(관련지번 표를 읽지 않음) | 보임(`relation: RELATED`) |
+
+- **만드는 법(한 번)**: `psql -v ON_ERROR_STOP=1 -f add-ix-juso-related-jibun.sql` — 약 50MB(추정)·수십 초. `CREATE INDEX IF NOT EXISTS`라 여러 번 실행해도 안전하다. **운영 DB에 쓰기이므로 사용자가 직접 실행한다.**
+- `load-juso.sh`는 새 관련지번 표에도 같은 색인을 만든다 → 월 갱신으로 표가 교체돼도 색인이 유지된다.
+- 앱은 `to_regclass(ref.ix_ti_scco_mvmn_jibun)`로 확인해 결과를 기억한다(기준월이 바뀌면, "없음"은 5분 뒤 다시) → **색인을 만든 뒤 앱 재시작은 필요 없다**. 지우면(`DROP INDEX ref.ix_ti_scco_mvmn_jibun;`) 대표지번 건물만 보인다.
 
 앱 계정에는 `ref` 스키마에 SELECT 권한만 주고(`to_regclass`·조회 모두 읽기), 적재 계정은 따로 쓴다. 앱은 새 표·인덱스를 만들지 않는다(법정동 사전은 앱 메모리). 색인은 위 SQL을 적재 계정이 실행한다.

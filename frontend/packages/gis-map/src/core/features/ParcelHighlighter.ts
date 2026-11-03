@@ -17,12 +17,22 @@ import { Style, Fill, Stroke, Icon, Text } from 'ol/style'
 import { fromLonLat } from 'ol/proj'
 import type { ResolvedGisMapTheme } from '../config'
 import type { ParcelSource } from '../sources'
+import type { GeoJsonObject } from '../types/geojson'
 import type { MapResources } from '../tracker'
 
 export interface ParcelHighlighter {
     /** 핀 즉시 표시 → parcel 소스가 있으면 필지 폴리곤 로드 후 핀을 중심으로 이동 */
     highlight(lon: number, lat: number, title?: string): void
     clear(): void
+    /**
+     * 필지 정보 카드용: 필지 경계(EPSG:4326 GeoJSON Feature)만 핀 없이 강조한다(이전 강조는 대체). 돌려주는 토큰으로만 `clearParcel`이 지운다.
+     * 이 호출로 대체된 이전 강조의 주인에게는 알리지 않는다(주인이 자기 자신이므로)
+     */
+    showParcel(feature: GeoJsonObject): number
+    /** token이 지금 강조의 주인일 때만 지운다(검색 강조가 덮은 뒤에는 아무 일도 안 한다). 지웠으면 true */
+    clearParcel(token: number): boolean
+    /** `highlight`나 `clear`가 지금 강조를 덮거나 지울 때 알린다(카드가 자기 카드를 닫는다). 반환값 = 구독 해제 */
+    onReplaced(listener: () => void): () => void
     /** 지금 붙어 있는 강조 레이어(없으면 null) */
     getOlLayer(): VectorLayer<Feature<Geometry>> | null
 }
@@ -88,6 +98,10 @@ export class ParcelHighlighterImpl implements ParcelHighlighter {
     private readonly opts: ParcelHighlighterOptions
     private readonly parcelStyle: Style
     private layer: VectorLayer<Feature<Geometry>> | null = null
+    /** 지금 강조가 필지 정보 카드 것이면 그 토큰(검색 강조·지움이면 0) */
+    private token = 0
+    private nextToken = 0
+    private readonly replacedListeners = new Set<() => void>()
     private destroyed = false
 
     constructor(opts: ParcelHighlighterOptions) {
@@ -100,8 +114,9 @@ export class ParcelHighlighterImpl implements ParcelHighlighter {
         const { olMap, resources, source, zIndex, theme } = this.opts
         const projection = olMap.getView().getProjection()
 
-        // 기존 레이어 제거
-        this.clear()
+        // 기존 레이어 제거 + 필지 정보 카드가 열려 있으면 닫히도록 알린다(강조 하나 = 화면 하나의 필지)
+        this.removeLayer()
+        this.notifyReplaced()
 
         // 핀 즉시 표시 (searched 좌표)
         const pinFeature = new FeatureClass({ geometry: new Point(fromLonLat([lon, lat], projection)) })
@@ -138,10 +153,56 @@ export class ParcelHighlighterImpl implements ParcelHighlighter {
     }
 
     clear(): void {
+        const had = this.layer !== null
+        this.removeLayer()
+        if (had) this.notifyReplaced()
+    }
+
+    /** 알리지 않고 레이어만 뗀다 */
+    private removeLayer(): void {
         if (this.layer) {
             this.opts.resources.removeLayer(this.layer)
             this.layer = null
         }
+        this.token = 0
+    }
+
+    private notifyReplaced(): void {
+        Array.from(this.replacedListeners).forEach(l => {
+            try {
+                l()
+            } catch (err) {
+                console.error('[gis-map] 필지 강조 교체 알림 중 오류', err)
+            }
+        })
+    }
+
+    onReplaced(listener: () => void): () => void {
+        this.replacedListeners.add(listener)
+        return () => {
+            this.replacedListeners.delete(listener)
+        }
+    }
+
+    showParcel(feature: GeoJsonObject): number {
+        if (this.destroyed) return 0
+        const { olMap, resources, zIndex } = this.opts
+        const projection = olMap.getView().getProjection()
+        this.removeLayer()
+        const wrapped = feature.type === 'Feature' ? feature : { type: 'Feature', geometry: feature, properties: {} }
+        const olFeatures = new GeoJSON().readFeatures({ type: 'FeatureCollection', features: [wrapped] }, { featureProjection: projection })
+        olFeatures.forEach(f => f.setStyle(this.parcelStyle))
+        const layer = new VectorLayer<Feature<Geometry>>({ source: new VectorSource<Feature<Geometry>>({ features: olFeatures }), zIndex })
+        resources.addLayer(layer)
+        this.layer = layer
+        this.token = ++this.nextToken
+        return this.token
+    }
+
+    clearParcel(token: number): boolean {
+        if (token === 0 || this.token !== token) return false
+        this.removeLayer()
+        return true
     }
 
     getOlLayer(): VectorLayer<Feature<Geometry>> | null {
@@ -150,7 +211,8 @@ export class ParcelHighlighterImpl implements ParcelHighlighter {
 
     destroy(): void {
         if (this.destroyed) return
-        this.clear()
+        this.removeLayer()
+        this.replacedListeners.clear()
         this.destroyed = true
     }
 }

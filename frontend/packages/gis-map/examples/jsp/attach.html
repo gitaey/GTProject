@@ -50,7 +50,7 @@
         <h2>도구</h2>
         <section id="tools">
             <button type="button" data-tool="draw-point">점</button><button type="button" data-tool="draw-line">선</button><button type="button" data-tool="draw-polygon">면</button><button type="button" data-tool="draw-circle">원</button><button type="button" data-tool="draw-box">사각형</button><button type="button" data-tool="draw-text">텍스트</button><button type="button" data-tool="select">선택</button><br>
-            <button type="button" data-tool="measure-distance">거리측정</button><button type="button" data-tool="measure-area">면적측정</button><button type="button" data-tool="radius-search">반경</button><br>
+            <button type="button" data-tool="measure-distance">거리측정</button><button type="button" data-tool="measure-area">면적측정</button><button type="button" data-tool="radius-search">반경</button><button type="button" data-tool="parcel-info">필지 정보</button><br>
             <button type="button" id="btnClear">전체 지우기</button><button type="button" id="btnPrint">출력(인쇄 창)</button><button type="button" id="btnPng">PNG 저장</button><button type="button" id="btnAnalysis">영역 분석(현재 화면)</button>
             <div class="demo-note">그리기·측정은 더블클릭 또는 우클릭으로 끝낸다. 같은 단추를 다시 누르면 꺼진다.</div>
         </section>
@@ -127,6 +127,44 @@
         return { groups: [{ id: 2, name: '엔진이 관리하는 레이어', parentId: null, sortOrder: 0, children: [], layers: layers }], ungroupedLayers: [] };
     }
 
+    // 필지 정보 예제용 가짜 소스(메모리, 영역 분석 예제와 같은 격자 필지) — 실제 페이지는 GisMap.adapters.proxy()(필지 속성·경계)와 GisMap.adapters.rest()(건물)가 만든다.
+    // 도구 'parcel-info'를 켜고 필지를 누르면 gis.parcelInfo.store 상태가 바뀐다(카드 화면은 React 위젯 — 여기서는 로그 한 줄). 필지 경계 강조는 엔진 레이어(호스트 레이어는 그대로)
+    function demoParcelSources() {
+        var S = 0.00027;
+        function cellAt(lon, lat) {
+            var gx = Math.floor((lon - 127.0270) / 0.0003), gy = Math.floor((lat - 37.4975) / 0.0003);
+            if (gx < 0 || gx > 7 || gy < 0 || gy > 5) return null;
+            if (lon > 127.0270 + gx * 0.0003 + S || lat > 37.4975 + gy * 0.0003 + S) return null;
+            return { gx: gx, gy: gy, n: gy * 8 + gx };
+        }
+        function pnuOf(n) { return '1168010500' + '1' + ('0000' + (100 + n)).slice(-4) + '0000'; }
+        return {
+            parcel: {
+                featuresAt: function () { return Promise.resolve([]); },
+                infoAt: function (lon, lat) {
+                    var c = cellAt(lon, lat);
+                    if (!c) return Promise.resolve(null);
+                    var x = 127.0270 + c.gx * 0.0003, y = 37.4975 + c.gy * 0.0003;
+                    return Promise.resolve({
+                        pnu: pnuOf(c.n), address: '서울특별시 강남구 역삼동 ' + (100 + c.n), lotNumber: String(100 + c.n), mountain: false, jimok: ['대', '전', '도'][c.n % 3],
+                        officialPrice: 1055000, priceYear: '2026', priceMonth: '01',
+                        geometry: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[x, y], [x + S, y], [x + S, y + S], [x, y + S], [x, y]]] } }
+                    });
+                }
+            },
+            parcelBuildings: {
+                byPnu: function (pnu) {
+                    return Promise.resolve({
+                        pnu: pnu, referenceVersion: '2026-09', buildingCount: 1, truncated: false, relatedIncluded: false,
+                        addresses: [{ roadAddress: '서울특별시 강남구 예시로 1 (역삼동)', underground: false, zipCode: '06100', name: '예시빌딩', apartment: false, relation: 'MAIN',
+                            buildings: [{ id: pnu + '1', name: '예시빌딩', detailName: null, sggName: null }] }]
+                    });
+                }
+            }
+        };
+    }
+    var DEMO_PARCEL = demoParcelSources();
+
     var gis = null, offs = [];
     function attach() {
         if (gis) return;
@@ -135,6 +173,8 @@
                 host: { keys: { vworld: VWORLD_KEY } },
                 sources: {
                     layerTree: { loadTree: function () { return Promise.resolve(demoTree()); } },
+                    parcel: DEMO_PARCEL.parcel,
+                    parcelBuildings: DEMO_PARCEL.parcelBuildings,
                     // 영역 분석 예제용 가짜 질의 소스(메모리). 실제 페이지는 GisMap.adapters.proxy() — VWorld는 호스트 프록시, GeoServer는 WFS 직접(CORS 필요)
                     areaQuery: {
                         describe: function () { return Promise.resolve({ queryable: true }); },
@@ -161,6 +201,11 @@
             for (var i = 0; i < btns.length; i++) btns[i].className = btns[i].getAttribute('data-tool') === s.activeTool ? 'is-on' : '';
         }));
         offs.push(gis.layers.store.subscribe(renderTree));
+        offs.push(gis.parcelInfo.store.subscribe(function (s) {
+            if (!s.open || s.parcel.status !== 'ready') return;
+            var i = s.parcel.info;
+            log('필지 ' + i.pnu + ' · ' + i.address + ' · 지목 ' + GisMap.jimokName(i.jimok) + ' · ' + Math.round(s.parcel.areaM2) + ' ㎡ · 건물 칸 ' + s.buildings.status);
+        }));
         renderTree();
         syncButtons();
     }

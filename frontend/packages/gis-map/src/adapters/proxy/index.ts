@@ -26,7 +26,7 @@ export function proxySources(options: ProxySourcesOptions = {}): GisMapSourcesFa
 
 export { proxyLegend, parseVWorldLegendStyle, geoserverLegendUrl } from './legend'
 export { proxyWfs } from './wfs'
-export { proxyAddressSearch, proxyParcel, proxyRegionName, stripLotNumber } from './vworld'
+export { proxyAddressSearch, proxyParcel, proxyRegionName, stripLotNumber, parseVWorldParcel } from './vworld'
 export { proxyAreaQuery } from './areaQuery'
 export type { ProxyAreaQueryOptions } from './areaQuery'
 export { jimokOf } from './areaQueryVWorld'

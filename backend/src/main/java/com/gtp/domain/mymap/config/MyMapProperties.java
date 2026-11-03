@@ -83,6 +83,8 @@ public class MyMapProperties {
         private String buildingTable = "ref.ti_spbd_buld";
         /** 도로명코드(도로명 1건 = 1행): 도로명 → road_cd 후보 */
         private String roadCodeTable = "ref.ti_sprd_stret";
+        /** 관련지번(건물 1건에 여러 행): 필지 정보 카드가 "이 필지를 관련지번으로 가진 건물"을 찾는 원천(색인 ix_ti_scco_mvmn_jibun이 있을 때만) */
+        private String relatedJibunTable = "ref.ti_scco_mvmn";
         /** AMBIGUOUS 때 보고서에 남기는 후보 최대 개수 */
         private int maxCandidates = 5;
     }

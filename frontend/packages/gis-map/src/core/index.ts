@@ -75,6 +75,12 @@ export { formatPrintDate } from './print/renderPage'
 export { minimalPdf } from './lib/minimalPdf'
 export { saveBlob } from './lib/saveBlob'
 
+// 필지 정보 카드 — map.parcelInfo. 지목 표·면적 계산도 공개(호스트가 자기 화면을 만들 때)
+export { INITIAL_PARCEL_INFO_STATE } from './parcelInfo/types'
+export type { ParcelInfoController, ParcelInfoState, ParcelStatus, ParcelBuildingsStatus } from './parcelInfo/types'
+export { jimokName, JIMOK_NAMES } from './parcelInfo/jimok'
+export { parcelAreaM2, BUILDINGS_FIRST_LIMIT, BUILDINGS_ALL_LIMIT } from './parcelInfo/ParcelInfoController'
+
 // 영역 분석 — map.areaAnalysis. 순수 계산(판정·잘라낸 면적·집계·CSV)도 공개(호스트가 자기 화면을 만들 때)
 export { DEFAULT_AREA_ANALYSIS, refKey as areaRefKey, sameRef as areaSameRef } from './areaAnalysis/types'
 export type {
@@ -108,6 +114,7 @@ export type {
     AddressSearchSource, ParcelSource, RegionNameSource, LegendSource, WfsSource,
     ShareUser, ShareGroup, ShareDirectorySource, ShareEntryState, ShareSnapshot, ShareChange, BulkShareMode, BulkShareResult,
     ShareTargetSource, AreaQuerySource, AreaQueryLayerInfo, AreaQueryPage,
+    ParcelInfo, ParcelBuilding, ParcelAddressGroup, ParcelBuildingsResult, ParcelBuildingSource,
 } from './sources'
 
 // 상태 저장소 / 이벤트

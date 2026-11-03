@@ -1,11 +1,12 @@
 // 짝 Spring 백엔드 REST 소스 어댑터({ success, message, data } 봉투). 주소·헤더는 호출 시점의 host에서 읽는다.
-// layerTree(FE-4a) + myMap·geoTiff·wind(FE-4b)
+// layerTree(FE-4a) + myMap·geoTiff·wind(FE-4b) + parcelBuildings(필지 정보 카드의 건물 칸)
 import type { GisMapSourcesFactory } from '../../core'
 import { restLayerTree } from './layerTree'
 import type { RestLayerTreeOptions } from './layerTree'
 import { restGeoTiff } from './geoTiff'
 import { restMyMap } from './myMap'
 import { restWind } from './wind'
+import { restParcelBuildings } from './parcelBuildings'
 import { restShareDirectory } from './shareDirectory'
 
 export type RestSourcesOptions = RestLayerTreeOptions
@@ -16,6 +17,7 @@ export function restSources(opts: RestSourcesOptions = {}): GisMapSourcesFactory
         myMap: restMyMap(ctx),
         geoTiff: restGeoTiff(ctx),
         wind: restWind(ctx),
+        parcelBuildings: restParcelBuildings(ctx),
         shareDirectory: restShareDirectory(ctx),
     })
 }
@@ -25,6 +27,7 @@ export type { RestLayerTreeOptions } from './layerTree'
 export { restGeoTiff } from './geoTiff'
 export { restMyMap } from './myMap'
 export { restWind } from './wind'
+export { restParcelBuildings } from './parcelBuildings'
 export { restShareDirectory } from './shareDirectory'
 export { readEnvelope, apiUrl } from './envelope'
 export type { ApiEnvelope } from './envelope'

@@ -59,6 +59,42 @@ public class InMemoryAddressRefReader implements AddressRefReader {
         return this;
     }
 
+    /** 필지 정보 카드용: 필지(지번 키) → 건물 줄. 시험은 직접 넣고, fake provider는 samples()가 넣는다 */
+    private final Map<JibunKey, List<BuildingRow>> parcelBuildings = new HashMap<>();
+    private volatile boolean relatedReady = false;
+    public int buildingsByJibunCalls = 0;
+    public int lastLimit = -1;
+
+    /** 필지 한 곳에 걸린 건물 1건을 넣는다(relation은 BuildingRow 안에 있다) */
+    public InMemoryAddressRefReader parcelBuilding(JibunKey key, BuildingRow row) {
+        parcelBuildings.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
+        return this;
+    }
+
+    /** 시험용: 관련지번 색인이 있는 것처럼(true) 또는 없는 것처럼(false, 기본) 동작한다 */
+    public InMemoryAddressRefReader relatedReady(boolean ready) {
+        this.relatedReady = ready;
+        return this;
+    }
+
+    @Override
+    public boolean relatedJibunLookupReady() {
+        return version != null && relatedReady;
+    }
+
+    /** 넣은 순서 그대로, 관련지번 색인이 없으면 RELATED 줄은 빼고 센다(실제 SQL과 같은 의미) */
+    @Override
+    public BuildingPage buildingsByJibun(JibunKey key, int limit) {
+        buildingsByJibunCalls++;
+        lastLimit = limit;
+        boolean related = relatedJibunLookupReady();
+        List<BuildingRow> all = new ArrayList<>();
+        for (BuildingRow r : parcelBuildings.getOrDefault(key, List.of())) {
+            if (related || "MAIN".equals(r.relation())) all.add(r);
+        }
+        return new BuildingPage(all.size(), related, List.copyOf(all.subList(0, Math.min(limit, all.size()))));
+    }
+
     public int findRoadCodesCalls = 0;
     public int findBuildingsCalls = 0;
     public int legalDongsCalls = 0;
@@ -154,6 +190,13 @@ public class InMemoryAddressRefReader implements AddressRefReader {
         r.legalDong("3611010300", 세종, "", "보람동", "");
         r.road("361102000002", 세종, "", "한누리대로", true)
                 .building("361102000002", false, 2130, 0, "3611010300", false, 718, 0, 세종, "", "보람동", "", "한누리대로");
+
+        // 필지 정보 카드 샘플(fake provider): 위 청사 필지에 가짜 동 2개(건물관리번호·기초구역번호는 가짜)
+        JibunKey 세종718 = new JibunKey("3611010300", "0", 718, 0);
+        r.parcelBuilding(세종718, new BuildingRow("3611010300107180000000001", 세종, "", "보람동", "", "한누리대로", "361102000002", "0",
+                        2130, 0, "정부세종청사", "1동", "", false, "30151", "1", "MAIN"))
+                .parcelBuilding(세종718, new BuildingRow("3611010300107180000000002", 세종, "", "보람동", "", "한누리대로", "361102000002", "0",
+                        2130, 0, "정부세종청사", "2동", "", false, "30151", "1", "MAIN"));
 
         r.legalDong("2647010200", 부산, "연제구", "연산동", "");
         r.road("264702000003", 부산, "연제구", "중앙대로", true)

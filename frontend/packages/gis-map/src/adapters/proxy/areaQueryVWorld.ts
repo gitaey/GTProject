@@ -99,7 +99,7 @@ function areaLimitMessage(km2: number | null): string {
     return 'VWorld는 영역이 ' + VWORLD_MAX_AREA_KM2 + ' ㎢ 이하일 때만 조회됩니다' + (km2 !== null ? '(현재 약 ' + km2.toFixed(1) + ' ㎢)' : '') + '. 영역을 줄여 다시 분석하세요.'
 }
 
-function errorMessage(code: string, text: string): string {
+export function errorMessage(code: string, text: string): string {
     if (code === 'INVALID_KEY' || code === 'INCORRECT_KEY' || code === 'UNAVAILABLE_KEY') return 'VWorld 인증키(도메인) 문제로 질의하지 못했습니다.'
     if (code === 'OVER_REQUEST_LIMIT') return 'VWorld 호출 한도를 넘었습니다. 나중에 다시 시도하세요.'
     return 'VWorld 질의 오류' + (code ? ' (' + code + ')' : '') + (text ? ': ' + text : '')

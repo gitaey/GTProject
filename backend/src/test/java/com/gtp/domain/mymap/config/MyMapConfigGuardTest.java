@@ -1,6 +1,7 @@
 package com.gtp.domain.mymap.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gtp.domain.mymap.infra.AddressRefReader;
 import com.gtp.domain.mymap.infra.FakePnuParcelProvider;
 import com.gtp.domain.mymap.infra.PostgisPnuParcelProvider;
 import com.gtp.domain.mymap.infra.TableAddressResolver;
@@ -192,12 +193,16 @@ class MyMapConfigGuardTest {
         MyMapRefJdbc ref = MyMapRefJdbc.create(props.getRef().getDatasource(), new DriverManagerDataSource("jdbc:h2:mem:svc_guard4"));
 
         props.getRef().setProvider("postgis");
-        AddressResolver postgis = config.addressResolver(props, ref);
+        AddressRefReader postgisReader = config.addressRefReader(props, ref);
+        assertThat(postgisReader).isInstanceOf(com.gtp.domain.mymap.infra.JdbcAddressRefReader.class);
+        AddressResolver postgis = config.addressResolver(props, postgisReader);
         assertThat(postgis).isInstanceOf(TableAddressResolver.class);
         assertThat(postgis.supported()).isTrue();
 
         props.getRef().setProvider("fake");
-        AddressResolver fake = config.addressResolver(props, ref);
+        AddressRefReader fakeReader = config.addressRefReader(props, ref);
+        assertThat(fakeReader).isInstanceOf(com.gtp.domain.mymap.infra.InMemoryAddressRefReader.class);
+        AddressResolver fake = config.addressResolver(props, fakeReader);
         assertThat(fake).isInstanceOf(TableAddressResolver.class);
         assertThat(fake.available()).isTrue();   // 메모리 자료는 늘 준비됨
         assertThat(fake.resolve(List.of("서울특별시 중구 세종대로 110")).get(0).pnu()).isEqualTo("1114010300100310000");
@@ -205,7 +210,7 @@ class MyMapConfigGuardTest {
         // 표 이름이 식별자 모양이 아니면 기동 때 바로 실패(SQL 주입 방지)
         props.getRef().setProvider("postgis");
         props.getRef().getAddress().setBuildingTable("ref.x; DROP TABLE y");
-        assertThatThrownBy(() -> config.addressResolver(props, ref)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> config.addressRefReader(props, ref)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -213,6 +218,7 @@ class MyMapConfigGuardTest {
         MyMapProperties.Address a = new MyMapProperties().getRef().getAddress();
         assertThat(a.getBuildingTable()).isEqualTo("ref.ti_spbd_buld");
         assertThat(a.getRoadCodeTable()).isEqualTo("ref.ti_sprd_stret");
+        assertThat(a.getRelatedJibunTable()).isEqualTo("ref.ti_scco_mvmn");
         assertThat(a.getMaxCandidates()).isEqualTo(5);
     }
 
