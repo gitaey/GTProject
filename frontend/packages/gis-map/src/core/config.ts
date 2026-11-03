@@ -7,6 +7,7 @@ import type { LayerExpandedStorage } from './layers/LayerTreeController'
 import { normalizeHexColor } from './lib/color'
 import type { LayerCrossOriginResolver } from './layers/resolveLayerUrl'
 import type { PrintLayoutConfig } from './print/types'
+import type { GisMapAreaAnalysisConfig } from './areaAnalysis/types'
 
 export interface GisMapViewConfig {
     /** [lon, lat] EPSG:4326 */
@@ -23,6 +24,8 @@ export interface GisMapTheme {
     primary?: string
     measure?: { distance?: string; area?: string; radius?: string }
     parcel?: { stroke?: string; fill?: string }
+    /** 영역 분석: 선택된 피처 강조(stroke·fill)와 지금 가리키는 피처(active) 색 */
+    selection?: { stroke?: string; fill?: string; active?: string }
 }
 
 /** 기본값을 전부 채운 테마 */
@@ -30,6 +33,7 @@ export interface ResolvedGisMapTheme {
     primary: string
     measure: { distance: string; area: string; radius: string }
     parcel: { stroke: string; fill: string }
+    selection: { stroke: string; fill: string; active: string }
 }
 
 export interface GisMapLayersConfig {
@@ -89,6 +93,8 @@ export interface GisMapConfig {
     projections?: Record<string, string> | false
     /** 지도 출력(map.print)의 기관명·로고·출처·글꼴·축척 선택지 */
     print?: PrintLayoutConfig
+    /** 영역 분석(map.areaAnalysis)의 강조 상한·범주표 크기·계산 시간 나누기 */
+    areaAnalysis?: GisMapAreaAnalysisConfig
     /** 엔진이 추가하는 레이어 zIndex. 붙이기 모드에서 호스트 레이어와 겹치지 않게 조정 */
     zIndex?: Partial<GisMapZIndex>
 }
@@ -117,6 +123,7 @@ export const DEFAULT_THEME: Readonly<ResolvedGisMapTheme> = Object.freeze({
     primary: '#F26722',
     measure: Object.freeze({ distance: '#e8365d', area: '#4169e1', radius: '#7c3aed' }),
     parcel: Object.freeze({ stroke: '#2563eb', fill: 'rgba(59,130,246,0.15)' }),
+    selection: Object.freeze({ stroke: '#0891b2', fill: 'rgba(8,145,178,0.12)', active: '#e11d48' }),
 })
 
 export const DEFAULT_ZINDEX: Readonly<GisMapZIndex> = Object.freeze({
@@ -157,6 +164,11 @@ export function resolveTheme(theme?: GisMapTheme): ResolvedGisMapTheme {
         parcel: {
             stroke: theme?.parcel?.stroke ?? DEFAULT_THEME.parcel.stroke,
             fill: theme?.parcel?.fill ?? DEFAULT_THEME.parcel.fill,
+        },
+        selection: {
+            stroke: theme?.selection?.stroke ?? DEFAULT_THEME.selection.stroke,
+            fill: theme?.selection?.fill ?? DEFAULT_THEME.selection.fill,
+            active: theme?.selection?.active ?? DEFAULT_THEME.selection.active,
         },
     }
 }

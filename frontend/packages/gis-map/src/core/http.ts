@@ -3,6 +3,12 @@ import type { GisMapHost } from './host'
 
 export interface HttpClient {
     fetch(url: string, init?: RequestInit): Promise<Response>
+    /**
+     * 외부 서버(다른 출처 GeoServer 등) 호출: 호스트 헤더(로그인 토큰 Authorization)를 붙이지 않고 `credentials: 'omit'`,
+     * 401이어도 `onUnauthorized`(로그아웃)를 부르지 않는다. 우리 토큰이 남의 서버로 새거나 남의 401에 로그아웃되는 것을 막는다.
+     * 호출부가 init.headers로 준 헤더만 가고 Authorization은 버린다
+     */
+    fetchExternal(url: string, init?: RequestInit): Promise<Response>
     /** !res.ok면 GisHttpError를 던진다 */
     json<T>(url: string, init?: RequestInit): Promise<T>
 }
@@ -33,8 +39,15 @@ export function createHttpClient(getHost: () => GisMapHost): HttpClient {
         return res
     }
 
+    async function requestExternal(url: string, init?: RequestInit): Promise<Response> {
+        const headers = new Headers(init?.headers)
+        headers.delete('authorization')
+        return fetch(url, { ...init, headers, credentials: 'omit' })
+    }
+
     return {
         fetch: request,
+        fetchExternal: requestExternal,
         async json<T>(url: string, init?: RequestInit): Promise<T> {
             const res = await request(url, init)
             if (!res.ok) throw new GisHttpError(res.status, `HTTP ${res.status} ${url}`)

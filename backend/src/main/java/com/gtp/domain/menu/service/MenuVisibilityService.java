@@ -36,14 +36,14 @@ public class MenuVisibilityService {
             "sidebar.system-user", "sidebar.system-access-log", "sidebar.system-menu", "sidebar.system-permission",
             "map.panel.layer", "map.panel.image", "map.panel.etc",
             "map.tool.zoom", "map.tool.draw", "map.tool.measure-distance",
-            "map.tool.measure-area", "map.tool.radius-search", "map.tool.wind", "map.tool.print", "map.tool.clear"
+            "map.tool.measure-area", "map.tool.radius-search", "map.tool.wind", "map.tool.print", "map.tool.area-analysis", "map.tool.clear"
         ),
         "MAP_ADMIN", List.of(
             "sidebar.home", "sidebar.map-view", "sidebar.map-layer",
             "sidebar.geoserver-publish", "sidebar.geoserver-styles",
             "map.panel.layer", "map.panel.image", "map.panel.etc",
             "map.tool.zoom", "map.tool.draw", "map.tool.measure-distance",
-            "map.tool.measure-area", "map.tool.radius-search", "map.tool.wind", "map.tool.print", "map.tool.clear"
+            "map.tool.measure-area", "map.tool.radius-search", "map.tool.wind", "map.tool.print", "map.tool.area-analysis", "map.tool.clear"
         ),
         "MAP_USER_VIEWER", List.of(
             "sidebar.home", "sidebar.map-view",
@@ -54,13 +54,13 @@ public class MenuVisibilityService {
             "sidebar.home", "sidebar.map-view",
             "map.panel.layer", "map.panel.image", "map.panel.etc",
             "map.tool.zoom", "map.tool.draw", "map.tool.measure-distance",
-            "map.tool.measure-area", "map.tool.radius-search", "map.tool.wind", "map.tool.print", "map.tool.clear"
+            "map.tool.measure-area", "map.tool.radius-search", "map.tool.wind", "map.tool.print", "map.tool.area-analysis", "map.tool.clear"
         ),
         "MAP_USER_DEPT_B", List.of(
             "sidebar.home", "sidebar.map-view",
             "map.panel.layer", "map.panel.image", "map.panel.etc",
             "map.tool.zoom", "map.tool.draw", "map.tool.measure-distance",
-            "map.tool.measure-area", "map.tool.radius-search", "map.tool.wind", "map.tool.print", "map.tool.clear"
+            "map.tool.measure-area", "map.tool.radius-search", "map.tool.wind", "map.tool.print", "map.tool.area-analysis", "map.tool.clear"
         )
     );
 

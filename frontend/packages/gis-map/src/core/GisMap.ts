@@ -30,7 +30,7 @@ import { AreaTool } from './tools/AreaTool'
 import { RadiusTool } from './tools/RadiusTool'
 import { LayerTreeControllerImpl } from './layers/LayerTreeController'
 import type { LayerTreeController } from './layers/LayerTreeController'
-import { resolveBasemapModes } from './layers/basemap'
+import { isBasemapLayer, resolveBasemapModes } from './layers/basemap'
 import { defaultLayerCrossOrigin, defaultResolveLayerUrl } from './layers/resolveLayerUrl'
 import { RasterOverlayControllerImpl } from './overlays/RasterOverlayController'
 import type { RasterOverlayController } from './overlays/RasterOverlayController'
@@ -42,6 +42,8 @@ import { RegionWatcherImpl } from './features/RegionWatcher'
 import type { RegionWatcher } from './features/RegionWatcher'
 import { PrintControllerImpl } from './print/PrintController'
 import type { PrintController } from './print/types'
+import { AreaAnalysisControllerImpl } from './areaAnalysis/AreaAnalysisController'
+import type { AreaAnalysisController } from './areaAnalysis/types'
 
 /** zoom 기본 16, 600ms */
 export interface FlyToRequest {
@@ -81,6 +83,8 @@ export interface GisMap {
     readonly region: RegionWatcher
     /** 지도 출력(PNG·PDF·인쇄). 틀·iframe은 처음 쓸 때만 만든다 */
     readonly print: PrintController
+    /** 영역 분석(영역을 정하고 레이어를 골라 개수·면적·열별 집계). 레이어·interaction·클릭 리스너는 쓸 때만 붙인다 */
+    readonly areaAnalysis: AreaAnalysisController
 
     /** owned=false면 아무것도 안 함(경고) */
     mount(target: HTMLElement | string): void
@@ -90,7 +94,7 @@ export interface GisMap {
     flyTo(req: FlyToRequest): void
     /** EPSG:4326 범위로 맞춤. 기본 padding 60, maxZoom 18, duration 500 */
     fitLonLatExtent(extent: [number, number, number, number], opts?: { duration?: number; maxZoom?: number }): void
-    /** 그리기·측정·반경·필지 강조·플러그인 clear() 정리. GeoTIFF/나만의지도/바람길은 유지 */
+    /** 그리기·측정·반경·필지 강조·영역 분석·플러그인 clear() 정리. GeoTIFF/나만의지도/바람길은 유지 */
     clearAll(): void
     use<T extends GisMapPlugin>(plugin: T): T
     getPlugin<T extends GisMapPlugin>(name: string): T | null
@@ -125,6 +129,7 @@ class GisMapEngine implements GisMap {
     readonly parcel: ParcelHighlighter
     readonly region: RegionWatcher
     readonly print: PrintController
+    readonly areaAnalysis: AreaAnalysisController
 
     /** FE-3·FE-4 컨트롤러가 쓸 설정값 */
     protected readonly zIndex: Readonly<GisMapZIndex>
@@ -143,6 +148,7 @@ class GisMapEngine implements GisMap {
     private readonly parcelHighlighter: ParcelHighlighterImpl
     private readonly regionWatcher: RegionWatcherImpl
     private readonly printController: PrintControllerImpl
+    private readonly areaController: AreaAnalysisControllerImpl
     private destroyed = false
 
     constructor(olMap: OlMap, owned: boolean, options: GisMapAttachOptions) {
@@ -219,6 +225,12 @@ class GisMapEngine implements GisMap {
             vector: this.vector, raster: this.raster, region: this.region, legend: this.sources.legend,
         })
         this.print = this.printController
+        this.areaController = new AreaAnalysisControllerImpl({
+            olMap, resources: this.resources, tools: this.toolManager, layers: this.layers, areaQuery: this.sources.areaQuery,
+            isBasemap: layer => isBasemapLayer(layer, basemapModes), theme: this.theme,
+            zIndex: this.zIndex.tools, config: options.areaAnalysis,
+        })
+        this.areaAnalysis = this.areaController
     }
 
     mount(target: HTMLElement | string): void {
@@ -281,6 +293,7 @@ class GisMapEngine implements GisMap {
         })
         // 필지 강조(옛: 'clear' 구독자). GeoTIFF·나만의지도·바람길은 유지한다(옛 동작)
         this.parcelHighlighter.clear()
+        this.areaController.clear()
         this.events.emit('clear', undefined)
     }
 
@@ -324,6 +337,7 @@ class GisMapEngine implements GisMap {
         this.toolManager.destroy()
         this.layerController.destroy()
         this.printController.destroy()
+        this.areaController.destroy()
         this.regionWatcher.destroy()
         this.parcelHighlighter.destroy()
         this.vectorController.destroy()

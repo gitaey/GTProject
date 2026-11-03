@@ -668,6 +668,10 @@ DELETE FROM tbl_wind_scalar WHERE cycle_date < #{d} OR (cycle_date = #{d} AND cy
 | GET `/wfs?TYPENAMES=&BBOX=minx,miny,maxx,maxy,EPSG:xxxx&SRSNAME=` | VWorld WFS 2.0 GetFeature(`outputFormat=application/json`)로 전달 | GeoJSON |
 | GET `/region?lon=&lat=` | VWorld 주소 API(`getAddress`, `type=parcel`) 전달 | VWorld 원본 JSON. `response.result[0].text` 사용(번지는 프론트가 제거) |
 
+**영역 분석(`map.areaAnalysis`)을 쓰려면 (2026-11-02 추가):**
+- `/vworld/data`는 영역 질의(`geomFilter=POLYGON((경도 위도,…))&size=1000&page=N&geometry=true&attribute=true&crs=EPSG:4326&format=json`)도 받아야 한다. **열린 프록시로 두지 말 것** — `data` 레이어 이름 허용 목록(GTProject: `LP_PA_CBND_BUBUN`·`LP_PA_CBND_BONBUN`·`LT_C_SPBD`·`LT_C_UQ###`·`LT_C_AD(SIDO|SIGG|EMD|RI)_INFO`)·`size` ≤ 1000·허용 파라미터(service·version·request·format·size·page·crs·data·geomFilter·geometry·attribute)만 넘기고 `key`·`domain`은 서버가 붙인다. 거절은 400(본문은 VWorld 오류 모양 `response.status = ERROR`), 업스트림 연결 실패는 502, 업스트림 비-2xx는 그 상태 그대로(항상 200으로 감추지 않는다). 프론트는 전체 건수를 `response.record.total`(문자열)에서, 쪽 수를 `response.page.total`에서 읽고, 결과 없음은 `status: NOT_FOUND`로 본다.
+- **GeoServer는 프록시를 거치지 않는다** — 브라우저가 WFS 2.0(`DescribeFeatureType`·`resultType=hits`·`GetFeature` json, `cql_filter=INTERSECTS(<geom>, SRID=4326;POLYGON(…))`, `srsName=EPSG:3857`)을 직접 부르므로 그 서버가 **CORS를 허용**해야 한다(같은 출처 프록시 뒤에 두고 레이어 주소를 그쪽으로 해도 된다). 로그인 토큰은 보내지 않는다.
+
 ---
 
 ## 10. Repository 메서드 ↔ SQL 대조표

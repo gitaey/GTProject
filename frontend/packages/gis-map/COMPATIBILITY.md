@@ -77,6 +77,11 @@
 지도 합성은 `.ol-layers`(뷰포트 안 레이어 컨테이너, ol 6.x 이후 `renderer/Composite`가 `ol-layers` 클래스를 단다 — 설치된 9.2.4 소스에서 확인) 아래 모든 `canvas`의 `style.transform`(`matrix(a,b,c,d,e,f)`)·부모 `opacity`·`backgroundColor`를 읽는다.
 `.ol-layers`가 없으면 뷰포트 전체에서 canvas를 찾는다. **7.1.0·8.2.0·10.10.0 공식 full build에서 `.ol-layers` 존재와 합성 결과(위치·투명도)는 브라우저로 직접 확인하지 못했다** — 호스트가 쓰는 ol 버전에서 `gis.print.render()` 한 번으로 확인한다(위치가 어긋나거나 빈 지도면 이 항목).
 
+## 영역 분석(`map.areaAnalysis`) — 확인 항목
+
+새 ol API는 `proj.getTransform` 하나(공식 full build 7.1 이상에 있다 — 소스 확인). 원격 질의 응답은 `format.GeoJSON.readFeatures`(기존 목록)로 읽고, GeoServer 응답의 3857 → 4326 역변환은 어댑터가 닫힌 식으로 직접 한다(ol 아님).
+**ol 7.1·8.2·10.10 브라우저에서 영역 그리기 3종·강조 레이어·GeoJSON 내보내기(`decimals` 옵션)는 직접 확인하지 못했다** — 9.2.4에서도 가짜 DOM·가짜 fetch 시험만 했다. 호스트가 쓰는 ol 버전에서 `gis.areaAnalysis.setArea(…)` + `run()` + `exportResult(ref, 'geojson')` 한 번으로 확인한다.
+**호스트 서버 조건(코드가 아니라 환경):** VWorld Data API 프록시(`{proxyBaseUrl}/vworld/data`)와, GeoServer는 브라우저 직접 호출이라 **CORS 허용** — 이 둘은 실제 서버로 확인한 것이 GTProject(`geo.gitaey-dev.com`·`localhost:3000` 프록시)뿐이다. 다른 서버는 `02b_probe` 절차(좌표계 표기·축 순서·쪽 넘김)를 한 번 확인한다.
 ## 다른 버전을 시험하려면
 
 1. 그 버전의 공식 full build `ol.js`·`ol.css`를 받는다 — 7.1.0 이상은 npm `ol@<버전>`의 `dist/ol.js`·`ol.css`, 그 아래는 GitHub 릴리스 자산(`v<버전>-dist.zip` 등).

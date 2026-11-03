@@ -112,6 +112,7 @@ const MENU_CATALOG: CatalogArea[] = [
                     { id: 'map.tool.radius-search', label: '반경 검색' },
                     { id: 'map.tool.wind', label: '바람길' },
                     { id: 'map.tool.print', label: '출력' },
+                    { id: 'map.tool.area-analysis', label: '영역 분석' },
                     { id: 'map.tool.clear', label: '전체 초기화' },
                 ],
             },

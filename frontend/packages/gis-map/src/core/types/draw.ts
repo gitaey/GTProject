@@ -4,6 +4,8 @@ export type MapTool =
     | 'none' | 'select' | 'edit'
     | 'draw-point' | 'draw-line' | 'draw-polygon' | 'draw-circle' | 'draw-box' | 'draw-text'
     | 'measure-distance' | 'measure-area' | 'radius-search'
+    /** 영역 분석 영역 그리기(core/areaAnalysis) */
+    | 'analysis-polygon' | 'analysis-box' | 'analysis-circle'
 
 export interface DrawStyle {
     /** hex */

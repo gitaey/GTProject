@@ -19,6 +19,9 @@ export const DEFAULT_TOOL_HINTS: Readonly<ToolHints> = Object.freeze({
     'draw-text': '우클릭으로 그리기 종료',
     'select': '클릭해서 선택 · Shift+클릭으로 여러 개 선택',
     'edit': '클릭해서 선택 · 꼭지점 드래그로 수정',
+    'analysis-polygon': '클릭으로 꼭짓점 추가 · 더블클릭으로 마침 · 우클릭으로 취소',
+    'analysis-box': '클릭하고 움직인 뒤 다시 클릭 · 우클릭으로 취소',
+    'analysis-circle': '중심을 클릭하고 움직인 뒤 다시 클릭 · 우클릭으로 취소',
 })
 
 /** config.ui.toolHints → 도구별 문구. false면 전부 끔, 객체면 기본 문구 위에 덮어씀('' = 그 도구만 끔) */

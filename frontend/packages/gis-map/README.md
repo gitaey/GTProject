@@ -122,6 +122,43 @@ export default function MapPage() {
 엔진은 업무 지도의 target·View·기존 레이어를 건드리지 않는다. 버전별 결과는 **`COMPATIBILITY.md`**, 붙이기 규칙·좌표계 주의는 `examples/jsp/README.md` 6절.
 ES 모듈 ol만 쓰는 업무 화면(webpack·vite)은 attach UMD 대신 패키지 소스의 `attachGisMap`을 번들러로 쓴다.
 
+## 영역 분석 — 영역 안 개수·면적·열별 집계 (`map.areaAnalysis`)
+
+영역(다각형·사각형·원·현재 화면)을 정하고 분석할 레이어를 고르면 레이어마다 **개수 · 걸친 면적 합 · 영역으로 잘라낸 면적 합 · 선 길이 합 · 숫자 열 통계(합계·평균·최소·최대) · 범주 열별 집계표**를 계산한다.
+엔진 인스턴스의 `areaAnalysis` 컨트롤러(React 없음)가 기본이고, React 위젯 `AreaAnalysisPanel`(도구 모음 "영역 분석" 단추)은 그 위의 선택형 화면이다.
+**대상은 레이어 트리의 GeoServer(WFS)·VWorld(Data API) 레이어**다(나만의지도는 대상이 아니다). 서버가 "영역에 걸친 피처"만 걸러 주고(`sources.areaQuery`), 선택 기준·잘라낸 면적·집계는 브라우저가 한다.
+
+```js
+// React: MapShell 도구 모음에 "영역 분석" 단추가 기본으로 있다(showAreaAnalysis={false}로 끔, 메뉴 권한 'map.tool.area-analysis'로 숨김)
+
+// 직접 쓰기(React·UMD (a)·UMD (b) 공통): 엔진 인스턴스의 areaAnalysis
+const A = gis.areaAnalysis
+A.store.getState().layers                                  // 분석할 수 있는 레이어 목록(종류·켜짐·질의 가능·회색 사유). 트리가 올라오면 채워진다
+A.refreshLayers()                                          // 패널을 열 때처럼: 아직 모르는 레이어의 질의 가능 여부를 레이어당 1번 판정(캐시)
+A.setArea(sigungu4326)                                     // 경위도 GeoJSON Polygon(구멍·꼬인 선은 Error). 또는 startDrawing('polygon'|'box'|'circle') · useViewExtent()
+A.setPicked([{ kind: 'tree', layerId: 21 }])               // 분석할 레이어(쉼표로 묶인 VWorld 이름은 { kind:'tree', layerId, part:'lt_c_uq111' })
+A.setMode('intersects')                                    // 걸침(기본) · 'center' 중심점 · 'within' 완전히 안
+const [r] = await A.run()                                  // ①질의 가능·예상 건수 → ②사전 확인 → ③쪽으로 받기 → ④브라우저에서 계산. cancel()로 멈춤(요청도 끊는다)
+r.status                                                   // 'done' | 'partial'(일부만) | 'error' | 'cancelled'
+r.count; r.total; r.received; r.clipAreaM2; r.sumAreaM2; r.numeric; r.category   // 개수 · 서버가 센 전체 건수 · 집계한 건수 · 잘라낸 면적 · 걸친 면적 합 · 숫자 열 · 범주표
+A.setCategory(r.ref, 'jimok')                              // 범주 열 바꾸기(재질의 없이)
+A.answerConfirm('limit')                                   // 사전 확인(state.confirm이 있을 때): 'limit' 상한까지만 · 'skip-over' 넘는 레이어 빼기 · 'cancel'
+GisMap.saveBlob(A.exportResult(r.ref, 'csv'), 'result.csv')   // 'geojson'도. CSV는 UTF-8 BOM·수식 주입 방지. A.resultRecords(ref)는 결과 목록용 행
+A.clear()                                                  // 영역·결과·강조 지움(map.clearAll()도 함께 지운다)
+```
+
+- **질의 수단(`sources.areaQuery`)**: `describe(layer, part)`(질의 가능 여부·열 정보, 코어가 레이어당 1번만 부르고 캐시) · `count?(layer, part, ring4326)`(걸친 건수만, 가능할 때) · `query(layer, part, ring4326, page)`(걸친 피처 한 쪽 — GeoJSON 4326 경도·위도 순). `GisMap.adapters.proxy()`(`proxySources()`)가 VWorld·GeoServer용을 만든다. 없으면 레이어 목록이 비어 "분석할 수 있는 레이어가 없습니다"만 보인다.
+- **호스트가 갖춰야 할 것**: **VWorld** — `{proxyBaseUrl}/vworld/data` 프록시(키를 서버가 붙인다). 열린 프록시로 두지 말고 `data` 레이어 이름 허용 목록·`size` ≤ 1000·허용 파라미터만 넘기고, 업스트림 오류는 오류 상태로 돌려준다(GTProject 예: `app/proxy/vworld/data/route.ts`). VWorld 키는 도메인에 묶여 있어 이식처 도메인 키가 필요하다. **GeoServer** — 브라우저가 WFS를 **직접** 부르므로 그 서버가 **CORS**(`Access-Control-Allow-Origin`)를 허용해야 한다(같은 출처 프록시 뒤에 두고 레이어 주소를 그쪽으로 해도 된다). 우리 로그인 토큰은 GeoServer로 보내지 않는다(`http.fetchExternal` — 헤더·쿠키 없음, 401이어도 로그아웃하지 않는다).
+- **어떤 트리 레이어가 대상인가**: VWorld WMS(주소에 `vworld.kr`, 레이어 이름을 대문자로 올려 Data API 이름으로 쓴다 — 쉼표로 묶인 이름은 나눠서) · `sourceType === 'GEOSERVER'`인 WMS/WFS(WFS 주소는 레이어 WMS 주소의 `/wms`·`/ows` → `/wfs`, 안 되면 `host.endpoints.geoserverUrl + '/wfs'`; `DescribeFeatureType` 성공 = 발행됨). 그 밖(그림 레이어·다른 서버 WMS)은 목록에 회색 + 사유로 보이고 분석할 수 없다. 모르는 VWorld 이름은 첫 질의 결과로 판정하고(안 되면 회색, 캐시) 호스트가 `proxySources({ areaQuery: { vworldDataName: n => … } })`로 이름표를 덮어쓸 수 있다.
+- **GeoServer 실측 사항(2026-11-02)**: 영역 필터는 `cql_filter=INTERSECTS(<geom>, SRID=4326;POLYGON(…))` — EPSG 표기가 없으면 레이어 원본 좌표계(예: 5179)로 읽혀 0건이 된다. 결과는 `srsName=EPSG:3857`로 받아 4326으로 역변환한다(4326로 받으면 소수 4자리로 잘려 온다). 쪽 넘김은 `startIndex`+`count`+`sortBy`. 건수는 `resultType=hits`.
+- **VWorld 실측 사항**: 필수 `service=data&version=2.0&request=GetFeature`. 전체 건수는 `response.record.total`(`page.total`은 쪽 수), 쪽당 최대 1000, 결과 없음은 `status: NOT_FOUND`, 오류는 프록시가 200으로 줘도 본문 `status: ERROR` + `error.code`. 지목은 따로 없어 `jibun` 끝 글자("708 대" → 대)를 파생 열로 만들고, 단가 `jiga`는 합계를 숨긴다(평균·최소·최대만). 서버에 보내는 영역은 꼭짓점 200개까지(넘으면 볼록 껍질 → 범위 사각형으로 키워 보내고, 정확한 판정은 브라우저가 원래 영역으로 다시 한다).
+- **상한·확인(조용히 틀린 통계 금지)**: 원격 레이어당 최대 5,000건(`areaAnalysis.maxFeaturesPerLayer`)까지만 집계하고 넘으면 카드에 "전체 12,400건 중 5,000건만 집계"(상태 `partial`). 예상 건수(GeoServer hits·VWorld 1쪽 total)가 상한을 넘거나 영역이 25 ㎢(`areaWarnKm2`)를 넘으면 받기 전에 묻는다(`state.confirm` → `answerConfirm`). 레이어 단위 동시 요청 2개(`maxConcurrent`). 패널을 열기만 해서는 질의가 없고(레이어당 describe 1번만) **분석** 단추를 눌러야 서버에 간다.
+- 선택 기준: 걸침(서버 필터와 같음) · 중심점(피처 중심이 영역 안 — 경계에 걸친 피처가 한쪽에만 셈) · 완전히 안. 서버는 걸침 후보만 주므로 기준을 바꿔도 **다시 받지 않고** 받아 둔 피처로 다시 센다.
+- 면적: 걸친 면적 합 = 선택된 면 피처 **전체** 면적, 잘라낸 면적 = **영역 안쪽만**. 둘 다 `ol/sphere getArea`와 같은 구면 공식(측정 도구와 값이 맞는다). 영역이 오목해도(다각형) 정확하다.
+- 지도 강조: 선택된 피처를 별도 레이어(`theme.selection` 청록, 가리키는 피처 `active` 빨강)로 그린다 — 레이어당 5,000개까지(`areaAnalysis.highlightMax`). 레이어가 지도에서 꺼지면 그 강조를 빼고 카드에 "지도에서 꺼짐". 강조 레이어는 `className`을 따로 준다(OL이 같은 className 레이어를 한 캔버스에 겹쳐 그려, CORS 없는 레이어로 오염된 캔버스에 섞이지 않게). 결과 목록(React "목록" 단추): 행을 누르면 지도가 그 피처로 이동하고 빨간 강조.
+- 엔진 설정 `areaAnalysis`(`GisMapAreaAnalysisConfig`): `highlightMax`(5000)·`categoryTop`(범주표 값 수, 8)·`chunkMs`(12)·`maxFeaturesPerLayer`(5000)·`areaWarnKm2`(25)·`maxConcurrent`(2). 새 ol API: `proj.getTransform`(COMPATIBILITY.md).
+- 한계: 영역 꼭짓점 5,000개까지(꼬임 검사·삼각 분할이 O(n²)). 서버 필터는 경위도 직선, 브라우저 판정은 뷰 좌표계 직선이라 대각선 변에서 수십 cm 어긋날 수 있다(경계에 겨우 닿는 피처 누락 가능). 쪼갠 변이 경위도에서 곡선이라 같은 피처를 격자로 잘라 더한 값과 원래 면적이 ppm 단위로 다르다(ol getArea도 같은 성질).
+
 ## 지도 출력 — PNG · PDF · 인쇄 (`map.print`)
 
 지금 보이는 지도를 제목·범례·축척 막대·방위표·출력일·출처가 들어간 A4/A3 한 장으로 내보낸다. 엔진 인스턴스의 `print` 컨트롤러(React 없음)가 기본이고,

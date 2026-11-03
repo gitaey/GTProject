@@ -51,7 +51,7 @@
         <section id="tools">
             <button type="button" data-tool="draw-point">점</button><button type="button" data-tool="draw-line">선</button><button type="button" data-tool="draw-polygon">면</button><button type="button" data-tool="draw-circle">원</button><button type="button" data-tool="draw-box">사각형</button><button type="button" data-tool="draw-text">텍스트</button><button type="button" data-tool="select">선택</button><br>
             <button type="button" data-tool="measure-distance">거리측정</button><button type="button" data-tool="measure-area">면적측정</button><button type="button" data-tool="radius-search">반경</button><br>
-            <button type="button" id="btnClear">전체 지우기</button><button type="button" id="btnPrint">출력(인쇄 창)</button><button type="button" id="btnPng">PNG 저장</button>
+            <button type="button" id="btnClear">전체 지우기</button><button type="button" id="btnPrint">출력(인쇄 창)</button><button type="button" id="btnPng">PNG 저장</button><button type="button" id="btnAnalysis">영역 분석(현재 화면)</button>
             <div class="demo-note">그리기·측정은 더블클릭 또는 우클릭으로 끝낸다. 같은 단추를 다시 누르면 꺼진다.</div>
         </section>
 
@@ -133,7 +133,21 @@
         try {
             gis = GisMap.attach(hostMap, {
                 host: { keys: { vworld: VWORLD_KEY } },
-                sources: { layerTree: { loadTree: function () { return Promise.resolve(demoTree()); } } },
+                sources: {
+                    layerTree: { loadTree: function () { return Promise.resolve(demoTree()); } },
+                    // 영역 분석 예제용 가짜 질의 소스(메모리). 실제 페이지는 GisMap.adapters.proxy() — VWorld는 호스트 프록시, GeoServer는 WFS 직접(CORS 필요)
+                    areaQuery: {
+                        describe: function () { return Promise.resolve({ queryable: true }); },
+                        query: function () {
+                            var feats = [];
+                            for (var gy = 0; gy < 6; gy++) for (var gx = 0; gx < 8; gx++) {
+                                var x = 127.0270 + gx * 0.0003, y = 37.4975 + gy * 0.0003, s = 0.00027;
+                                feats.push({ type: 'Feature', id: 'demo.' + (gy * 8 + gx), properties: { 지목: ['대', '전', '답'][(gx + gy) % 3] }, geometry: { type: 'Polygon', coordinates: [[[x, y], [x + s, y], [x + s, y + s], [x, y + s], [x, y]]] } });
+                            }
+                            return Promise.resolve({ features: feats, total: feats.length, hasMore: false });
+                        }
+                    }
+                },
                 // 호스트 레이어 zIndex 체계(이 예제: 호스트 벡터 50)와 겹치지 않게 엔진 도구·강조 레이어를 위로
                 zIndex: { tools: 900, parcel: 950 }
             });
@@ -205,6 +219,17 @@
         if (!gis) return;
         gis.print.exportPng({ title: '붙이기 출력 예제' }).then(function (blob) { GisMap.saveBlob(blob, '출력.png'); })
             .catch(function (e) { alert(e.code === 'TAINTED' ? e.message : '출력 실패: ' + e.message); });
+    };
+
+    // 영역 분석(gis.areaAnalysis): 호스트 지도의 현재 화면을 영역으로, 트리의 연속지적도(VWorld WMS, VWORLD_KEY가 있을 때)를 분석한다.
+    // 호스트 레이어는 건드리지 않고 강조·영역 레이어만 붙였다 뗀다
+    document.getElementById('btnAnalysis').onclick = function () {
+        if (!gis) return;
+        var layer = gis.areaAnalysis.store.getState().layers.filter(function (l) { return l.ref.layerId === 21; })[0];
+        if (!layer) { log('영역 분석: 연속지적도(VWorld) 레이어는 VWORLD_KEY를 넣어야 트리에 있습니다'); return; }
+        gis.areaAnalysis.useViewExtent();
+        gis.areaAnalysis.setPicked([layer.ref]);
+        gis.areaAnalysis.run().then(function (rs) { console.log('영역 분석', rs[0].status, rs[0].count, '건', rs[0].clipAreaM2, '㎡'); });
     };
 
     attach();

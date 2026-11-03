@@ -4,7 +4,7 @@
 // FE-5b-2: 그리기 패널·반경 패널·활성 도구 연결을 DrawPanel.tsx·RadiusPanel.tsx·activeTool.ts로 떼어 냈다(본문 그대로)
 import { useState, useRef, useEffect } from 'react'
 import {
-    PenLine, Ruler, Trash2, Plus, Minus, SquareDashed, CircleDot, Wind, Printer,
+    PenLine, Ruler, Trash2, Plus, Minus, SquareDashed, CircleDot, Wind, Printer, ChartPie,
 } from 'lucide-react'
 import { useGisHost, useGisMap, useWindPlugin, useWindState } from '../../react'
 import type { WindState } from '../../core'
@@ -13,6 +13,7 @@ import { isDrawMode, isSelectMode, useActiveTool } from './activeTool'
 import DrawPanel from './DrawPanel'
 import RadiusPanel from './RadiusPanel'
 import PrintPanel from '../print/PrintPanel'
+import AreaAnalysisPanel from '../areaAnalysis/AreaAnalysisPanel'
 
 // ── 툴팁 ──────────────────────────────────────────────────────────────────────
 
@@ -51,9 +52,11 @@ const selectWindVisible = (s: WindState) => s.visible
 export interface MapToolbarProps {
     /** 출력(PNG·PDF·인쇄) 단추와 패널. 기본 true(메뉴 권한 map.tool.print도 통과해야 보인다) */
     showPrint?: boolean
+    /** 영역 분석(영역을 정하고 레이어별 개수·면적·열별 집계) 단추와 패널. 기본 true(메뉴 권한 map.tool.area-analysis도 통과해야 보인다) */
+    showAreaAnalysis?: boolean
 }
 
-export default function MapToolbar({ showPrint = true }: MapToolbarProps = {}) {
+export default function MapToolbar({ showPrint = true, showAreaAnalysis = true }: MapToolbarProps = {}) {
     // 바람길 토글은 엔진의 바람길 플러그인(설치: app/map/page.tsx의 setup)
     const wind = useWindPlugin()
     const windLayerVisible = useWindState(selectWindVisible)
@@ -66,25 +69,43 @@ export default function MapToolbar({ showPrint = true }: MapToolbarProps = {}) {
     const map = gis ? gis.olMap : null
     const [drawOpen, setDrawOpen] = useState(false)
     const [printOpen, setPrintOpen] = useState(false)
+    const [analysisOpen, setAnalysisOpen] = useState(false)
     const panelRef = useRef<HTMLDivElement>(null)
 
     const isAnyDraw = isDrawMode(activeTool) || isSelectMode(activeTool)
 
-    // 그리기·반경 패널과 출력 패널은 같은 자리(도구 모음 왼쪽)를 쓴다 → 하나를 열면 다른 하나를 닫는다
+    // 그리기·반경 패널, 출력 패널, 영역 분석 패널은 같은 자리(도구 모음 왼쪽)를 쓴다 → 하나를 열면 나머지를 닫는다
+    // (닫히는 영역 분석 패널은 언마운트되며 영역·결과·강조를 지운다). 반경 도구가 켜지면 출력·영역 분석 패널이 닫히고,
+    // 출력·영역 분석 패널을 열면 켜져 있던 반경 도구가 꺼진다
     function toggleDraw() {
         const next = !drawOpen
         setDrawOpen(next)
-        if (next) setPrintOpen(false)
+        if (next) {
+            setPrintOpen(false)
+            setAnalysisOpen(false)
+        }
     }
     function togglePrint() {
         const next = !printOpen
         setPrintOpen(next)
         if (!next) return
         setDrawOpen(false)
+        setAnalysisOpen(false)
+        if (activeTool === 'radius-search') setActiveTool('none')
+    }
+    function toggleAnalysis() {
+        const next = !analysisOpen
+        setAnalysisOpen(next)
+        if (!next) return
+        setDrawOpen(false)
+        setPrintOpen(false)
         if (activeTool === 'radius-search') setActiveTool('none')
     }
     useEffect(() => {
-        if (activeTool === 'radius-search') setPrintOpen(false)
+        if (activeTool === 'radius-search') {
+            setPrintOpen(false)
+            setAnalysisOpen(false)
+        }
     }, [activeTool])
 
     // loaded가 false(미로그인/미로드)면 전부 표시
@@ -96,6 +117,7 @@ export default function MapToolbar({ showPrint = true }: MapToolbarProps = {}) {
     const showRadius  = show('map.tool.radius-search')
     const showWind    = show('map.tool.wind')
     const showPrintBtn = showPrint && show('map.tool.print')
+    const showAnalysisBtn = showAreaAnalysis && show('map.tool.area-analysis')
     const showToolGrp = showDraw || showMeasD || showMeasA || showRadius
 
     function zoom(delta: number) {
@@ -171,6 +193,22 @@ export default function MapToolbar({ showPrint = true }: MapToolbarProps = {}) {
                             <RadiusPanel />
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* ── 영역 분석 ── */}
+            {showAnalysisBtn && (
+                <div className="gm-toolbar__group">
+                    <Tip label={analysisOpen ? '' : '영역 분석'}>
+                        <TBtn active={analysisOpen} onClick={toggleAnalysis} cls="gm-toolbar__btn--single">
+                            <ChartPie size={15} />
+                        </TBtn>
+                    </Tip>
+                </div>
+            )}
+            {showAnalysisBtn && analysisOpen && (
+                <div className="gm-toolbar__analysis-slot">
+                    <AreaAnalysisPanel onClose={() => setAnalysisOpen(false)} />
                 </div>
             )}
 

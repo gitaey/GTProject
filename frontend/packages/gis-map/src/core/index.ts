@@ -75,6 +75,18 @@ export { formatPrintDate } from './print/renderPage'
 export { minimalPdf } from './lib/minimalPdf'
 export { saveBlob } from './lib/saveBlob'
 
+// 영역 분석 — map.areaAnalysis. 순수 계산(판정·잘라낸 면적·집계·CSV)도 공개(호스트가 자기 화면을 만들 때)
+export { DEFAULT_AREA_ANALYSIS, refKey as areaRefKey, sameRef as areaSameRef } from './areaAnalysis/types'
+export type {
+    AreaAnalysisController, AreaAnalysisState, AreaAnalysisArea, AreaAnalysisLayerRef, AreaAnalysisLayerItem, AreaAnalysisColumn, LayerAnalysisResult,
+    NumericColumnStats, CategoryResult, CategoryRow, AreaShape, AreaDrawShape, AreaSelectMode, AreaWarningCode, GisMapAreaAnalysisConfig,
+    AreaConfirm, AreaConfirmChoice, AreaResultRecord,
+} from './areaAnalysis/types'
+export { INITIAL_AREA_ANALYSIS_STATE } from './areaAnalysis/AreaAnalysisController'
+export { signedSphericalAreaM2, polygonAreaM2, clipPolygonAreaM2, lineLengthM, EARTH_RADIUS_M } from './areaAnalysis/clip'
+export { buildAreaModel, selectParts, geomParts, MAX_AREA_VERTICES } from './areaAnalysis/spatial'
+export { buildCsv, csvCell } from './areaAnalysis/exportResult'
+
 // 설정
 export { DEFAULT_VIEW, DEFAULT_THEME, DEFAULT_ZINDEX, resolveView, resolveTheme, resolveZIndex } from './config'
 export type {
@@ -89,13 +101,13 @@ export { createHttpClient, GisHttpError } from './http'
 export type { HttpClient } from './http'
 
 // 데이터 소스
-export { resolveSources } from './sources'
+export { resolveSources, AreaQueryUnsupportedError } from './sources'
 export type {
     GisMapSources, GisMapSourcesInput, GisMapSourcesFactory, SourceContext,
     LayerTreeSource, LayerUserSelectionSource, MyMapSource, GeoTiffSource, WindSource,
     AddressSearchSource, ParcelSource, RegionNameSource, LegendSource, WfsSource,
     ShareUser, ShareGroup, ShareDirectorySource, ShareEntryState, ShareSnapshot, ShareChange, BulkShareMode, BulkShareResult,
-    ShareTargetSource,
+    ShareTargetSource, AreaQuerySource, AreaQueryLayerInfo, AreaQueryPage,
 } from './sources'
 
 // 상태 저장소 / 이벤트

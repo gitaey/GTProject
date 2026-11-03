@@ -10,6 +10,7 @@ import type {
     MyMapImportReport, MyMapImportReportQuery, MyMapQuota, MyMapSampleKind, MyMapUpdateInput, ShpUploadInput, UserMapListItem, UserMapShare, UserMapStatus,
 } from './types/mymap'
 import type { AddressSearchItem, VWorldLegendItem } from './types/search'
+import type { AreaAnalysisColumn } from './areaAnalysis/types'
 import type { WindField, WindFrameMeta, WindScalarField } from './types/wind'
 
 export interface LayerUserSelectionSource {
@@ -160,6 +161,45 @@ export interface WfsSource {
     getFeatureUrl(typeName: string, extent: number[], srsCode: string): string
 }
 
+// ── 영역 분석(원격 질의): GeoServer WFS·VWorld Data API 등 "영역에 걸친 피처"를 서버가 걸러 주는 소스 ──
+export interface AreaQueryLayerInfo {
+    /** false = 질의 못 함(사유는 reason). 'unknown' = 아직 모름(첫 질의 결과로 판정) */
+    queryable: boolean | 'unknown'
+    /** queryable=false 사유(화면에 그대로) */
+    reason?: string
+    /** 알려진 열(화면 이름·합계 숨김·파생 열). 없으면 받은 피처의 속성 이름을 그대로 쓴다 */
+    columns?: AreaAnalysisColumn[]
+    /** 범주표 기본 열(없으면 코어가 값 분포로 고른다) */
+    defaultCategory?: string | null
+    /** `count`로 걸친 건수를 미리 알 수 있나(GeoServer hits). false면 1쪽 응답의 total을 쓴다 */
+    supportsCount?: boolean
+}
+
+export interface AreaQueryPage {
+    /** GeoJSON Feature(EPSG:4326, 경도·위도 순) */
+    features: GeoJsonObject[]
+    /** 영역에 걸친 전체 건수(알면) */
+    total: number | null
+    hasMore: boolean
+}
+
+/** 이 레이어는 질의할 수 없다(Data API에 없음·허용 목록 밖 등) — 코어가 그 레이어를 회색으로 바꾸고 캐시한다 */
+export class AreaQueryUnsupportedError extends Error {
+    constructor(message: string) {
+        super(message)
+        this.name = 'AreaQueryUnsupportedError'
+    }
+}
+
+export interface AreaQuerySource {
+    /** 이 트리 레이어(쉼표로 묶인 VWorld 이름이면 part)를 질의할 수 있나. 코어가 캐시한다(레이어당 1번) */
+    describe(layer: LayerDef, part: string | undefined, signal?: AbortSignal): Promise<AreaQueryLayerInfo>
+    /** 영역(바깥 링 하나, EPSG:4326 [경도, 위도])에 걸친 건수만(가능할 때). 못 하면 null */
+    count?(layer: LayerDef, part: string | undefined, ring4326: number[][], signal?: AbortSignal): Promise<number | null>
+    /** 영역에 걸친 피처 한 쪽(page는 1부터, 쪽 크기는 어댑터가 정한다). 안 되는 레이어면 `AreaQueryUnsupportedError` */
+    query(layer: LayerDef, part: string | undefined, ring4326: number[][], page: number, signal?: AbortSignal): Promise<AreaQueryPage>
+}
+
 export interface GisMapSources {
     layerTree?: LayerTreeSource
     myMap?: MyMapSource
@@ -170,6 +210,8 @@ export interface GisMapSources {
     regionName?: RegionNameSource
     legend?: LegendSource
     wfs?: WfsSource
+    /** 영역 분석(원격 질의). 없으면 영역 분석 패널은 "분석할 수 있는 레이어가 없습니다"만 보인다 */
+    areaQuery?: AreaQuerySource
     /** 공유 상대 검색·그룹 목록(자원 공통). 없으면 공유 화면이 아이디·코드 직접 입력 */
     shareDirectory?: ShareDirectorySource
 }

@@ -4160,6 +4160,23 @@
     white-space: nowrap;
 }
 
+/* 정렬 단추가 없는 표(영역 분석 결과 목록): 속성 테이블은 th 여백 0 + 정렬 단추(5px 8px)라서, 단추가 없으면 머리글이 칸보다 왼쪽·오른쪽 끝에 붙는다 */
+.gm-table-dialog__table--plain th {
+    padding: 6px 8px;
+}
+
+/* 표 양끝에 숨 쉴 여백: 마지막 열이 모달 가장자리에 붙어 보이지 않게 한다(첫 열 # 은 왼쪽 여백) */
+/* 선택자를 한 단계 높여(.gm-table-dialog__table 겹침) 뒤에 나오는 th/td.gm-table-dialog__rowno 의 padding 보다 앞서게 한다 */
+.gm-table-dialog__table.gm-table-dialog__table--plain th:last-child,
+.gm-table-dialog__table.gm-table-dialog__table--plain td:last-child {
+    padding-right: 20px;
+}
+
+.gm-table-dialog__table.gm-table-dialog__table--plain th:first-child,
+.gm-table-dialog__table.gm-table-dialog__table--plain td:first-child {
+    padding-left: 16px;
+}
+
 .gm-table-dialog__table td {
     max-width: 260px;
     padding: 4px 8px;
@@ -4805,6 +4822,622 @@
     }
 
     .gm-print-panel {
+        width: 100%;
+        max-height: 70vh;
+        border-radius: var(--gm-radius-xl) var(--gm-radius-xl) 0 0;
+    }
+}
+
+/* ── 영역 분석 패널 (ui/areaAnalysis/*) — 도구 모음 왼쪽에 붙는 떠 있는 카드(비모달: 지도는 계속 움직인다). 출력 패널과 같은 자리 ── */
+.gm-toolbar__analysis-slot {
+    position: absolute;
+    right: calc(var(--gm-spacing) * 11);
+    top: 0;
+    z-index: 50;
+}
+
+.gm-analysis {
+    display: flex;
+    flex-direction: column;
+    width: 320px;
+    max-height: calc(100vh - 140px);
+    overflow: hidden;
+    background-color: var(--gm-color-white);
+    border-radius: var(--gm-radius-xl);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, .2);
+    font-size: 12px;
+    color: var(--gm-color-gray-700);
+}
+
+/* 접힘: 헤더만 남겨 지도를 가리지 않는다(body는 hidden 속성 — display:flex가 UA [hidden]을 덮으므로 다시 숨김) */
+.gm-analysis[hidden],
+.gm-analysis [hidden] {
+    display: none;
+}
+
+.gm-analysis.gm-is-collapsed {
+    width: 190px;
+}
+
+.gm-analysis__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-bottom: 2px solid var(--gm-primary);
+    flex: none;
+}
+
+.gm-analysis__title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gm-primary);
+}
+
+.gm-analysis__head-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.gm-analysis__icon-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--gm-color-gray-400);
+}
+
+.gm-analysis__body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* 본문은 스크롤 영역이다 — 자식(특히 overflow:hidden인 결과 카드)이 flex 기본값(shrink 1)으로 눌려 내용이 잘리지 않게 한다.
+   카드가 여러 개(레이어 6개 등)가 되면 눌려서 머리줄만 보이던 결함 */
+.gm-analysis__body > * {
+    flex-shrink: 0;
+}
+
+.gm-analysis__sec {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gm-color-gray-700);
+}
+
+.gm-analysis__sec em {
+    font-style: normal;
+    font-weight: 400;
+    font-size: 10.5px;
+    color: var(--gm-color-gray-400);
+}
+
+.gm-analysis__shapes {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+}
+
+.gm-analysis__shape {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 6px 0 5px;
+    border: 1px solid var(--gm-color-gray-200);
+    border-radius: 6px;
+    background-color: var(--gm-color-white);
+    font-size: 10.5px;
+    color: var(--gm-color-gray-600, #4b5563);
+    cursor: pointer;
+}
+
+.gm-analysis__shape.gm-is-active {
+    border-color: var(--gm-primary);
+    background-color: rgba(var(--gm-primary-rgb), .06);
+    color: var(--gm-primary);
+    font-weight: 700;
+}
+
+.gm-analysis__shape:disabled {
+    cursor: not-allowed;
+    opacity: .5;
+}
+
+.gm-analysis__areainfo {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    font-size: 10.5px;
+    color: var(--gm-color-gray-500);
+}
+
+.gm-analysis__areainfo b {
+    color: #111827;
+}
+
+.gm-analysis__note,
+.gm-analysis__fine {
+    margin: 4px 0 0;
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: var(--gm-color-gray-400);
+}
+
+.gm-analysis__error {
+    margin-top: 4px;
+    padding: 6px 8px;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    background-color: #fef2f2;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #b91c1c;
+}
+
+.gm-analysis__warn {
+    display: flex;
+    gap: 6px;
+    padding: 6px 8px;
+    border: 1px solid #fcd34d;
+    border-radius: 6px;
+    background-color: #fffbeb;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #92400e;
+}
+
+.gm-analysis__warn svg {
+    flex: none;
+    margin-top: 2px;
+}
+
+/* 레이어 목록 */
+/* 레이어가 많으면 이 상자 안에서 스크롤(페이지 넘김 아님). 뒤에 있던 `overflow: hidden`이 overflow-y: auto 를 덮어써 스크롤이 안 되던 결함 —
+   가로만 자르고 세로는 스크롤로 둔다. 스크롤이 끝에 닿아도 바깥(패널 본문)이 같이 움직이지 않게 한다 */
+.gm-analysis__layers {
+    max-height: 220px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--gm-color-gray-200);
+    border-radius: 8px;
+}
+
+.gm-analysis__layer {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 8px;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 11.5px;
+}
+
+.gm-analysis__layer:last-child {
+    border-bottom: 0;
+}
+
+.gm-analysis__layer.gm-is-disabled {
+    background-color: #fafafa;
+    color: #9ca3af;
+}
+
+.gm-analysis__layer-label {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.gm-analysis__layer-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #111827;
+}
+
+.gm-analysis__layer.gm-is-disabled .gm-analysis__layer-name {
+    color: #9ca3af;
+}
+
+.gm-analysis__badge {
+    flex: none;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background-color: var(--gm-primary);
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.gm-analysis__badge--geoserver {
+    background-color: #2563eb;
+}
+
+.gm-analysis__badge--vworld {
+    background-color: #059669;
+}
+
+.gm-analysis__badge--none {
+    background-color: #cbd5e1;
+}
+
+.gm-analysis__why,
+.gm-analysis__count {
+    flex: none;
+    font-size: 10px;
+    color: #9ca3af;
+    white-space: nowrap;
+}
+
+.gm-analysis__dot {
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: #16a34a;
+}
+
+.gm-analysis__dot.gm-is-off {
+    border: 1.5px solid #d1d5db;
+    background-color: transparent;
+}
+
+/* 선택 기준 */
+.gm-analysis__seg {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border: 1px solid var(--gm-color-gray-200);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.gm-analysis__seg-btn {
+    padding: 5px 0;
+    border: 0;
+    border-right: 1px solid var(--gm-color-gray-200);
+    background-color: var(--gm-color-white);
+    font-size: 11px;
+    color: var(--gm-color-gray-700);
+    cursor: pointer;
+}
+
+.gm-analysis__seg-btn:last-child {
+    border-right: 0;
+}
+
+.gm-analysis__seg-btn.gm-is-active {
+    background-color: var(--gm-primary);
+    font-weight: 700;
+    color: #fff;
+}
+
+/* 단추 */
+.gm-analysis__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 8px 0;
+    border: 1px solid var(--gm-color-gray-200);
+    border-radius: 6px;
+    background-color: var(--gm-color-white);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gm-color-gray-700);
+    cursor: pointer;
+}
+
+.gm-analysis__btn--primary {
+    border-color: var(--gm-primary);
+    background-color: var(--gm-primary);
+    color: #fff;
+}
+
+.gm-analysis__btn--sm {
+    flex: none;
+    padding: 4px 8px;
+    font-size: 11px;
+}
+
+.gm-analysis__btn:disabled {
+    border-color: #eceef1;
+    background-color: var(--gm-color-gray-100);
+    color: #c0c4cc;
+    cursor: not-allowed;
+}
+
+/* 결과 카드 */
+.gm-analysis__card {
+    border: 1px solid var(--gm-color-gray-200);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.gm-analysis__card-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 9px;
+    border-bottom: 1px solid #f3f4f6;
+    background-color: #fafafa;
+    font-size: 11.5px;
+}
+
+.gm-analysis__card-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 700;
+    color: #111827;
+}
+
+.gm-analysis__status {
+    flex: none;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.gm-analysis__status--ok {
+    background-color: #dcfce7;
+    color: #15803d;
+}
+
+.gm-analysis__status--part {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.gm-analysis__status--run {
+    background-color: #ffedd5;
+    color: var(--gm-primary);
+}
+
+.gm-analysis__status--err {
+    background-color: #fee2e2;
+    color: #b91c1c;
+}
+
+.gm-analysis__status--cx {
+    background-color: #f3f4f6;
+    color: #6b7280;
+}
+
+.gm-analysis__card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 11px;
+}
+
+/* 하단 단추 줄: 머리줄과 짝이 되는 연한 바탕, 단추는 같은 폭으로 나눈다 */
+.gm-analysis__card-foot {
+    display: flex;
+    gap: 6px;
+    padding: 8px 11px;
+    border-top: 1px solid #f3f4f6;
+    background-color: #fafafa;
+}
+
+.gm-analysis__card-foot .gm-analysis__btn--sm {
+    flex: 1;
+    padding: 6px 0;
+}
+
+.gm-analysis__progress {
+    height: 6px;
+    border-radius: 3px;
+    background-color: #f3f4f6;
+    overflow: hidden;
+}
+
+.gm-analysis__progress i {
+    display: block;
+    height: 100%;
+    background-color: var(--gm-primary);
+}
+
+/* 요약 줄: 왼쪽 건수(종류 표시 + 큰 숫자), 오른쪽 범주 열 선택 */
+.gm-analysis__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.gm-analysis__kv {
+    display: flex;
+    gap: 6px;
+}
+
+.gm-analysis__kv-item {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+/* 종류 표시(면·선·점): 작은 알약 */
+.gm-analysis__kv-k {
+    padding: 1px 7px;
+    border-radius: 999px;
+    background-color: #ecfeff;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #0e7490;
+}
+
+.gm-analysis__kv-v {
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1.1;
+    color: #111827;
+}
+
+.gm-analysis__kv-item.gm-is-main .gm-analysis__kv-v {
+    color: #0891b2;
+}
+
+.gm-analysis__kv-v small {
+    margin-left: 2px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #6b7280;
+}
+
+.gm-analysis__cat-select {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    font-size: 10.5px;
+    color: #6b7280;
+}
+
+.gm-analysis__cat-select select {
+    min-width: 0;
+    max-width: 150px;
+    padding: 3px 6px;
+    border: 1px solid var(--gm-color-gray-200);
+    border-radius: 5px;
+    background-color: var(--gm-color-white);
+    font-size: 11px;
+    color: #111827;
+}
+
+.gm-analysis__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.gm-analysis__table th {
+    padding: 4px 5px;
+    border-bottom: 1px solid var(--gm-color-gray-200);
+    font-size: 10px;
+    font-weight: 600;
+    text-align: right;
+    white-space: nowrap;
+    color: #6b7280;
+}
+
+.gm-analysis__table td {
+    padding: 5px;
+    border-bottom: 1px solid #f3f4f6;
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    color: #111827;
+}
+
+/* 이름 칸은 남는 폭을 다 쓰고(길면 …), 숫자 칸은 내용 폭 */
+.gm-analysis__table th:first-child,
+.gm-analysis__table td:first-child {
+    width: 100%;
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+}
+
+.gm-analysis__table td.gm-is-dim {
+    color: #cbd5e1;
+}
+
+.gm-analysis__table tr.gm-is-other td,
+.gm-analysis__table tr.gm-is-blank td {
+    color: #6b7280;
+}
+
+.gm-analysis__table tr.gm-is-sum td {
+    border-top: 1px solid var(--gm-color-gray-200);
+    border-bottom: 0;
+    background-color: #f8fafc;
+    font-weight: 700;
+}
+
+.gm-analysis__table td.gm-analysis__bar {
+    width: 34px;
+    min-width: 34px;
+    padding-right: 0;
+}
+
+.gm-analysis__bar i {
+    display: block;
+    height: 7px;
+    border-radius: 3px;
+    background-color: #0891b2;
+    opacity: .7;
+}
+
+.gm-analysis__table tr.gm-is-other .gm-analysis__bar i,
+.gm-analysis__table tr.gm-is-blank .gm-analysis__bar i {
+    background-color: #cbd5e1;
+}
+
+/* 사전 확인(패널 안 — 브라우저 대화상자를 쓰지 않는다) */
+.gm-analysis__confirm {
+    padding: 8px 9px;
+    border: 1px solid #fcd34d;
+    border-radius: 8px;
+    background-color: #fffbeb;
+}
+
+.gm-analysis__confirm-title {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 4px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #92400e;
+}
+
+.gm-analysis__confirm-line {
+    margin: 0 0 4px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #92400e;
+}
+
+.gm-analysis__confirm-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 6px;
+}
+
+/* 모바일(768px 미만): 아래 시트 */
+@media (max-width: 47.99rem) {
+    .gm-toolbar__analysis-slot {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: auto;
+    }
+
+    .gm-analysis {
         width: 100%;
         max-height: 70vh;
         border-radius: var(--gm-radius-xl) var(--gm-radius-xl) 0 0;
