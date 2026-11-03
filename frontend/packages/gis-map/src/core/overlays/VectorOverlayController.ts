@@ -5,10 +5,15 @@
 //   - 3단계: 레이어마다 스타일(styleConfig v1) — 서버에 저장된 값(saved)과 대화상자가 보여 주는 미리보기(preview)를 따로 들고,
 //     스타일만 바뀌면 GeoJSON을 다시 받지 않고 layer.setStyle만 한다. 라벨은 같은 VectorSource를 쓰는 별도 레이어(declutter·minZoom).
 //     클릭 팝업은 MyMapPopup(코어 DOM). 스타일 설정이 없거나 깨졌으면 옛 고정 스타일(myMapStyle) 그대로
+//   - 큰 레이어(10만 피처): GeoJSON → 피처 변환을 시간을 나눠 하고(runChunked, 취소 가능, 진행률 loadProgress),
+//     화면 안 피처가 많으면 본 레이어는 그대로 두고 숨긴 채 격자 묶음 레이어(myMapCluster)를 덧붙인다(moveend마다 다시 판단, 누르면 확대)
 import type OlMap from 'ol/Map'
 import type Feature from 'ol/Feature'
 import type Geometry from 'ol/geom/Geometry'
 import type { Pixel } from 'ol/pixel'
+import type { Extent } from 'ol/extent'
+import type MapBrowserEvent from 'ol/MapBrowserEvent'
+import { transformExtent } from 'ol/proj'
 import VectorLayer from 'ol/layer/Vector'
 import VectorSource from 'ol/source/Vector'
 import GeoJSON from 'ol/format/GeoJSON'
@@ -19,28 +24,39 @@ import type { ReadableStore, WritableStore } from '../store'
 import type { MapResources } from '../tracker'
 import type { ToolManager } from '../tools/ToolManager'
 import type { MyMapColumnInfo, MyMapQuota, MyMapStyleConfig, MyMapUpdateInput, UserMapListItem, UserMapStatus } from '../types/mymap'
-import { createLegacyMyMapStyle, createMyMapAnchors, createMyMapLabelStyle, createMyMapStyle } from '../lib/mymapStyle'
+import { createLegacyMyMapStyle, createMyMapAnchors, createMyMapClusterStyle, createMyMapLabelStyle, createMyMapStyle } from '../lib/mymapStyle'
 import type { MyMapAnchors } from '../lib/mymapStyle'
 import {
-    categoryCounts, defaultMyMapStyle, displayText, effectiveLabelMinZoom, numericValues, parseMyMapStyle, popupFieldsFor,
+    categoryCounts, defaultMyMapStyle, displayText, effectiveLabelMinZoom, makeClassColorFn, numericValues, parseMyMapStyle, popupFieldsFor,
     serializeMyMapStyle, summarizeColumns,
 } from '../lib/mymapStyleConfig'
+import { defaultNow, defaultYield, runChunked } from '../lib/runner'
 import type { CategoryCounts } from '../lib/mymapStyleConfig'
 import { CatalogBase } from './catalog'
 import type { Catalog, CatalogState } from './catalog'
 import { MyMapPopup } from './MyMapPopup'
 import type { MyMapPopupContent } from './MyMapPopup'
+import {
+    CLUSTER_OFF_RATIO, MyMapClusterView, emptyKindCounts, geomKindOf, isClusterable, resolveLoadChunkMs, resolveMyMapCluster, viewCountExceeds,
+} from './myMapCluster'
+import type { ClusterScale, GisMapMyMapConfig, KindCounts, ResolvedMyMapClusterConfig } from './myMapCluster'
 
 export interface VectorOverlayState {
     /** 표시하기로 한 나만의지도 id(체크 상태). 불러오는 중인 것도 포함 */
     visibleIds: readonly number[]
-    /** GeoJSON을 받는 중인 id */
+    /** GeoJSON을 받는 중인 id(받기 + 피처 변환 단계) */
     loadingIds: readonly number[]
+    /** 피처 변환 단계의 진행률(id → 0..1). 받는 동안(서버 응답을 기다리는 동안)에는 없다 */
+    loadProgress: Readonly<Record<number, number>>
+    /** 지금 묶음(원 + 숫자)으로 그리는 id. 이때 본 레이어(getOlLayer)는 숨겨져 있다 */
+    clusteredIds: readonly number[]
 }
 
 export const EMPTY_VECTOR_OVERLAY_STATE: Readonly<VectorOverlayState> = Object.freeze({
     visibleIds: Object.freeze([]) as readonly number[],
     loadingIds: Object.freeze([]) as readonly number[],
+    loadProgress: Object.freeze({}) as Readonly<Record<number, number>>,
+    clusteredIds: Object.freeze([]) as readonly number[],
 })
 
 export interface MyMapCatalogState extends CatalogState<UserMapListItem> {
@@ -84,7 +100,17 @@ export interface VectorOverlayController {
     zoomTo(id: number, opts?: { color?: string }): Promise<void>
     /** 체크 상태(받는 중 포함) */
     isVisible(id: number): boolean
+    /**
+     * 본 레이어. 묶음 모드(displayMode 'cluster')에서는 숨겨져 있다(getVisible() false) — 레이어 자체는 그대로고 소스·스타일도 그대로.
+     * 호스트가 가시성을 읽어 쓰면 displayMode를 함께 본다
+     */
     getOlLayer(id: number): VectorLayer<Feature<Geometry>> | null
+    /** 지금 이 레이어를 어떻게 그리는가: 'shape' 원래 모양 / 'cluster' 묶음(원 + 숫자) / null 지도에 없음 */
+    displayMode(id: number): 'shape' | 'cluster' | null
+    /** 불러온 피처를 서버 응답 순서 그대로(속성 표 행 번호와 같다). 지도에 없으면 null. 호출한 쪽은 바꾸지 않는다 */
+    featuresInOrder(id: number): readonly Feature<Geometry>[] | null
+    /** 피처 범위(EPSG:4326 [minLon, minLat, maxLon, maxLat]). 모양이 없거나 좌표가 깨졌으면 null */
+    featureLonLatExtent(feature: Feature<Geometry>): [number, number, number, number] | null
     /** 목록(openCatalog)에서 본 레이어 이름. 모르면 null — 출력 범례가 쓴다 */
     nameOf(id: number): string | null
     /** 목록 하나를 연다(패널 한 번 열림). autoLoad 기본 true. 엔진 destroy 때 열린 목록도 전부 dispose */
@@ -126,6 +152,8 @@ export interface VectorOverlayControllerOptions {
     defaultColor: string
     /** 도구(그리기·측정 등)가 켜져 있으면 클릭 팝업을 띄우지 않는다. 없으면 항상 허용 */
     tools?: ToolManager
+    /** 나눠 불러오기·묶음 설정(config.myMap). 없으면 기본값 */
+    config?: GisMapMyMapConfig
 }
 
 /** 옛 styleFor 그대로: 채우기는 색 + 알파 '33', 선 2px, 점은 반지름 5 + 흰 테두리 */
@@ -139,6 +167,15 @@ export function myMapStyle(color: string): Style {
 
 /** 라벨 레이어가 본 레이어보다 위에 그려지도록 zIndex에 더하는 값 */
 const LABEL_Z_OFFSET = 0.1
+/** 묶음 레이어가 본 레이어보다 위·라벨 레이어보다 아래에 오도록 zIndex에 더하는 값 */
+const CLUSTER_Z_OFFSET = 0.05
+/** 묶음 레이어 className — OL은 className이 같은 레이어를 한 캔버스에 겹쳐 그린다. 패널 CSS(gm-*)와 겹치지 않도록 gm-hl- 접두사 */
+const CLUSTER_CLASS_NAME = 'ol-layer gm-hl-mymap-cluster'
+/** 피처 변환 중 VectorSource에 한 번에 넣는 개수(rbush 적재를 나눠 한 덩어리 멈춤을 없앤다) */
+const SOURCE_BATCH = 1000
+/** 묶음 원을 눌러 확대할 때 여백(px)·시간(ms) */
+const CLUSTER_FIT_PADDING = 60
+const CLUSTER_FIT_MS = 300
 /** 팝업 값 최대 글자 수 */
 const POPUP_VALUE_MAX = 200
 /** 클릭 판정 여유(px) — 가는 선·작은 점도 잡히게 */
@@ -239,6 +276,14 @@ interface LayerEntry {
     geometryName: string
     anchors: MyMapAnchors
     columns: MyMapColumnInfo[] | null
+    /** 서버 응답 순서 그대로의 피처(속성 표 행 번호·묶음 격자의 피처 번호) */
+    features: Array<Feature<Geometry>>
+    /** 점·면·그 밖 개수(묶을 수 있는 레이어인지 판단) */
+    kinds: KindCounts
+    /** 묶음 레이어(처음 묶을 때 만든다) */
+    cluster: MyMapClusterView | null
+    /** 지금 묶음으로 그리는가(본 레이어 숨김) */
+    clustered: boolean
     /** 본 레이어를 지도에 올렸는가(show 도중에는 false — 그때 만든 라벨 레이어는 show가 함께 올린다) */
     mounted: boolean
 }
@@ -262,10 +307,17 @@ export class VectorOverlayControllerImpl implements VectorOverlayController {
     private popupEnabled = true
     private popupLayerId: number | null = null
     private destroyed = false
+    /** 묶음 설정(null = 끔) · 피처 변환 한 번의 시간 */
+    private readonly clusterCfg: ResolvedMyMapClusterConfig | null
+    private readonly chunkMs: number
+    /** moveend·singleclick 리스너 해제(엔진이 붙인 것은 엔진이 뗀다) */
+    private unlisten: (() => void) | null = null
 
     constructor(opts: VectorOverlayControllerOptions) {
         this.opts = opts
-        this.state = createStore<VectorOverlayState>({ visibleIds: [], loadingIds: [] })
+        this.clusterCfg = resolveMyMapCluster(opts.config)
+        this.chunkMs = resolveLoadChunkMs(opts.config)
+        this.state = createStore<VectorOverlayState>({ visibleIds: [], loadingIds: [], loadProgress: {}, clusteredIds: [] })
         this.store = this.state
     }
 
@@ -292,19 +344,18 @@ export class VectorOverlayControllerImpl implements VectorOverlayController {
             try {
                 const geojson = await source.geojson(id)
                 if (!isCurrent()) return
-                const features = new GeoJSON().readFeatures(geojson, {
-                    dataProjection: 'EPSG:4326',
-                    featureProjection: this.opts.olMap.getView().getProjection(),
-                })
+                const read = await this.readLayer(geojson, () => !isCurrent(), fraction => this.setProgress(id, fraction))
+                if (!read || !isCurrent()) return
+                const { features } = read
                 const layer = new VectorLayer<Feature<Geometry>>({
-                    source: new VectorSource({ features }),
+                    source: read.source,
                     zIndex: this.opts.zIndex,
                 })
                 const entry: LayerEntry = {
                     layer, labelLayer: null, baseColor: opts?.color ?? this.opts.defaultColor, featureCount: features.length,
                     geometryName: features.length > 0 ? features[0].getGeometryName() : 'geometry',
                     anchors: createMyMapAnchors(),
-                    columns: null, mounted: false,
+                    columns: null, features, kinds: read.kinds, cluster: null, clustered: false, mounted: false,
                 }
                 this.entries.set(id, entry)
                 // 스타일을 먼저 정한 뒤 지도에 올린다(기본 파랑 스타일이 한 프레임 보이지 않게)
@@ -313,7 +364,9 @@ export class VectorOverlayControllerImpl implements VectorOverlayController {
                 entry.mounted = true
                 if (entry.labelLayer) this.opts.resources.addLayer(entry.labelLayer)
                 this.ensurePopup()
+                this.ensureMapListeners()
                 loaded = true
+                this.evaluateCluster(id)
             } catch {
                 // 옛 코드: !res.ok면 조용히 끝(레이어 없음)
             } finally {
@@ -322,6 +375,7 @@ export class VectorOverlayControllerImpl implements VectorOverlayController {
                     const cur = this.state.getState()
                     this.state.setState({
                         loadingIds: cur.loadingIds.filter(x => x !== id),
+                        loadProgress: withoutKey(cur.loadProgress, id),
                         // 받지 못했으면 체크도 되돌린다(체크 = 지도)
                         visibleIds: loaded ? cur.visibleIds : cur.visibleIds.filter(x => x !== id),
                     })
@@ -347,8 +401,10 @@ export class VectorOverlayControllerImpl implements VectorOverlayController {
             this.state.setState({
                 visibleIds: s.visibleIds.filter(x => x !== id),
                 loadingIds: s.loadingIds.filter(x => x !== id),
+                loadProgress: withoutKey(s.loadProgress, id),
             })
         }
+        this.syncClusteredIds()
     }
 
     async zoomTo(id: number, opts?: { color?: string }): Promise<void> {
@@ -368,6 +424,25 @@ export class VectorOverlayControllerImpl implements VectorOverlayController {
 
     getOlLayer(id: number): VectorLayer<Feature<Geometry>> | null {
         return this.entries.get(id)?.layer ?? null
+    }
+
+    displayMode(id: number): 'shape' | 'cluster' | null {
+        const e = this.entries.get(id)
+        return e ? (e.clustered ? 'cluster' : 'shape') : null
+    }
+
+    featuresInOrder(id: number): readonly Feature<Geometry>[] | null {
+        return this.entries.get(id)?.features ?? null
+    }
+
+    featureLonLatExtent(feature: Feature<Geometry>): [number, number, number, number] | null {
+        const g = feature.getGeometry()
+        if (!g) return null
+        const e = g.getExtent()
+        if (e.some(v => !Number.isFinite(v))) return null
+        const ll = transformExtent(e, this.opts.olMap.getView().getProjection(), 'EPSG:4326')
+        if (ll.some(v => !Number.isFinite(v))) return null
+        return [ll[0], ll[1], ll[2], ll[3]]
     }
 
     nameOf(id: number): string | null {
@@ -458,11 +533,24 @@ export class VectorOverlayControllerImpl implements VectorOverlayController {
         return out
     }
 
-    /** 저장값·미리보기를 합쳐 지도 레이어(본 레이어·라벨 레이어)에 반영한다. 지도에 없는 id면 아무것도 안 한다 */
+    /** 저장값·미리보기를 합쳐 지도 레이어(본 레이어·라벨 레이어·묶음 레이어)에 반영한다. 지도에 없는 id면 아무것도 안 한다 */
     private apply(id: number): void {
         const e = this.entries.get(id)
         if (!e) return
-        const cfg = this.previews.get(id) ?? parseMyMapStyle(this.saved.get(id) ?? null, e.baseColor)
+        const cfg = this.effectiveStyle(id, e)
+        this.applyBase(e, cfg)
+        e.cluster?.setStyle(createMyMapClusterStyle(cfg, e.baseColor))
+        if (e.labelLayer) e.labelLayer.setVisible(!e.clustered)
+        // 스타일이 바뀌면 묶음 대상(점으로 표시 여부)·묶음 색이 달라질 수 있다
+        this.evaluateCluster(id)
+    }
+
+    /** 미리보기 > 저장값. null = 설정 없음(옛 고정 스타일) */
+    private effectiveStyle(id: number, e: LayerEntry): MyMapStyleConfig | null {
+        return this.previews.get(id) ?? parseMyMapStyle(this.saved.get(id) ?? null, e.baseColor)
+    }
+
+    private applyBase(e: LayerEntry, cfg: MyMapStyleConfig | null): void {
         if (!cfg) {
             // 설정이 없거나 못 읽는다 → 옛 고정 스타일 그대로
             e.layer.setStyle(createLegacyMyMapStyle(myMapStyle(e.baseColor), e.baseColor, e.anchors))
@@ -505,7 +593,186 @@ export class VectorOverlayControllerImpl implements VectorOverlayController {
 
     private removeLayers(e: LayerEntry): void {
         this.dropLabelLayer(e)
+        if (e.cluster) {
+            this.opts.resources.removeLayer(e.cluster.layer)
+            e.cluster.dispose()
+            e.cluster = null
+        }
+        e.clustered = false
         this.opts.resources.removeLayer(e.layer)
+    }
+
+    // ── 나눠 불러오기 ───────────────────────────────────────────────────────
+
+    /**
+     * GeoJSON → 피처. FeatureCollection이면 피처 하나씩 변환하며 chunkMs마다 화면에 양보하고(취소되면 null), VectorSource에도 SOURCE_BATCH개씩 나눠 넣는다.
+     * 그 밖의 모양(단일 Feature·지오메트리)은 한 번에 읽는다. 결과 순서 = 서버 응답 순서
+     */
+    private async readLayer(
+        geojson: unknown, isCancelled: () => boolean, onProgress: (fraction: number) => void,
+    ): Promise<{ features: Array<Feature<Geometry>>; source: VectorSource<Feature<Geometry>>; kinds: KindCounts } | null> {
+        const format = new GeoJSON()
+        const readOpts = { dataProjection: 'EPSG:4326', featureProjection: this.opts.olMap.getView().getProjection() }
+        const kinds = emptyKindCounts()
+        const tally = (f: Feature<Geometry>): void => {
+            const k = geomKindOf(f.getGeometry())
+            if (k) kinds[k]++
+        }
+        const fc = geojson as { type?: unknown; features?: unknown } | null
+        if (!fc || fc.type !== 'FeatureCollection' || !Array.isArray(fc.features)) {
+            const features = format.readFeatures(geojson as never, readOpts) as Array<Feature<Geometry>>
+            features.forEach(tally)
+            return { features, source: new VectorSource<Feature<Geometry>>({ features }), kinds }
+        }
+        const list = fc.features as unknown[]
+        const features = new Array<Feature<Geometry>>(list.length)
+        const source = new VectorSource<Feature<Geometry>>()
+        let batch: Array<Feature<Geometry>> = []
+        const done = await runChunked(list.length, i => {
+            const f = format.readFeature(list[i] as never, readOpts) as Feature<Geometry>
+            features[i] = f
+            tally(f)
+            batch.push(f)
+            if (batch.length >= SOURCE_BATCH) {
+                source.addFeatures(batch)
+                batch = []
+            }
+        }, {
+            budgetMs: this.chunkMs, now: defaultNow, yieldToUi: defaultYield, isCancelled,
+            onProgress: (d, t) => onProgress(t > 0 ? d / t : 1),
+        })
+        if (!done) return null
+        if (batch.length > 0) source.addFeatures(batch)
+        return { features, source, kinds }
+    }
+
+    /** 변환 진행률(0..1). 받는 중이 아니거나 같은 퍼센트면 상태를 바꾸지 않는다(패널 다시 그리기 최소) */
+    private setProgress(id: number, fraction: number): void {
+        const cur = this.state.getState()
+        if (this.destroyed || !cur.loadingIds.includes(id)) return
+        const prev = cur.loadProgress[id]
+        if (prev !== undefined && Math.floor(prev * 100) === Math.floor(fraction * 100)) return
+        this.state.setState({ loadProgress: { ...cur.loadProgress, [id]: fraction } })
+    }
+
+    // ── 묶음 ────────────────────────────────────────────────────────────────
+
+    /** 이동·확대가 끝날 때마다 묶음 여부를 다시 판단하고, 묶음 원을 누르면 확대한다(묶음을 끈 설정이면 붙이지 않는다) */
+    private ensureMapListeners(): void {
+        if (this.unlisten || this.destroyed || !this.clusterCfg) return
+        const olMap = this.opts.olMap
+        olMap.on('moveend', this.onMoveEnd)
+        olMap.on('singleclick', this.onSingleClick)
+        this.unlisten = this.opts.resources.onDispose(() => {
+            olMap.un('moveend', this.onMoveEnd)
+            olMap.un('singleclick', this.onSingleClick)
+        })
+    }
+
+    private readonly onMoveEnd = (): void => {
+        if (this.destroyed) return
+        Array.from(this.entries.keys()).forEach(id => this.evaluateCluster(id))
+    }
+
+    private readonly onSingleClick = (ev: MapBrowserEvent<UIEvent>): void => {
+        const cfg = this.clusterCfg
+        if (this.destroyed || !cfg) return
+        const t = this.opts.tools
+        if (t && t.store.getState().activeTool !== 'none') return
+        const layers = new Set<unknown>()
+        this.entries.forEach(e => {
+            if (e.clustered && e.cluster) layers.add(e.cluster.layer)
+        })
+        if (layers.size === 0) return
+        let target: Extent | null = null
+        this.opts.olMap.forEachFeatureAtPixel(
+            ev.pixel,
+            feature => {
+                const count = feature.get('count') as number
+                const ext = feature.get('extent') as Extent | undefined
+                if (!(count > 1) || !ext) return undefined
+                target = ext
+                return true
+            },
+            { layerFilter: l => layers.has(l), hitTolerance: HIT_TOLERANCE },
+        )
+        if (!target) return
+        this.popup?.close()
+        const pad = CLUSTER_FIT_PADDING
+        this.opts.olMap.getView().fit(target, { padding: [pad, pad, pad, pad], duration: CLUSTER_FIT_MS, maxZoom: cfg.maxZoom })
+    }
+
+    /** 줌을 정수 단계로 맞춘 격자 키·해상도(줌을 모르는 뷰는 해상도를 2의 거듭제곱으로) */
+    private scaleOf(): ClusterScale {
+        const view = this.opts.olMap.getView()
+        const zoom = view.getZoom()
+        if (zoom !== undefined && Number.isFinite(zoom)) {
+            const z = Math.round(zoom)
+            return { key: z, resolution: view.getResolutionForZoom(z) }
+        }
+        const k = Math.round(Math.log2(view.getResolution() ?? 1))
+        return { key: 1000 + k, resolution: Math.pow(2, k) }
+    }
+
+    /**
+     * 이 레이어를 묶음으로 그릴지 판단하고 반영한다(moveend·스타일 변경·불러오기 끝에서).
+     * 묶음 대상: 피처 수 > minFeatures, 선이 없음, 줌 < maxZoom, 화면 안 점(또는 점으로 표시 중인 면) > pointViewLimit 또는 면 > areaViewLimit.
+     * 켜져 있을 때는 기준의 80%까지 유지한다(깜빡임 방지). 화면 크기를 모르면 지금 상태를 유지한다
+     */
+    private evaluateCluster(id: number): void {
+        const cfg = this.clusterCfg
+        const e = this.entries.get(id)
+        if (!cfg || !e || !e.mounted || this.destroyed) return
+        const olMap = this.opts.olMap
+        const view = olMap.getView()
+        const style = this.effectiveStyle(id, e)
+        const areaAsPoint = style?.display === 'point'
+        const zoom = view.getZoom()
+        const size = olMap.getSize()
+        const extent = size && size[0] > 0 && size[1] > 0 ? view.calculateExtent(size) : null
+        const source = e.layer.getSource()
+        let want = false
+        if (!source || e.featureCount <= cfg.minFeatures || !isClusterable(e.kinds, cfg, areaAsPoint)) want = false
+        else if (zoom !== undefined && zoom >= cfg.maxZoom - 1e-6) want = false
+        else if (!extent) want = e.clustered
+        else want = viewCountExceeds(source, extent, cfg, areaAsPoint, e.clustered ? CLUSTER_OFF_RATIO : 1)
+        if (want && extent) {
+            if (!e.cluster) {
+                e.cluster = new MyMapClusterView({
+                    features: e.features, cfg, zIndex: this.opts.zIndex + CLUSTER_Z_OFFSET, className: CLUSTER_CLASS_NAME,
+                    style: createMyMapClusterStyle(style, e.baseColor),
+                })
+                this.opts.resources.addLayer(e.cluster.layer)
+            }
+            const classify = style?.classify ?? null
+            const colorOf = classify ? colorFnOf(classify) : null
+            e.cluster.update(extent, this.scaleOf(), colorOf)
+        }
+        this.setClustered(id, e, want)
+    }
+
+    private setClustered(id: number, e: LayerEntry, on: boolean): void {
+        if (e.clustered === on) return
+        e.clustered = on
+        e.layer.setVisible(!on)
+        e.labelLayer?.setVisible(!on)
+        if (e.cluster) {
+            e.cluster.layer.setVisible(on)
+            if (!on) e.cluster.clear()
+        }
+        // 팝업이 떠 있던 피처는 이제 화면에 없다
+        if (on && this.popupLayerId === id) this.popup?.close()
+        this.syncClusteredIds()
+    }
+
+    private syncClusteredIds(): void {
+        const ids: number[] = []
+        this.entries.forEach((e, id) => {
+            if (e.clustered) ids.push(id)
+        })
+        const cur = this.state.getState().clusteredIds
+        if (cur.length === ids.length && cur.every((v, i) => v === ids[i])) return
+        this.state.setState({ clusteredIds: ids })
     }
 
     // ── 클릭 팝업 ───────────────────────────────────────────────────────────
@@ -524,13 +791,27 @@ export class VectorOverlayControllerImpl implements VectorOverlayController {
 
     private pick(pixel: Pixel): { id: number; feature: Feature<Geometry> } | null {
         const byLayer = new Map<unknown, number>()
-        this.entries.forEach((e, id) => byLayer.set(e.layer, id))
+        const clusterLayers = new Set<unknown>()
+        this.entries.forEach((e, id) => {
+            byLayer.set(e.layer, id)
+            if (e.cluster) {
+                byLayer.set(e.cluster.layer, id)
+                clusterLayers.add(e.cluster.layer)
+            }
+        })
         let found: { id: number; feature: Feature<Geometry> } | null = null
         this.opts.olMap.forEachFeatureAtPixel(
             pixel,
             (feature, layer) => {
                 const id = layer ? byLayer.get(layer) : undefined
                 if (id === undefined) return undefined
+                if (layer && clusterLayers.has(layer)) {
+                    // 묶음 원: 둘 이상이면 팝업 대신 확대(onSingleClick), 하나뿐인 칸은 그 피처 자체
+                    const orig = feature.get('orig') as Feature<Geometry> | undefined
+                    if (feature.get('count') !== 1 || !orig) return undefined
+                    found = { id, feature: orig }
+                    return true
+                }
                 found = { id, feature: feature as Feature<Geometry> }
                 return true
             },
@@ -606,6 +887,8 @@ export class VectorOverlayControllerImpl implements VectorOverlayController {
     destroy(): void {
         if (this.destroyed) return
         this.destroyed = true
+        this.unlisten?.()
+        this.unlisten = null
         Array.from(this.catalogs).forEach(c => c.dispose())
         this.catalogs.clear()
         this.pending.clear()
@@ -618,4 +901,19 @@ export class VectorOverlayControllerImpl implements VectorOverlayController {
         this.names.clear()
         this.state.destroy()
     }
+}
+
+/** id 키를 뺀 새 객체(없으면 같은 객체 — 상태가 안 바뀌게) */
+function withoutKey(rec: Readonly<Record<number, number>>, id: number): Readonly<Record<number, number>> {
+    if (!(id in rec)) return rec
+    const next: Record<number, number> = { ...rec }
+    delete next[id]
+    return next
+}
+
+/** 범주·구간 스타일의 값 → 색(묶음의 대표 색 계산용) */
+function colorFnOf(classify: NonNullable<MyMapStyleConfig['classify']>): (f: Feature<Geometry>) => string {
+    const colorOfValue = makeClassColorFn(classify)
+    const field = classify.field
+    return f => colorOfValue(f.get(field))
 }

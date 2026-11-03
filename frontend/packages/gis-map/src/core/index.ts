@@ -29,6 +29,9 @@ export { EMPTY_RASTER_OVERLAY_STATE, EMPTY_GEOTIFF_CATALOG_STATE } from './overl
 export type { RasterOverlayController, RasterOverlayState, GeoTiffCatalog, GeoTiffCatalogState } from './overlays/RasterOverlayController'
 export { EMPTY_VECTOR_OVERLAY_STATE, EMPTY_MYMAP_CATALOG_STATE, myMapStyle } from './overlays/VectorOverlayController'
 export type { VectorOverlayController, VectorOverlayState, MyMapCatalog, MyMapCatalogState, MyMapFeatureHit } from './overlays/VectorOverlayController'
+// 큰 나만의지도(10만 피처): 나눠 불러오기·격자 묶음 설정과 순수 함수(config.myMap)
+export { DEFAULT_MYMAP_CLUSTER, DEFAULT_MYMAP_LOAD_CHUNK_MS, resolveMyMapCluster, resolveLoadChunkMs, gridCluster } from './overlays/myMapCluster'
+export type { GisMapMyMapConfig, GisMapMyMapClusterConfig, ResolvedMyMapClusterConfig } from './overlays/myMapCluster'
 // 나만의지도 스타일(styleConfig v1) — 순수 함수(스키마·검증·구간·팔레트·컬럼 요약)와 ol 스타일 함수
 export {
     MYMAP_STYLE_VERSION, MYMAP_STYLE_MAX_BYTES, STYLE_FILL_OPACITY, STYLE_STROKE_WIDTH, STYLE_POINT_RADIUS, STYLE_POINT_STROKE_WIDTH,

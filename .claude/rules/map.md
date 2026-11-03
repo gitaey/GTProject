@@ -82,6 +82,7 @@ React는 `<GisMapProvider host={…}>`(바뀌면 `map.setHost`), UMD는 `GisMap.
   알려진 예외: `ui/statusbar/MapStatusBar`는 원본을 3857로 고정해 둔다(비-3857 뷰 호스트에서는 상태바 값이 틀림 — 후속 과제).
 - 엔진 = `GisMap`: `tools`(ToolManager)·`draw`·`layers`(LayerTreeController — 트리·가시성·투명도·배경지도·펼침)·`raster`(GeoTIFF)·`vector`(나만의지도)·
   `parcel`·`region` + 플러그인(`wind`). `clearAll()`은 그리기·측정·반경·필지·플러그인 `clear()`를 정리하고 GeoTIFF/나만의지도는 남긴다.
+- 큰 나만의지도(10만 피처): `config.myMap`(`loadChunkMs`·`cluster`) — 피처 변환을 `runChunked`로 나눠 하고(`loadProgress`), 화면 안 피처가 많으면 본 레이어를 숨기고 격자 묶음 레이어(`core/overlays/myMapCluster.ts`, className `ol-layer gm-hl-mymap-cluster`)를 덧붙인다. 본 레이어·소스·`getOlLayer`는 그대로(묶음 모드에서 `getVisible()` false → `displayMode(id)`), 속성 표는 켜진 레이어면 `featuresInOrder(id)`를 재사용한다.
 - 레이어 트리: `LayerGroupDef`(중첩) > `LayerDef`. `flattenGroupLayers()`로 잎 레이어를 모은다. 나만의지도는 트리에 얹지 않고 `vector` 오버레이로 관리.
 - 붙이기(attach): 엔진이 붙인 레이어·interaction·overlay·control·리스너만 추적·해제하고 호스트의 target·View·기존 레이어는 건드리지 않는다.
   attach UMD는 ol을 싣지 않고 전역 `ol` 하나만 바깥 모듈로 쓴다(가상 모듈 `olPath`/`olMember`, `vite.config.ts`). 최소 ol 7.1(`checkOl`, `COMPATIBILITY.md`).

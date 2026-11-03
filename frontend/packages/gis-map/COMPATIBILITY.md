@@ -82,6 +82,11 @@
 새 ol API는 `proj.getTransform` 하나(공식 full build 7.1 이상에 있다 — 소스 확인). 원격 질의 응답은 `format.GeoJSON.readFeatures`(기존 목록)로 읽고, GeoServer 응답의 3857 → 4326 역변환은 어댑터가 닫힌 식으로 직접 한다(ol 아님).
 **ol 7.1·8.2·10.10 브라우저에서 영역 그리기 3종·강조 레이어·GeoJSON 내보내기(`decimals` 옵션)는 직접 확인하지 못했다** — 9.2.4에서도 가짜 DOM·가짜 fetch 시험만 했다. 호스트가 쓰는 ol 버전에서 `gis.areaAnalysis.setArea(…)` + `run()` + `exportResult(ref, 'geojson')` 한 번으로 확인한다.
 **호스트 서버 조건(코드가 아니라 환경):** VWorld Data API 프록시(`{proxyBaseUrl}/vworld/data`)와, GeoServer는 브라우저 직접 호출이라 **CORS 허용** — 이 둘은 실제 서버로 확인한 것이 GTProject(`geo.gitaey-dev.com`·`localhost:3000` 프록시)뿐이다. 다른 서버는 `02b_probe` 절차(좌표계 표기·축 순서·쪽 넘김)를 한 번 확인한다.
+## 큰 나만의지도(묶음·나눠 불러오기) — 확인 항목
+
+새 ol **모듈 경로는 없다**(`REQUIRED_OL_API` 그대로). 새로 쓰는 멤버는 이미 쓰던 클래스의 오래된 메서드·옵션뿐이다: `format.GeoJSON#readFeature`(피처 하나씩 변환), `source.Vector#forEachFeatureInExtent`·`addFeatures`·`clear(true)`, `View#calculateExtent`·`getResolutionForZoom`·`fit({ maxZoom, padding, duration })`, `layer.Vector`의 `className` 옵션(묶음 레이어를 한 캔버스에 겹쳐 그리지 않으려고), `Style`의 `Circle`+`Text`·`Stroke#lineDash`. 모두 7.1에 있다(소스 확인).
+**ol 7.1·8.2·10.10 브라우저에서 묶음 원 그리기·클릭 확대·진행 표시는 직접 확인하지 못했다** — 9.2.4에서도 가짜 DOM·합성 데이터 시험만 했다. 호스트가 쓰는 ol 버전에서 큰 레이어(5,000점 이상)를 켜 전국 줌에서 원 + 숫자가 보이는지, 원을 눌러 확대되는지 한 번 확인한다.
+
 ## 다른 버전을 시험하려면
 
 1. 그 버전의 공식 full build `ol.js`·`ol.css`를 받는다 — 7.1.0 이상은 npm `ol@<버전>`의 `dist/ol.js`·`ol.css`, 그 아래는 GitHub 릴리스 자산(`v<버전>-dist.zip` 등).

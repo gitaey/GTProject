@@ -28,18 +28,13 @@ export interface TableModel {
 
 const EMPTY_ROW: PropertyRow = Object.freeze({})
 
-/** FeatureCollection → 표. features가 없으면 빈 표 */
-export function buildTable(fc: unknown): TableModel {
-    const features = fc && typeof fc === 'object' && Array.isArray((fc as { features?: unknown }).features)
-        ? (fc as { features: unknown[] }).features : []
-    const rows: PropertyRow[] = new Array(features.length)
+/** 행 배열 → 열 합집합(처음 나온 순서, 최대 TABLE_MAX_COLUMNS)을 붙인 표 */
+function tableOf(rows: PropertyRow[]): TableModel {
     const seen = new Set<string>()
     const columns: string[] = []
-    for (let i = 0; i < features.length; i++) {
-        const f = features[i]
-        const p = f && typeof f === 'object' ? (f as { properties?: unknown }).properties : null
-        if (!p || typeof p !== 'object' || Array.isArray(p)) { rows[i] = EMPTY_ROW; continue }
-        rows[i] = p as PropertyRow
+    for (let i = 0; i < rows.length; i++) {
+        const p = rows[i]
+        if (p === EMPTY_ROW) continue
         for (const k in p) {
             if (seen.has(k)) continue
             seen.add(k)
@@ -47,6 +42,46 @@ export function buildTable(fc: unknown): TableModel {
         }
     }
     return { rows, columns, totalColumns: seen.size }
+}
+
+/** FeatureCollection → 표. features가 없으면 빈 표 */
+export function buildTable(fc: unknown): TableModel {
+    const features = fc && typeof fc === 'object' && Array.isArray((fc as { features?: unknown }).features)
+        ? (fc as { features: unknown[] }).features : []
+    const rows: PropertyRow[] = new Array(features.length)
+    for (let i = 0; i < features.length; i++) {
+        const f = features[i]
+        const p = f && typeof f === 'object' ? (f as { properties?: unknown }).properties : null
+        rows[i] = !p || typeof p !== 'object' || Array.isArray(p) ? EMPTY_ROW : (p as PropertyRow)
+    }
+    return tableOf(rows)
+}
+
+/** 표의 행으로 읽을 수 있는 피처(ol Feature와 같은 모양 — 이 파일은 ol을 가져오지 않는다) */
+export interface PropertyFeature {
+    getKeys(): string[]
+    get(key: string): unknown
+    getGeometryName(): string
+}
+
+/**
+ * 지도에 올라온 피처(서버 응답 순서 그대로) → 표. 속성 복사본을 행으로 쓴다(지오메트리 키는 뺀다 — 원본 GeoJSON의 properties와 같은 모양).
+ * 속성이 하나도 없는 피처는 빈 행. 지도 레이어가 켜져 있을 때 같은 데이터를 한 번 더 받지 않으려고 쓴다
+ */
+export function buildTableFromFeatures(features: readonly PropertyFeature[]): TableModel {
+    const rows: PropertyRow[] = new Array(features.length)
+    for (let i = 0; i < features.length; i++) {
+        const f = features[i]
+        const geometryName = f.getGeometryName()
+        let row: Record<string, unknown> | null = null
+        for (const k of f.getKeys()) {
+            if (k === geometryName) continue
+            if (row === null) row = {}
+            row[k] = f.get(k)
+        }
+        rows[i] = row ?? EMPTY_ROW
+    }
+    return tableOf(rows)
 }
 
 /** 셀에 보일 글자 — null·undefined는 빈 칸, 객체는 JSON, 나머지는 문자열 */

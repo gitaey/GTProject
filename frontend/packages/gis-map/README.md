@@ -375,6 +375,36 @@ GTProject 저장소의 `.claude/skills/map-module-export/references/`에 있다.
   OL의 `minZoom`은 "이 줌 **초과**에서만 보임"이라 설정한 줌에서도 보이도록 `1e-6` 낮춰 넣는다.
 - 어댑터: `update`는 `PATCH /api/mymap/{id}`(JSON, 값이 있는 키만 — 서버는 빠진 키를 "그대로"로 본다). 오류는 봉투의 `message`를 `Error`로 던진다(403 "이 나만의지도에 대한 권한이 없습니다.", 400 "스타일 설정 형식이 올바르지 않습니다.").
 
+### 큰 나만의지도 — 나눠 불러오기·묶음 (`config.myMap`)
+
+shp 10만 피처처럼 큰 레이어를 켜도 지도가 멈추지 않게 하는 **클라이언트 쪽** 처리다(서버·DB·`MyMapSource` 계약은 그대로 — `geojson(id)`가 FeatureCollection 하나를 돌려주는 것 그대로).
+
+- **불러오는 중 표시:** 체크하면 곧바로 `map.vector.store`의 `loadingIds`에 들어가고(패널은 "불러오는 중"), 서버 응답을 받은 뒤 피처로 바꾸는 동안 `loadProgress[id]`(0..1)가 올라간다(패널 "불러오는 중 42%" + 얇은 막대). 응답을 받는 동안(`res.json()` 한 번 포함)은 진행률이 없다.
+- **나눠 변환:** GeoJSON → 피처 변환과 `VectorSource` 적재를 한 번에 `loadChunkMs`(기본 12ms)씩 하고 화면에 양보한다. 도중에 `hide(id)`·엔진 `destroy()`를 하면 즉시 멈추고 결과를 버린다. FeatureCollection이 아닌 응답(단일 Feature·지오메트리)은 예전처럼 한 번에 읽는다.
+- **묶음(클러스터):** 이동·확대가 끝날 때(`moveend`)마다 **화면 안** 피처 수를 세어, 레이어 피처가 5,000개를 넘고 화면 안 점이 5,000개(면은 20,000개)를 넘으면 본 레이어는 그대로 둔 채 숨기고 격자 묶음 레이어(원 + 숫자)를 덧붙인다. 칸은 60px × 그 줌의 해상도, 원 크기는 개수의 로그(14~30px), 숫자는 "1.2천"·"3.4만".
+  켜진 묶음은 기준의 80% 아래로 내려가야 꺼진다(깜빡임 방지). 줌 17 이상은 항상 원래 모양. **원을 누르면** 그 원의 범위로 확대(300ms)하고, 하나뿐인 칸은 원래 피처 점이라 팝업이 열린다. 도구(그리기·측정)가 켜져 있으면 확대하지 않는다.
+  범주·구간 스타일이면 원 색은 **가장 많은 값의 색**이고, 색이 섞인 칸은 테두리가 회색 점선이다. 선(LineString) 레이어(또는 선이 섞인 레이어)는 묶지 않는다. 면을 "점으로 표시"로 바꾸면 점 기준(5,000)으로 센다.
+- **그대로인 것:** 본 `VectorLayer`·`VectorSource`·`getOlLayer(id)`·스타일 대화상자 통계(열 요약·값 개수는 본 레이어 전체 기준)·속성 표·범위로 이동·지도 출력·공유는 묶음과 무관하게 같은 데이터를 본다. 출력에서는 묶음 모드로 찍힌 레이어 범례에 "묶음 (숫자 = 피처 수)" 한 줄이 더해진다. 라벨 레이어는 묶음 모드에서 숨는다(원래 줌 16 이상에서만 보임).
+  **주의:** 묶음 모드에서는 `getOlLayer(id).getVisible()`이 false다. 호스트가 가시성을 읽어 쓰면 `map.vector.displayMode(id)`(`'shape'` | `'cluster'` | 없으면 null)를 함께 본다. 묶음 레이어는 `className`이 `ol-layer gm-hl-mymap-cluster`로 따로 있다.
+- **속성 표:** 레이어가 지도에 올라와 있으면 표는 그 피처(서버 응답 순서 그대로 `map.vector.featuresInOrder(id)`)로 만든다 — 같은 GeoJSON을 두 번째로 받지 않는다. 꺼져 있으면 예전처럼 `geojson(id)`를 한 번 받는다.
+- **설정(`createGisMap`/`GisMap.create`/`GisMap.attach`의 `myMap`, 모두 선택):**
+
+```js
+myMap: {
+    loadChunkMs: 12,                     // 피처 변환 한 번의 시간(ms)
+    cluster: {                           // false 로 주면 묶음을 끈다
+        minFeatures: 5000,               // 레이어 피처 수가 이 값 이하면 묶음을 검토하지 않는다
+        pointViewLimit: 5000,            // 화면 안 점이 이 값을 넘으면 묶음
+        areaViewLimit: 20000,            // 화면 안 면이 이 값을 넘으면 묶음 (null = 면은 묶지 않음)
+        cellPx: 60,                      // 격자 한 칸 크기(px)
+        maxZoom: 17                      // 이 줌 이상은 항상 원래 모양
+    }
+}
+```
+
+- 엔진 인스턴스 API: `map.vector.store`의 `loadProgress`·`clusteredIds`, `displayMode(id)`, `featuresInOrder(id)`, `featureLonLatExtent(feature)`. 새 ol API **0**(`REQUIRED_OL_API` 그대로).
+- 한계: 응답 본문을 한 번에 받아 `res.json()`으로 읽는 한 번의 긴 작업(피처 수·좌표 수에 비례)은 줄이지 못한다. 메모리는 줄이지 않는다(피처 10만 개가 힙에 그대로 있다 — M1 합성 측정 약 280MB). 서버 범위 조회·벡터 타일은 이 처리에 없다.
+
 ### 바람지도 (선택)
 
 패널을 쓰려면 플러그인과 패널을 함께 넣는다. 앱 쪽 예: `panels={[...defaultPanels, windPanel]}` (`windPanel`은 `@gtp/gis-map/ui`, 권한 키 `map.tool.wind`).
@@ -426,6 +456,7 @@ const setup = (map) => { map.use(createWindPlugin({ monoColor: (mode) => (mode =
 - 기본이 아닌 `theme.primary`는 엔진이 생긴 뒤 들어가 서버 렌더 첫 프레임은 기본색이다. 깜빡임이 싫으면 CSS(`.gm-root { --gm-primary: … }`)로 준다.
   호스트가 `--gm-*`나 위젯 모양을 덮으려면 패키지 CSS **뒤에**, `@layer` 밖에서 선언한다.
 - 바람길 표시는 ol 버전별로 시험하지 않았다(설치·제거만).
+- 큰 나만의지도 묶음·나눠 불러오기는 가짜 DOM·합성 데이터 시험과 node 측정(M1)만 했다 — 브라우저 렌더 시간(다시 그리기)·원 모양·클릭은 `examples/_tmp-big-vector-bench.html`(임시)로 확인한다.
 - 필지 정보 카드의 실제 PostgreSQL 실행 계획·VWorld 점 질의 응답·브라우저 레이아웃은 구현 때 직접 확인하지 못했다(운영 DB 접근 금지).
 
 ## 라이선스 고지

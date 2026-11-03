@@ -3,6 +3,7 @@
 // 나만의지도 패널 — 스타일: gm-panel(TIFF·나만의지도 공용), gm-mymap-panel
 // 내 레이어 / 공유받은 레이어 두 묶음. 항목은 두 줄(이름 / 종류 칩·개수·공유 수·처리 중·실패 N·보낸 사람) + 위치 이동·⋯ 메뉴.
 // 결과 줄(매칭·실패·기준월)은 툴팁으로만, 실패가 있으면 줄 끝 빨간 `실패 N`(누르면 결과 보고서). ⋯ 메뉴: 스타일·라벨 / 업로드 결과 / 속성 테이블 / 내보내기 / 삭제.
+// 불러오는 중(GeoJSON 받기·피처 변환)은 줄 끝 "불러오는 중 42%"(받는 동안은 회전 아이콘만)와 아래 얇은 막대, 묶음으로 그리는 레이어는 "묶음 보기" 칩.
 // 처리 중은 항목 아래 얇은 진행 막대, 상단 `내 레이어 n/20`(한도는 소스의 quota가 있을 때만). 켜짐·진행률처럼 값에 따라 바뀌는 것만 인라인 style
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -42,6 +43,9 @@ const MENU_DEF: Readonly<Record<ItemMenuId, { label: string; icon: ReactNode }>>
 
 const selectCatalog = (s: MyMapCatalogState) => s
 const selectVisibleIds = (s: VectorOverlayState) => s.visibleIds
+const selectLoadingIds = (s: VectorOverlayState) => s.loadingIds
+const selectLoadProgress = (s: VectorOverlayState) => s.loadProgress
+const selectClusteredIds = (s: VectorOverlayState) => s.clusteredIds
 
 // 목록·상태 폴링·삭제는 패널이 열려 있는 동안의 목록 객체(map.vector.openCatalog)가,
 // 지도에 올린 레이어와 체크 상태는 엔진 인스턴스(map.vector)가 가진다 → 패널을 닫았다 열어도 체크 = 지도
@@ -57,6 +61,11 @@ export default function MyMapPanel() {
     const { items, loading, quota } = useStoreValue(catalog?.store, selectCatalog, EMPTY_MYMAP_CATALOG_STATE)
     const visibleIdList = useVectorOverlayState(selectVisibleIds)
     const visibleIds = useMemo(() => new Set(visibleIdList), [visibleIdList])
+    const loadingIdList = useVectorOverlayState(selectLoadingIds)
+    const loadingIds = useMemo(() => new Set(loadingIdList), [loadingIdList])
+    const loadProgress = useVectorOverlayState(selectLoadProgress)
+    const clusteredIdList = useVectorOverlayState(selectClusteredIds)
+    const clusteredIds = useMemo(() => new Set(clusteredIdList), [clusteredIdList])
     const [showUpload, setShowUpload] = useState(false)
     // 공유 대화상자에 넘길 레이어(하나면 단일, 둘 이상이면 일괄)
     const [shareItems, setShareItems] = useState<Array<{ id: number; name: string }> | null>(null)
@@ -145,6 +154,10 @@ export default function MyMapPanel() {
 
     const renderItem = (item: UserMapListItem) => {
         const active = visibleIds.has(item.id)
+        // 지도에 올리는 중(받기 → 피처 변환). 진행률은 변환 단계에서만 있다
+        const layerLoading = active && loadingIds.has(item.id)
+        const layerPct = loadProgress[item.id] === undefined ? null : Math.min(100, Math.floor(loadProgress[item.id] * 100))
+        const layerClustered = active && !layerLoading && clusteredIds.has(item.id)
         const isProcessing = item.status === 'PROCESSING'
         const isFailed = item.status === 'FAILED'
         const total = item.progressTotal ?? 0
@@ -193,6 +206,20 @@ export default function MyMapPanel() {
                             <>
                                 <span className="gm-mymap-panel__dot" aria-hidden="true" />
                                 <span>{formatCount(item.featureCount)}개</span>
+                            </>
+                        )}
+                        {layerLoading && (
+                            <>
+                                <span className="gm-mymap-panel__dot" aria-hidden="true" />
+                                <span className="gm-panel__item-status gm-panel__item-status--busy" role="status">
+                                    {layerPct !== null ? `불러오는 중 ${layerPct}%` : <><Loader2 size={9} className="gm-loader" /> 불러오는 중</>}
+                                </span>
+                            </>
+                        )}
+                        {layerClustered && (
+                            <>
+                                <span className="gm-mymap-panel__dot" aria-hidden="true" />
+                                <span className="gm-mymap-panel__cluster-chip" title="화면 안 피처가 많아 원과 숫자로 묶어 보여 줍니다. 확대하거나 원을 누르면 원래 모양이 보입니다">묶음 보기</span>
                             </>
                         )}
                         {item.owner && (item.shareCount ?? 0) > 0 && (
@@ -261,6 +288,12 @@ export default function MyMapPanel() {
                     </div>
                 )}
 
+                {layerLoading && layerPct !== null && (
+                    <div className="gm-mymap-panel__loadbar" role="progressbar" aria-label={`${item.name} 불러오기 진행률`}
+                        aria-valuemin={0} aria-valuemax={100} aria-valuenow={layerPct}>
+                        <div className="gm-mymap-panel__loadbar-fill" style={{ width: `${layerPct}%` }} />
+                    </div>
+                )}
                 {hasProgress && (
                     <div className="gm-mymap-panel__bar" role="progressbar" aria-label={`${item.name} 처리 진행률`}
                         aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}>

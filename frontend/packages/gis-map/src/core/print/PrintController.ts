@@ -284,7 +284,7 @@ export class PrintControllerImpl implements PrintController {
         const treeLayers = layers.allLayers().filter(l => layers.isRendered(l) && !isBasemapLayer(l, basemapModes))
         const myMaps = vector.store.getState().visibleIds
             .filter(id => vector.getOlLayer(id) !== null)
-            .map(id => ({ name: vector.nameOf(id) ?? '나만의지도 ' + id, style: vector.getStyle(id) }))
+            .map(id => ({ name: vector.nameOf(id) ?? '나만의지도 ' + id, style: vector.getStyle(id), clustered: vector.displayMode(id) === 'cluster' }))
         const rasters = raster.store.getState().visibleIds.map(id => ({ name: raster.nameOf(id) ?? 'GeoTIFF ' + id }))
         return buildLegendGroups({
             layers: treeLayers,

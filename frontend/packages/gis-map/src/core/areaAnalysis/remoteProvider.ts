@@ -13,7 +13,7 @@ import type { AreaQueryLayerInfo, AreaQueryPage, AreaQuerySource } from '../sour
 import type { LayerDef } from '../types/layer'
 import type { Candidate } from './analyze'
 import type { AreaLayerProvider, CancelToken, FetchOptions, LayerCandidates, ProbeResult, RunArea } from './providers'
-import { runPool } from './runner'
+import { runPool } from '../lib/runner'
 import { refKey } from './types'
 import type { AreaAnalysisLayerItem, AreaAnalysisLayerRef } from './types'
 

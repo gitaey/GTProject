@@ -217,7 +217,7 @@ class GisMapEngine implements GisMap {
         this.raster = this.rasterController
         this.vectorController = new VectorOverlayControllerImpl({
             olMap, resources: this.resources, source: this.sources.myMap, zIndex: this.zIndex.vector,
-            defaultColor: this.theme.primary, tools: this.toolManager,
+            defaultColor: this.theme.primary, tools: this.toolManager, config: options.myMap,
         })
         this.vector = this.vectorController
         this.parcelHighlighter = new ParcelHighlighterImpl({

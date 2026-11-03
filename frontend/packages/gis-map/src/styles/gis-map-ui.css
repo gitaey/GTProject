@@ -2603,6 +2603,33 @@
     transition: width .3s;
 }
 
+/* 지도에 올리는 중(피처 변환) 진행 막대 — 처리 중 막대와 같은 자리·모양, 짧은 간격으로 갱신되므로 transition 없음 */
+.gm-mymap-panel__loadbar {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 0;
+    height: 2px;
+    border-radius: 2px;
+    background: #f3f4f6;
+    overflow: hidden;
+}
+
+.gm-mymap-panel__loadbar-fill {
+    height: 100%;
+    background: var(--gm-primary);
+}
+
+/* "묶음 보기" 칩 — 화면 안 피처가 많아 원 + 숫자로 묶어 그리는 중 */
+.gm-mymap-panel__cluster-chip {
+    padding: 0 5px;
+    border-radius: 4px;
+    font-size: 9.5px;
+    font-weight: 600;
+    background: rgba(var(--gm-primary-rgb), 0.1);
+    color: var(--gm-primary);
+}
+
 /* 실패 N — 있을 때만 빨갛게. 소유자는 눌러서 결과 보고서 */
 .gm-mymap-panel__fail-link {
     background: none;

@@ -8,6 +8,7 @@ import { normalizeHexColor } from './lib/color'
 import type { LayerCrossOriginResolver } from './layers/resolveLayerUrl'
 import type { PrintLayoutConfig } from './print/types'
 import type { GisMapAreaAnalysisConfig } from './areaAnalysis/types'
+import type { GisMapMyMapConfig } from './overlays/myMapCluster'
 
 export interface GisMapViewConfig {
     /** [lon, lat] EPSG:4326 */
@@ -95,6 +96,8 @@ export interface GisMapConfig {
     print?: PrintLayoutConfig
     /** 영역 분석(map.areaAnalysis)의 강조 상한·범주표 크기·계산 시간 나누기 */
     areaAnalysis?: GisMapAreaAnalysisConfig
+    /** 나만의지도 큰 레이어 처리: 피처 변환 나눠 하기(loadChunkMs)·화면 안 피처가 많을 때 묶음(cluster — false로 끔, 기준값 조정) */
+    myMap?: GisMapMyMapConfig
     /** 엔진이 추가하는 레이어 zIndex. 붙이기 모드에서 호스트 레이어와 겹치지 않게 조정 */
     zIndex?: Partial<GisMapZIndex>
 }

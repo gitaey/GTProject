@@ -26,6 +26,9 @@ export interface LegendGroup {
     more: number
 }
 
+/** 묶음으로 찍힌 나만의지도의 범례 한 줄 */
+export const CLUSTER_LEGEND_LABEL = '묶음 (숫자 = 피처 수)'
+
 /** 범주·구간 스타일에서 그리는 분류 최대 수(나머지는 "외 n개") */
 export const LEGEND_MAX_CLASSES = 8
 
@@ -37,7 +40,8 @@ export interface LegendBuildDeps {
     vworldItems(layerName: string): Promise<VWorldLegendItem[]>
     /** 범례 이미지 읽기(crossOrigin 'anonymous'). 실패하면 null */
     loadImage(url: string): Promise<HTMLImageElement | null>
-    myMaps: ReadonlyArray<{ name: string; style: MyMapStyleConfig }>
+    /** clustered = 지금 묶음(원 + 숫자)으로 그리는 중 → 범례에 "묶음" 한 줄 */
+    myMaps: ReadonlyArray<{ name: string; style: MyMapStyleConfig; clustered?: boolean }>
     rasters: ReadonlyArray<{ name: string }>
 }
 
@@ -121,7 +125,15 @@ export async function buildLegendGroups(deps: LegendBuildDeps): Promise<LegendBu
     const warnings: PrintWarning[] = []
     const treeGroups = await Promise.all(deps.layers.map(l => layerGroup(l, deps, warnings)))
     const groups: LegendGroup[] = treeGroups.filter((g): g is LegendGroup => g !== null)
-    for (const m of deps.myMaps) groups.push(mymapLegendGroup(m.name, m.style))
+    for (const m of deps.myMaps) {
+        const group = mymapLegendGroup(m.name, m.style)
+        if (m.clustered) {
+            // 묶음 원은 가장 많은 값의 색(범주·구간) 또는 점 색 — 견본은 점 색에 흰 테두리
+            const dot = m.style.pointColor ?? m.style.stroke
+            group.entries.push({ label: CLUSTER_LEGEND_LABEL, swatch: { kind: 'point', fill: dot, stroke: '#ffffff' } })
+        }
+        groups.push(group)
+    }
     for (const r of deps.rasters) groups.push({ title: '', entries: [{ label: r.name, swatch: null }], more: 0 })
     return { groups, warnings }
 }

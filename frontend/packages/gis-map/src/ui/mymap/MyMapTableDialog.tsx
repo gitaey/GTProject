@@ -1,19 +1,22 @@
 'use client'
 
 // 나만의지도 속성 테이블 — 레이어의 피처 속성을 표로(열 = 모든 피처 속성 키 합집합, 맨 앞 `#` 행 번호).
-// 데이터는 소스의 geojson(id)(EPSG:4326 FeatureCollection)을 한 번 받아 한 번만 파싱한다(useMemo). 큰 레이어(shp 최대 10만 피처)에서도
+// 데이터: 이 레이어가 지도에 올라와 있으면 그 피처(서버 응답 순서 그대로, vector.featuresInOrder)를 그대로 쓴다 — 큰 레이어에서 같은 GeoJSON을 두 번 받지 않는다.
+// 꺼져 있으면 소스의 geojson(id)(EPSG:4326 FeatureCollection)을 한 번 받아 한 번만 파싱한다(useMemo). 큰 레이어(shp 최대 10만 피처)에서도
 // 멈추지 않게 현재 쪽(100행)만 그리고, 필터·정렬은 행 번호 배열(tableModel)만 만든다. 공유받은 레이어도 연다(서버가 권한을 판단).
 // 행을 누르면 그 피처의 좌표 범위로 지도를 옮기고(레이어가 꺼져 있으면 켠다) 모달을 작은 막대로 접는다 — 막대를 누르면 필터·정렬·쪽 그대로 다시 펼쳐진다.
 // 스타일: gm-modal(업로드·공유와 공용), gm-table-dialog
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { X, Loader2, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Search, Table2 } from 'lucide-react'
+import type Feature from 'ol/Feature'
+import type Geometry from 'ol/geom/Geometry'
 import { useGisMap } from '../../react'
 import { cx } from '../cx'
 import { formatCount } from './format'
 import {
     CELL_MAX_CHARS, CELL_TITLE_MAX_CHARS, CELL_TITLE_MIN_CHARS, TABLE_MAX_COLUMNS, TABLE_PAGE_SIZE,
-    buildTable, cellText, clampPage, clipText, featureExtent, filterIndices, hasFeatureGeometry, pageCount, pageRange, sortIndices,
+    buildTable, buildTableFromFeatures, cellText, clampPage, clipText, featureExtent, filterIndices, hasFeatureGeometry, pageCount, pageRange, sortIndices,
 } from './tableModel'
 import type { RowOrder, SortDir } from './tableModel'
 
@@ -28,11 +31,14 @@ const FILTER_DELAY_MS = 250
 
 interface SortState { key: string; dir: SortDir }
 
+/** 표의 원자료: 서버 GeoJSON(raw) 또는 지도에 올라온 피처(features — 행 번호 = 배열 위치) */
+type TableData = { kind: 'raw'; raw: unknown } | { kind: 'features'; features: readonly Feature<Geometry>[] }
+
 export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialogProps) {
     // 엔진·소스 객체는 엔진마다 하나(참조 고정) → 아래 effect가 다시 돌지 않는다
     const map = useGisMap()
     const myMap = map?.sources.myMap
-    const [raw, setRaw] = useState<unknown>(null)
+    const [data, setData] = useState<TableData | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [filterInput, setFilterInput] = useState('')
@@ -51,14 +57,23 @@ export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialog
         let cancelled = false
         setLoading(true)
         setError(null)
-        setRaw(null)
+        setData(null)
+        // 지도에 올라와 있는 레이어면 그 피처를 쓴다(다시 받지 않는다). 올리는 중이거나 꺼져 있으면 null → 받아 온다
+        const onMap = map?.vector.featuresInOrder(id) ?? null
+        if (onMap) {
+            setData({ kind: 'features', features: onMap })
+            setLoading(false)
+            return () => {
+                cancelled = true
+            }
+        }
         ;(async () => {
             try {
                 if (!myMap) throw new Error('속성 정보를 불러오지 못했습니다')
                 const res = await myMap.geojson(id)
                 if (cancelled) return
                 if (!res || typeof res !== 'object') throw new Error('속성 정보를 읽을 수 없습니다')
-                setRaw(res)
+                setData({ kind: 'raw', raw: res })
             } catch (e) {
                 if (!cancelled) setError(e instanceof Error && e.message ? e.message : '속성 정보를 불러오지 못했습니다')
             } finally {
@@ -68,7 +83,7 @@ export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialog
         return () => {
             cancelled = true
         }
-    }, [id, myMap])
+    }, [id, myMap, map])
 
     // Esc로 닫기(부모가 매번 새 콜백을 줘도 리스너를 다시 달지 않는다)
     const closeRef = useRef(onClose)
@@ -89,7 +104,10 @@ export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialog
     }, [filterInput])
 
     // 파싱은 응답이 바뀔 때 한 번만
-    const table = useMemo(() => (raw === null ? null : buildTable(raw)), [raw])
+    const table = useMemo(
+        () => (data === null ? null : data.kind === 'raw' ? buildTable(data.raw) : buildTableFromFeatures(data.features)),
+        [data],
+    )
     const filtered = useMemo<RowOrder>(() => (table ? filterIndices(table.rows, table.columns, filter) : null), [table, filter])
     const order = useMemo<RowOrder>(
         () => (table && sort ? sortIndices(table.rows, filtered, sort.key, sort.dir) : filtered),
@@ -111,8 +129,16 @@ export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialog
     }
 
     // 행 → 지도: 피처 범위로 이동. 레이어가 꺼져 있으면 켜서 피처가 보이게 하고, 점 하나면 너무 확대되지 않게 17까지만
+    const rowHasGeometry = (ri: number): boolean =>
+        data === null ? false : data.kind === 'raw' ? hasFeatureGeometry(data.raw, ri) : !!data.features[ri]?.getGeometry()
+    const rowExtent = (ri: number) => {
+        if (data === null) return null
+        if (data.kind === 'raw') return featureExtent(data.raw, ri)
+        const f = data.features[ri]
+        return f && map ? map.vector.featureLonLatExtent(f) : null
+    }
     const goTo = (ri: number) => {
-        const extent = featureExtent(raw, ri)
+        const extent = rowExtent(ri)
         if (!map || !extent) return
         setPicked(ri)
         if (!map.vector.isVisible(id)) Promise.resolve(map.vector.show(id)).catch(() => {})
@@ -132,7 +158,7 @@ export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialog
         for (let p = start; p < end; p++) {
             const ri = order ? order[p] : p
             const row = table.rows[ri]
-            const canGo = !!map && hasFeatureGeometry(raw, ri)
+            const canGo = !!map && rowHasGeometry(ri)
             bodyRows.push(
                 <tr key={ri} className={cx(canGo && 'gm-table-dialog__row--go', picked === ri && 'gm-is-picked')}
                     tabIndex={canGo ? 0 : undefined} title={canGo ? '누르면 지도에서 이 위치로 이동합니다' : undefined}

@@ -207,6 +207,77 @@ export function createMyMapStyle(cfg: MyMapStyleConfig, anchors: MyMapAnchors): 
     }
 }
 
+/** 묶음 원 반지름(px): 개수의 로그에 비례, 14~30 */
+export function clusterRadius(count: number): number {
+    if (!(count > 1)) return 14
+    return Math.min(30, Math.max(14, Math.round(12 + 4.5 * Math.log10(count))))
+}
+
+/** 묶음 원 안 숫자: 999까지 그대로, 1,000~9,999 "1.2천", 1만 이상 "3.4만"(소수 .0은 뺀다) */
+export function formatClusterCount(n: number): string {
+    if (n < 1000) return String(n)
+    // 소수 1자리로 반올림한 값이 다음 단위(10천 → 1만)로 넘어가면 다음 단위로 쓴다
+    const thousands = Math.round(n / 100) / 10
+    if (thousands < 10) return String(thousands) + '천'
+    const tenThousands = Math.round(n / 1000) / 10
+    if (tenThousands < 10000) return String(tenThousands) + '만'
+    return String(Math.round(n / 10000000) / 10) + '억'
+}
+
+/** 색이 섞인 묶음 원의 테두리 색(회색 점선) */
+export const MYMAP_CLUSTER_MIXED_STROKE = '#6b7280'
+
+/**
+ * 묶음 레이어 스타일 함수. 피처 속성 count(개수)·color(대표 색, 없으면 레이어 점 색)·mixed(색이 섞임).
+ * 개수 2 이상 = 색 원 + 숫자(흰 글자·어두운 후광, 테두리 흰색 2px 또는 섞였으면 회색 점선), 개수 1 = 본 레이어의 점 기호와 같은 작은 점.
+ * (반지름·색·섞임)마다 Style 하나를 재사용하고 Text는 그 Style의 것을 돌려 쓴다(라벨 스타일과 같은 방식 — OL이 그 자리에서 읽어 간다).
+ * cfg가 null이면 옛 고정 스타일(baseColor, 반지름 5, 흰 테두리 1px)
+ */
+export function createMyMapClusterStyle(cfg: MyMapStyleConfig | null, baseColor: string): StyleFunction {
+    const dotColor = cfg ? cfg.pointColor ?? cfg.stroke : baseColor
+    const dotRadius = cfg ? cfg.pointRadius : MYMAP_TINY_DOT_RADIUS
+    const dotStroke = cfg ? (cfg.pointStrokeWidth > 0 ? { color: cfg.pointStroke, width: cfg.pointStrokeWidth } : null) : { color: '#fff', width: 1 }
+    const dots = new Map<string, Style>()
+    const circles = new Map<string, Style>()
+    return (feature: FeatureLike): Style | undefined => {
+        const count = feature.get('count') as number
+        const raw = feature.get('color')
+        const color = typeof raw === 'string' && raw !== '' ? raw : dotColor
+        if (!(count > 1)) {
+            let dot = dots.get(color)
+            if (!dot) {
+                dot = new Style({
+                    image: new CircleStyle({
+                        radius: Math.max(dotRadius, MYMAP_TINY_DOT_RADIUS), fill: new Fill({ color }),
+                        ...(dotStroke ? { stroke: new Stroke(dotStroke) } : {}),
+                    }),
+                })
+                dots.set(color, dot)
+            }
+            return dot
+        }
+        const radius = clusterRadius(count)
+        const mixed = feature.get('mixed') === true
+        const key = radius + '|' + color + '|' + (mixed ? 'm' : '')
+        let style = circles.get(key)
+        if (!style) {
+            style = new Style({
+                image: new CircleStyle({
+                    radius, fill: new Fill({ color }),
+                    stroke: new Stroke(mixed ? { color: MYMAP_CLUSTER_MIXED_STROKE, width: 2, lineDash: [4, 3] } : { color: '#fff', width: 2 }),
+                }),
+                text: new Text({
+                    font: `600 12px ${MYMAP_LABEL_FONT_FAMILY}`, fill: new Fill({ color: '#fff' }),
+                    stroke: new Stroke({ color: 'rgba(0,0,0,0.55)', width: 3 }), textAlign: 'center', textBaseline: 'middle',
+                }),
+            })
+            circles.set(key, style)
+        }
+        style.getText()?.setText(formatClusterCount(count))
+        return style
+    }
+}
+
 /**
  * 라벨 레이어 스타일 함수(cfg.label이 있을 때). Style·Text는 하나를 돌려 쓰며 피처마다 글자만 바꾼다(OL이 그 자리에서 읽어 간다).
  * 위치는 대표점(폴리곤 안쪽·선 가운데). 점이거나 표시 방식이 "점"이면 점 위쪽에 띄운다. 값이 없으면 라벨 없음
