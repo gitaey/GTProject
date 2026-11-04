@@ -6,9 +6,8 @@
 | 파일 | 내용 |
 |---|---|
 | `map.jsp` | (a) 번들 — 엔진이 지도를 만든다. 서버 값(키·주소·사용자)을 모델 → `data-` 속성 → 엔진 옵션으로 넘긴다. 실제 백엔드에 붙는다(`GisMap.adapters.rest()`·`proxy()`) |
-| `map.html` | `map.jsp`와 같은 화면의 정적 HTML. 백엔드 없이 뜬다(레이어 트리 = 메모리 소스) |
+| (정적 판) | 백엔드 없이 뜨는 정적 예제는 **`../gis-demo/`**(`index.html`·`create.html`·`attach.html`·`map.jsp`)로 옮겼다 — 서버 없이 폴더째 복사하면 열린다. 빌드 `npm run build:gis-demo` → `dist/gis-demo/`, 자세한 내용은 `../gis-demo/README.txt` |
 | `attach.jsp` | (b) attach 번들 — 업무 화면이 전역 `ol`로 **이미 만든 지도**에 엔진을 붙인다 |
-| `attach.html` | `attach.jsp`와 같은 화면의 정적 HTML. 백엔드 없이 뜬다. 붙이기/떼기 단추로 호스트 지도가 원래대로 돌아오는 것을 본다 |
 
 ## 0. 어느 번들을 쓰나
 
@@ -157,7 +156,7 @@ jQuery로 써도 같다: `$('#btnArea').on('click', function () { map.tools.acti
 ## 6. 기존 OL 지도에 붙이기 — (b) attach 번들
 
 업무 화면이 이미 `<script src="ol.js">`(공식 full build, 전역 `ol`)로 `new ol.Map(...)`을 만들어 쓰고 있고, 거기에 측정·그리기·반경·필지 강조·
-레이어 트리 관리만 얹고 싶을 때 쓴다. 예제: `attach.html`(정적), `attach.jsp`.
+레이어 트리 관리만 얹고 싶을 때 쓴다. 예제: `attach.jsp`(서버 렌더), `../gis-demo/attach.html`(정적 — 붙이기/떼기 단추로 호스트 지도가 원래대로 돌아오는 것을 본다).
 
 ```html
 <link rel="stylesheet" href="/resources/ol/9.2.4/ol.css">                    <!-- 업무 화면이 원래 쓰던 ol -->
@@ -281,4 +280,4 @@ px로 바꿀지는 설계 결정 대기다.
 `ol.renderer.canvas.Layer`를 상속하며, 번들이 뜨는 순간 그 상속이 성공하는 것까지는 버전마다 확인됐다.
 
 **(4) (a) 번들 지도에는 OL 저작자 표시 컨트롤이 없다** — 번들 ol은 숨은 사본이라 페이지가 `ol.control.Attribution`을 만들어 넣을 수 없다.
-OpenStreetMap 타일처럼 저작자 표시가 필요한 타일을 쓰면 `map.html`처럼 페이지가 지도 위에 문구를 직접 보인다. attach는 업무 지도의 컨트롤을 그대로 쓴다.
+OpenStreetMap 타일처럼 저작자 표시가 필요한 타일을 쓰면 `../gis-demo/create.html`처럼 페이지가 지도 위에 문구를 직접 보인다. attach는 업무 지도의 컨트롤을 그대로 쓴다.

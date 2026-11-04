@@ -1,2 +1,5 @@
 # gis-map 패키지 UMD 빌드 산출물 (npm run build:gis-umd)
 packages/*/dist/
+
+# 공개 데모 정적 예제 사본 (prebuild = npm run build:gis-demo -- --copy-to public/demo/umd)
+public/demo/umd/

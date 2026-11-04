@@ -1,7 +1,7 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%--
-  gis-map attach 번들(b) 예제 — 업무 화면이 원래 가진 OL 지도(전역 ol)에 엔진을 붙인다. 화면은 같은 폴더 attach.html과 같다.
+  gis-map attach 번들(b) 예제 — 업무 화면이 원래 가진 OL 지도(전역 ol)에 엔진을 붙인다. 백엔드 없이 먼저 보려면 ../gis-demo/attach.html(정적 예제 폴더, `npm run build:gis-demo`)을 연다 — 이 파일은 서버와 연동하는 실연동 틀이다.
   준비: dist/gis-map.attach.umd.js, dist/gis-map.attach.css(+ gis-map.attach.THIRD-PARTY-NOTICES.txt)를 webapp/resources/gis-map/<버전>/ 에 복사(README 6절).
         ol은 업무 프로젝트가 원래 쓰던 공식 full build(ol.js·ol.css, 7.1 이상)를 그대로 쓴다. 아래 경로는 예시다.
   Jakarta EE 10(Tomcat 10.1+, JSTL 3.0)이면 taglib uri를 "jakarta.tags.core"로 바꾼다.

@@ -1,0 +1,112 @@
+<!doctype html>
+<!--
+  gis-map UMD (a) 예제 — GisMap.create: 엔진이 지도(ol)를 만든다. 번들 안에 ol 9.2.4가 들어 있어 ol을 따로 불러오지 않는다.
+  이 폴더(gis-demo/)는 순수 정적 파일이다 — 서버 프로그램 없이 정적 폴더·JSP 옆에 폴더째 복사하면 열린다. 경로는 전부 상대 경로.
+  배경지도·VWorld 키는 demo-data.js 맨 위 두 줄에서 바꾼다(기본 OSM, 폐쇄망은 'none').
+  데이터는 전부 가상 샘플(번들 안 합성 생성기, 시드 고정)이고 서버 호출이 없다. 바깥으로 나가는 것은 배경 타일(OSM)뿐이다.
+  React·Tailwind·jQuery 없음. ES5 문법만 쓴다. map.jsp는 이 파일 앞에 JSP 지시자 한 줄을 붙인 것(빌드가 만든다).
+-->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>gis-map 예제: GisMap.create (UMD a)</title>
+<!-- CSS는 JS가 넣어 주지 않는다 — 번들과 같은 이름의 gis-map.css(= ol.css + 코어 CSS)를 직접 불러온다 -->
+<link rel="stylesheet" href="./lib/gis-map.css">
+<link rel="stylesheet" href="./demo.css">
+</head>
+<body>
+<div class="demo">
+    <aside class="demo-side">
+        <h1>GisMap.create 예제</h1>
+        <div class="demo-note">gis-map <span id="ver"></span> · 정적 HTML · 서버 호출 없음 · <span class="demo-badge">가상 데이터</span></div>
+        <div class="demo-note"><a href="./index.html">예제 목록</a> · 지역: <span id="regionName">-</span></div>
+
+        <h2>검색(샘플 장소·가상 필지)</h2>
+        <div><input id="searchInput" type="text" placeholder="예: 세종, 서울, 9012"><button type="button" id="btnSearch">검색</button></div>
+        <div id="searchResults"></div>
+
+        <h2>도구</h2>
+        <section id="tools">
+            <button type="button" data-tool="draw-point">점</button><button type="button" data-tool="draw-line">선</button><button type="button" data-tool="draw-polygon">면</button><button type="button" data-tool="draw-circle">원</button><button type="button" data-tool="draw-box">사각형</button><button type="button" data-tool="draw-text">텍스트</button><button type="button" data-tool="select">선택</button><br>
+            <button type="button" data-tool="measure-distance">거리측정</button><button type="button" data-tool="measure-area">면적측정</button><button type="button" data-tool="radius-search">반경</button><button type="button" data-tool="parcel-info">필지 정보</button>
+            <div class="demo-note">그리기·측정은 더블클릭 또는 우클릭으로 끝낸다. 같은 단추를 다시 누르면 꺼진다. 필지 정보는 시범 구역(세종 인근 격자)에서 필지를 누른다.</div>
+        </section>
+        <div id="parcelCard" class="demo-card" hidden></div>
+        <div style="margin-top:6px">
+            <button type="button" id="btnClear">전체 지우기</button><button type="button" id="btnPrint">출력(인쇄 창)</button><button type="button" id="btnPng">PNG 저장</button><button type="button" id="btnPdf">PDF 저장</button><button type="button" id="btnGeoJson">그린 도형 GeoJSON</button><button type="button" id="btnWind">바람(가상) 켜기/끄기</button><button type="button" id="btnRecreate">지도 다시 만들기(초기화)</button>
+        </div>
+
+        <h2>영역 분석(현재 화면)</h2>
+        <button type="button" id="btnAnalysis">분석 실행</button>
+        <div id="analysisResult"></div>
+
+        <h2>레이어</h2>
+        <section id="tree"><div class="demo-note">불러오는 중</div></section>
+
+        <h2>나만의지도(가상)</h2>
+        <section id="mymaps"></section>
+        <button type="button" id="btnStyle">시설 구분별 색(restyle)</button>
+        <div class="demo-note">큰 데이터 — 켜면 원 + 숫자로 묶이고, 원을 누르거나 확대하면 점으로 풀린다.</div>
+        <div id="bigButtons"></div>
+
+        <h2>기록</h2>
+        <div id="log" class="demo-log"></div>
+    </aside>
+    <!-- 지도 요소: class "gm-root"는 필수(없으면 ol.css가 하나도 안 걸린다) -->
+    <div id="map" class="gm-root demo-map"><div id="attrib" class="demo-attrib" hidden>© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</div></div>
+</div>
+
+<script src="./lib/gis-map.umd.js"></script>
+<script src="./demo-data.js"></script>
+<script>
+(function () {
+    'use strict';
+    var gis = null;
+    var unbind = null;
+
+    function log(msg) {
+        var el = document.getElementById('log');
+        el.textContent += msg + '\n';
+        el.scrollTop = el.scrollHeight;
+    }
+
+    function createMap() {
+        var demo = GisDemoData.make(GisMap);
+        gis = GisMap.create({
+            target: 'map',
+            host: {
+                // 이 예제는 서버를 부르지 않는다. 세션·CSRF 헤더를 넣는 법은 examples/jsp/map.jsp를 본다
+                http: { credentials: 'same-origin', getHeaders: function () { return {}; } },
+                keys: { vworld: VWORLD_KEY }
+            },
+            sources: demo.sources,
+            layers: demo.config.layers,
+            print: demo.config.print,
+            view: { center: demo.view.center, zoom: demo.view.zoom }
+        });
+        GisMap.controls.scaleLine(gis);
+        unbind = GisDemoData.bind(gis, { GisMap: GisMap, demo: demo, log: log });
+        log('지도 생성 ' + gis.id + ' · 배경 ' + demo.basemap);
+    }
+
+    document.getElementById('btnGeoJson').onclick = function () {
+        var fc = gis.draw.toGeoJSON();
+        log('도형 ' + fc.features.length + '개: ' + JSON.stringify(fc).slice(0, 300));
+    };
+    // 지도 다시 만들기 = destroy 후 create. 소스(가상 저장소)도 새로 만들어지므로 처음 상태로 돌아간다
+    document.getElementById('btnRecreate').onclick = function () {
+        unbind();
+        gis.destroy();
+        log('destroy 후 OL 레이어 ' + gis.olMap.getLayers().getLength() + ' · interaction ' + gis.olMap.getInteractions().getLength() +
+            ' · overlay ' + gis.olMap.getOverlays().getLength() + ' · control ' + gis.olMap.getControls().getLength());
+        createMap();
+    };
+
+    document.getElementById('ver').textContent = GisMap.version;
+    createMap();
+})();
+</script>
+</body>
+</html>

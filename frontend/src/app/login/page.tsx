@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff, LogIn, Shield } from 'lucide-react'
+import { Eye, EyeOff, LogIn, Play, Shield } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import type { AuthUser } from '@/stores/authStore'
 
@@ -153,6 +154,18 @@ export default function LoginPage() {
                         </button>
                     </form>
                 </div>
+
+                {/* 로그인 없이 공개 데모 */}
+                <p className="text-center mt-5">
+                    <Link
+                        href="/demo"
+                        className="inline-flex items-center gap-1.5 text-sm transition-colors hover:underline"
+                        style={{ color: 'var(--accent)' }}
+                    >
+                        <Play size={14} />
+                        로그인 없이 데모 둘러보기
+                    </Link>
+                </p>
             </div>
         </div>
     )

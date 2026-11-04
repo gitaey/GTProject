@@ -23,11 +23,12 @@ packages/gis-map/
 │   ├── ui/          선택형 위젯(MapShell, MapHeader, SearchBar, MapToolbar, LayerPanel, ImagePanel, MyMapPanel, MapStatusBar …)
 │   ├── adapters/
 │   │   ├── rest/    짝 Spring 백엔드({ success, message, data }) — 레이어 트리·개인 레이어 설정·나만의지도·GeoTIFF·바람길
-│   │   └── proxy/   호스트 프록시 규약 — VWorld 주소 검색·필지·지역명·범례, WFS, GeoServer 범례 이미지
+│   │   ├── proxy/   호스트 프록시 규약 — VWorld 주소 검색·필지·지역명·범례, WFS, GeoServer 범례 이미지
+│   │   └── memory/  서버 없는 데이터 공급원 — 이미 가진 GeoJSON·목록으로 소스를 만든다(`memory(data)`), 합성 샘플 한 벌(`demo(opts)`, 시드 고정·가상 PNU). 정적 예제 gis-demo·공개 웹 데모가 같은 코드를 쓴다
 │   ├── styles/      gis-map.css(리셋·--gm-* 변수·코어 DOM) · gis-map-ui.css(위젯). 클래스는 전부 gm- 접두사, Tailwind 없음
 │   ├── standalone.ts         UMD (a) 진입점(ol 포함)
 │   └── standalone-attach.ts  UMD (b) 진입점(ol 제외, 전역 ol 사용)
-├── examples/        standalone.html(개발 서버) · jsp/{map,attach}.{jsp,html} + jsp/README.md(JSP 상세 안내)
+├── examples/        standalone.html(개발 서버) · jsp/{map,attach}.jsp(서버 연동 틀) + jsp/README.md(JSP 상세 안내) · gis-demo/(서버 없이 열리는 정적 예제 폴더: index·create·attach.html, demo-data.js, README.txt — 빌드가 lib/·map.jsp를 더해 dist/gis-demo/를 만든다)
 ├── vite.config.ts   UMD 빌드·개발 서버 설정 (Next 빌드와 무관)
 ├── COMPATIBILITY.md attach 번들의 ol 버전 호환 표
 └── THIRD-PARTY-NOTICES.md  번들에 들어가는 서드파티 라이선스 원문(저장소용 사본)
@@ -42,7 +43,7 @@ GTProject에서는 `bash .claude/skills/map-module-export/scripts/audit-portabil
 필요한 것: `ol@^9.2`, `proj4@^2.20`, `react>=18`, `react-dom`, `lucide-react`(위젯을 쓸 때), `ol-wind@^1.1`(바람길을 쓸 때).
 
 1. 이 폴더를 대상 프로젝트에 복사하고, 경로 별칭 6개를 잡는다(GTProject는 `frontend/tsconfig.json` `paths`):
-   `@gtp/gis-map/core`, `/core/wind`, `/react`, `/ui`, `/adapters/rest`, `/adapters/proxy` → 각 `src/.../index.ts`. 앱은 이 6개만 import한다.
+   `@gtp/gis-map/core`, `/core/wind`, `/react`, `/ui`, `/adapters/rest`, `/adapters/proxy`, `/adapters/memory` → 각 `src/.../index.ts`. 앱은 이 7개만 import한다.
 2. 전역 CSS에 순서대로: `ol/ol.css` → `src/styles/gis-map.css` → `src/styles/gis-map-ui.css`.
 3. 조립:
 
@@ -104,6 +105,8 @@ export default function MapPage() {
 ```
 
 서버 값(키·주소·CSRF 토큰)을 넘기는 법, `<c:url>`을 쓰지 않는 이유, bfcache·AMD 로더 대응은 **`examples/jsp/README.md`**에 있다.
+
+**서버 없이 시험·시연(`adapters/memory`)**: `sources: [GisMap.adapters.memory(data)]` — `data`(레이어 트리·나만의지도 레이어 GeoJSON·필지+건물·장소·지역·영역 분석 레이어·바람 프레임·공유 상대)에 넣은 항목의 소스만 만든다(없는 항목은 그 기능이 꺼짐). 저장소(나만의지도 수정·삭제·공유)는 호출마다 새로 만든 객체라 소스를 다시 만들면 처음 상태다. `GisMap.adapters.demo({ basemap: 'osm' | 'vworld' | 'both' | 'none', vworldKey, bigCounts })`은 합성 샘플 한 벌(세종 인근 가상 필지 300개·건물·시설·노선·큰 점 데이터·바람 9프레임, 시드 고정, 가상 PNU는 `3611099900` + 본번 9000번대)과 배경지도 설정을 `{ sources, config, view, notice, data }`로 돌려준다. 서버 호출 0 — 업로드 계열은 안내 문구로 reject한다. 이 어댑터로 만든 정적 예제는 `examples/gis-demo/`.
 
 ## 3. 기존 지도에 붙이기 — UMD (b) `GisMap.attach`
 
@@ -438,9 +441,10 @@ const setup = (map) => { map.use(createWindPlugin({ monoColor: (mode) => (mode =
 |---|---|
 | `npm run build:gis-umd` | (a)·(b)를 차례로 빌드 → `dist/gis-map.umd.js`·`gis-map.es.js`·`gis-map.css`, `dist/gis-map.attach.umd.js`·`gis-map.attach.css`, 번들마다 `*.THIRD-PARTY-NOTICES.txt`. 두 빌드 모두 `dist`를 비우지 않는다 |
 | `npx vite build -c packages/gis-map/vite.config.ts [--mode attach]` | 한쪽만 다시 빌드 |
+| `npm run build:gis-demo` (= `node scripts/build-gis-demo.mjs [--copy-to <dir>]`) | 서버 없이 열리는 정적 예제 폴더 조립 → `dist/gis-demo/`(`examples/gis-demo/*` + `lib/`(번들 6파일 + `ol.js`·`ol.css`·`LICENSE.md`) + 생성한 `map.jsp`). `dist/`의 UMD 산출물이 없거나 소스보다 오래됐으면 스스로 vite build 두 번을 돌리고(깨끗한 체크아웃·CI에서도 성공, vite가 없으면 이유를 말하고 실패), 조립 뒤 이식성 검사(서버 경로·절대 경로·`fetch`·`type="module"` 등)를 하며 위반이면 실패한다. `--copy-to`는 대상 폴더를 비운 뒤 복사(`prebuild`가 `public/demo/umd`로) |
 | `npm run dev:gis-standalone` | 개발 서버 5199 → `/examples/standalone.html`(Tailwind 없는 환경 확인, `?host=real`이면 로컬 백엔드·프록시에 붙음) |
 
-`dist/`는 git에 올리지 않는다(`.gitignore`). CI·배포는 이 빌드를 돌리지 않는다. React 앱은 빌드 없이 소스를 그대로 쓴다.
+`dist/`는 git에 올리지 않는다(`.gitignore`). GTProject의 `npm run build`는 `prebuild`로 `build:gis-demo`를 먼저 돌려 `public/demo/umd/`(웹 데모의 정적 예제)를 만든다 — vite 두 번이 더 든다(약 9초). React 앱은 빌드 없이 소스를 그대로 쓴다.
 
 ## 알려진 제한
 

@@ -77,6 +77,7 @@ export { scaleDenominator, framePxWidthForScale, niceBarMeters, planScaleBar, fo
 export { formatPrintDate } from './print/renderPage'
 export { minimalPdf } from './lib/minimalPdf'
 export { saveBlob } from './lib/saveBlob'
+export { transformGeoJson } from './lib/geoJsonTransform'
 
 // 필지 정보 카드 — map.parcelInfo. 지목 표·면적 계산도 공개(호스트가 자기 화면을 만들 때)
 export { INITIAL_PARCEL_INFO_STATE } from './parcelInfo/types'

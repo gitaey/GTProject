@@ -11,6 +11,7 @@ import type { GisMap } from './core'
 import { createWindPlugin } from './core/wind'
 import { restSources } from './adapters/rest'
 import { proxySources } from './adapters/proxy'
+import { memorySources, demoSources } from './adapters/memory'
 
 /** 패키지 버전(core GIS_MAP_VERSION) */
 export const version = GIS_MAP_VERSION
@@ -23,8 +24,11 @@ export { createGisMap }
 /** 플러그인: map.use(GisMap.plugins.wind()) — 바람장 소스(host 또는 options.source)가 있어야 그린다 */
 export const plugins = Object.freeze({ wind: createWindPlugin })
 
-/** 데이터 소스 어댑터: sources: [GisMap.adapters.rest(), GisMap.adapters.proxy()] */
-export const adapters = Object.freeze({ rest: restSources, proxy: proxySources })
+/**
+ * 데이터 소스 어댑터: sources: [GisMap.adapters.rest(), GisMap.adapters.proxy()].
+ * memory(data) = 이미 가진 데이터(GeoJSON·목록)로 서버 없이 소스를 만든다. demo(opts) = 합성 샘플 데이터 + 배경지도 설정 한 벌({ sources, config, view, notice }) — 정적 예제 gis-demo가 쓴다.
+ */
+export const adapters = Object.freeze({ rest: restSources, proxy: proxySources, memory: memorySources, demo: demoSources })
 
 /**
  * 축척 막대(OL ScaleLine)를 붙인다. 번들 안의 ol 사본으로 만들어야 하므로(페이지의 전역 ol로 만든 컨트롤은 섞을 수 없다) 여기서 제공한다.

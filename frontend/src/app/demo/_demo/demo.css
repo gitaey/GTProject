@@ -1,0 +1,447 @@
+/* 공개 데모(/demo/map) 화면 틀 · 안내 띠 · 가이드 투어. 클래스는 전부 demo- 접두사(패키지 gm-·ol- 선택자와 겹치지 않게).
+   투어는 지도 위에 겹치지 않고 "옆(데스크톱)·아래(모바일)"에 놓는 배치라 지도 위젯 z-index(10~50, 모달 포털 1000)와 부딪히지 않는다.
+   브레이크포인트는 패키지와 같은 md = 48rem(768px). 색은 지도 위젯(항상 밝은 테마)에 맞춰 고정값. */
+
+.demo-root {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    background: #fff;
+    color: #111827;
+    font-size: 13px;
+}
+
+.demo-root--loading {
+    background: #f6f7f9;
+}
+
+/* ── 안내 띠 ── */
+.demo-band {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    height: 32px;
+    padding: 0 14px;
+    background: #fff8f3;
+    border-bottom: 1px solid #fed7aa;
+    color: #9a3412;
+    font-size: 12px;
+}
+
+.demo-band__tag {
+    font-weight: 800;
+}
+
+.demo-band__text {
+    min-width: 0;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.demo-band__short {
+    display: none;
+}
+
+.demo-band__right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.demo-band__btn,
+.demo-band__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #f26722;
+    font: inherit;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.demo-band__btn[aria-pressed="true"] {
+    color: #9a3412;
+}
+
+.demo-seg {
+    display: inline-flex;
+    border: 1px solid #fdba74;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.demo-seg button {
+    padding: 2px 9px;
+    border: 0;
+    background: #fff;
+    color: #9a3412;
+    font: inherit;
+    font-size: 11.5px;
+    cursor: pointer;
+}
+
+.demo-seg button[aria-pressed="true"] {
+    background: #f26722;
+    color: #fff;
+    font-weight: 600;
+}
+
+/* ── 본문: 투어 + 지도 ── */
+.demo-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+}
+
+.demo-stage {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+}
+
+.demo-stage__fill {
+    position: absolute;
+    inset: 0;
+}
+
+.demo-attr {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    max-width: 70%;
+    padding: 1px 6px;
+    background: rgba(255, 255, 255, 0.8);
+    border-top-left-radius: 3px;
+    color: #333;
+    font-size: 10.5px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+/* ── 가이드 투어 ── */
+.demo-tour {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    width: 300px;
+    min-height: 0;
+    background: #fff;
+    border-right: 1px solid #e5e7eb;
+}
+
+.demo-tour--collapsed {
+    display: none;
+}
+
+.demo-tour__bar {
+    display: none;
+}
+
+.demo-tour__panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.demo-tour__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    padding: 12px 14px 8px;
+    font-size: 13px;
+}
+
+.demo-tour__count {
+    color: #6b7280;
+    font-weight: 400;
+}
+
+.demo-tour__close {
+    display: inline-flex;
+    margin-left: auto;
+    padding: 2px;
+    border: 0;
+    background: none;
+    color: #9ca3af;
+    cursor: pointer;
+}
+
+.demo-tour__prog {
+    flex-shrink: 0;
+    height: 4px;
+    margin: 0 14px 10px;
+    background: #f3f4f6;
+    border-radius: 2px;
+}
+
+.demo-tour__prog i {
+    display: block;
+    height: 100%;
+    background: #f26722;
+    border-radius: 2px;
+}
+
+.demo-tour__list {
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+    padding: 0 8px;
+    list-style: none;
+    overflow-y: auto;
+}
+
+.demo-tour__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-shrink: 0;
+    padding: 10px 14px;
+    border-top: 1px solid #e5e7eb;
+}
+
+/* 단계 */
+.demo-step {
+    border-radius: 8px;
+}
+
+.demo-step--cur {
+    background: #fff8f3;
+}
+
+.demo-step__head {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    padding: 8px;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    color: #374151;
+    font: inherit;
+    font-size: 12.5px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.demo-step__head:hover {
+    background: #f9fafb;
+}
+
+.demo-step--cur .demo-step__head:hover {
+    background: transparent;
+}
+
+.demo-step--done .demo-step__head {
+    color: #6b7280;
+}
+
+.demo-step__n {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 50%;
+    color: #6b7280;
+    font-size: 10.5px;
+}
+
+.demo-step--done .demo-step__n {
+    background: #16a34a;
+    border-color: #16a34a;
+    color: #fff;
+}
+
+.demo-step--cur .demo-step__n {
+    background: #f26722;
+    border-color: #f26722;
+    color: #fff;
+}
+
+.demo-step--cur .demo-step__title {
+    color: #111827;
+    font-weight: 700;
+}
+
+.demo-step__body {
+    padding: 0 8px 10px 38px;
+}
+
+.demo-step__text {
+    margin: 0 0 8px;
+    color: #374151;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.demo-step__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.demo-tag {
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 10.5px;
+    font-weight: 700;
+}
+
+.demo-tag--sample {
+    background: #f0fdf4;
+    color: #16a34a;
+}
+
+.demo-tag--real {
+    background: #eff6ff;
+    color: #2563eb;
+}
+
+.demo-tag--browser {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.demo-step__note {
+    margin: 0 0 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: #fffbeb;
+    color: #b45309;
+    font-size: 11.5px;
+    line-height: 1.5;
+}
+
+.demo-step__acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.demo-step__msg {
+    margin: 8px 0 0;
+    color: #b91c1c;
+    font-size: 11.5px;
+    line-height: 1.5;
+}
+
+.demo-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 7px;
+    background: #fff;
+    color: #374151;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.demo-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.demo-btn--pri {
+    background: #f26722;
+    border-color: #f26722;
+    color: #fff;
+}
+
+/* ── 모바일(768px 미만): 투어는 지도 아래 시트, 접으면 한 줄 막대 ── */
+@media (max-width: 47.99rem) {
+    .demo-band {
+        height: 28px;
+        padding: 0 10px;
+        font-size: 11px;
+    }
+
+    .demo-band__long,
+    .demo-band__link,
+    .demo-band__btn--tour,
+    .demo-seg {
+        display: none;
+    }
+
+    .demo-band__short {
+        display: inline;
+    }
+
+    .demo-body {
+        flex-direction: column;
+    }
+
+    .demo-stage {
+        order: 1;
+    }
+
+    .demo-tour {
+        order: 2;
+        width: auto;
+        max-height: 46vh;
+        max-height: 46dvh;
+        border-right: 0;
+        border-top: 1px solid #e5e7eb;
+        box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.12);
+    }
+
+    .demo-tour--collapsed {
+        display: flex;
+        max-height: none;
+    }
+
+    .demo-tour--collapsed .demo-tour__panel {
+        display: none;
+    }
+
+    .demo-tour--collapsed .demo-tour__bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 11px 14px;
+        border: 0;
+        background: #fff;
+        color: #111827;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .demo-tour__bar-text {
+        flex: 1;
+        min-width: 0;
+        text-align: left;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+    }
+}

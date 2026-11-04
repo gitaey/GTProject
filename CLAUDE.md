@@ -20,7 +20,7 @@ DB는 PostgreSQL 16 + PostGIS(Docker). 지오메트리는 hibernate-spatial 없�
 
 1. **지도 모듈 이식성** — 지도는 `frontend/packages/gis-map/` 폴더 하나다: `core`(React 무관 엔진) · `react` · `ui` · `adapters` · `styles`.
    안에서는 상대 경로로만 import하고(`ui → react → core`, `adapters → core`), 앱 코드·`process.env`·모듈 전역 상태·Tailwind·호스트 경로를 쓰지 않는다.
-   인증·주소·키·권한은 `GisMapHost`로, 데이터는 `GisMapSources`(어댑터)로 주입받는다. GTProject 연결부는 `app/map/page.tsx`·`app/map/_gtp/`뿐이다.
+   인증·주소·키·권한은 `GisMapHost`로, 데이터는 `GisMapSources`(어댑터)로 주입받는다. GTProject 연결부는 `app/map/page.tsx`·`app/map/_gtp/`·`app/demo/`(공개 데모)뿐이다.
    쓰는 법은 세 가지 — React `MapShell`, 비-React UMD `GisMap.create`, 기존 ol 지도에 `GisMap.attach`(attachGisMap).
    다른 원칙과 충돌하면 이것이 우선한다. 상세: `.claude/rules/map.md`
 2. **도메인 독립** — 새 백엔드 도메인은 다른 도메인의 엔티티/리포지토리를 import하지 않는다.
@@ -44,6 +44,7 @@ npx tsc --noEmit     # 타입 검사 — npm run lint는 eslint-plugin-next 설�
 npx tsc -p packages/gis-map --noEmit   # 지도 패키지 단독 타입 검사
 npm run build:gis-umd       # 지도 UMD 번들 (a) 일반 + (b) attach → packages/gis-map/dist/ (gitignore, CI 안 돌림)
 npm run dev:gis-standalone  # 지도 패키지 단독 개발 서버 5199 (Tailwind 없는 환경 확인)
+npm run build:gis-demo      # 정적 예제 폴더 조립 → packages/gis-map/dist/gis-demo/ (`-- --copy-to public/demo/umd`면 웹 /demo/umd 사본; npm run build의 prebuild가 자동 실행)
 
 # backend/  (bot/도 동일)
 ./mvnw spring-boot:run
@@ -89,3 +90,4 @@ npm run dev:gis-standalone  # 지도 패키지 단독 개발 서버 5199 (Tailwi
 | 2026-10-02 | 지도 모듈 전면 재개편 — 옛 세 폴더를 `frontend/packages/gis-map`(core/react/ui/adapters/styles)으로 재구성, `GisMapHost`·`GisMapSources` 주입, 지도 인스턴스별 상태(한 화면 지도 2개), Tailwind 제거(gm- CSS), UMD (a)·attach (b) 번들과 ol 7.1~10.x 호환 표, 백엔드 `map` User FK 제거·`global/gis`(GisErrorCode·GisUserContext)·이식 문서(references), 감사 스크립트 최종판(15항목) | frontend 지도 모듈 전면, `app/map`, 지도 백엔드 도메인, rules/skills/agents | 지도 재사용성 — JSP·전자정부·기존 ol 지도 부착 지원 |
 | 2026-10-14 | 에이전트 모델 조정 — planner·qa·security-reviewer·region-code-manager는 opus, backend-dev·frontend-dev·map-dev·arch/perf/style-reviewer는 sonnet(토큰 절감). 바람지도 탭 작업을 `fullstack-pipeline`(planner→map-dev→qa 3회→메인 브라우저 확인)으로 수행 | `.claude/agents/*`, 바람길 도메인·지도 패키지 | 하네스 토큰 사용량이 커서 구현 계열을 sonnet으로 내림 |
 | 2026-10-22 | 토큰 절약 규칙 — 구현 에이전트: 변이 시험 핵심 30개 안팎·수정 루프는 바뀐 곳만·퍼즈는 1회·도구 호출 약 100회, qa: 바뀐 파일 범위 표본 확인, 파이프라인: QA는 단계 끝에 한 번·수정 루프 기본 1회·작은 변경은 직접·새 단계는 새 에이전트 | `.claude/agents/map-dev.md`, `qa.md`, `skills/fullstack-pipeline/SKILL.md` | 구현 에이전트가 전체 토큰의 약 70%(변이 시험·긴 도구 호출·이어 쓰기로 맥락 증가)를 써서 주간 한도에 걸림 |
+| 2026-11-03 | 공개 데모 `/demo`(로그인 없이 열림, noindex) 추가, `/proxy/**` 로그인 필수화, `npm run build`에 `prebuild`(정적 예제 조립) 추가 | `frontend/src/middleware.ts`, `app/demo`, `app/proxy`, `package.json` | 이식 데모 공개, 익명이 VWorld 키 한도를 쓰는 것 차단 |

@@ -25,7 +25,8 @@
       "@gtp/gis-map/react": ["./packages/gis-map/src/react/index.ts"],
       "@gtp/gis-map/ui": ["./packages/gis-map/src/ui/index.ts"],
       "@gtp/gis-map/adapters/rest": ["./packages/gis-map/src/adapters/rest/index.ts"],
-      "@gtp/gis-map/adapters/proxy": ["./packages/gis-map/src/adapters/proxy/index.ts"]
+      "@gtp/gis-map/adapters/proxy": ["./packages/gis-map/src/adapters/proxy/index.ts"],
+      "@gtp/gis-map/adapters/memory": ["./packages/gis-map/src/adapters/memory/index.ts"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

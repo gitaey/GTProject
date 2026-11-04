@@ -1,7 +1,7 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%--
-  gis-map UMD (a) 예제 — 순수 서블릿 컨테이너 JSP(Spring MVC·eGov 공통). 화면은 같은 폴더 map.html과 같다.
+  gis-map UMD (a) 예제 — 순수 서블릿 컨테이너 JSP(Spring MVC·eGov 공통). 백엔드 없이 먼저 보려면 ../gis-demo/(정적 예제 폴더, `npm run build:gis-demo`)를 연다 — 이 파일은 서버(JSTL·CSRF·contextPath)와 연동하는 실연동 틀이다.
   준비: dist/gis-map.umd.js, dist/gis-map.css 두 파일을 webapp/resources/gis-map/<버전>/ 에 복사(README.md 1절).
   Jakarta EE 10(Tomcat 10.1+, JSTL 3.0)이면 taglib uri를 "jakarta.tags.core"로 바꾼다.
 

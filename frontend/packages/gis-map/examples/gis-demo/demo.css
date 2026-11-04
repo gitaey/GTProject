@@ -1,0 +1,60 @@
+/* gis-demo 예제 페이지(업무 화면) 자체의 모양. 지도 모듈 CSS(lib/gis-map*.css)가 아니다 — 클래스는 전부 demo- 접두사 */
+/* 글자 크기는 body에만 준다 — html 글자 크기를 바꾸면 rem으로 쓴 지도 모듈 CSS(측정 툴팁 등)의 크기도 같이 바뀐다 */
+html, body { margin: 0; height: 100%; }
+body { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; font-size: 14px; color: #222; }
+
+.demo { display: flex; height: 100%; }
+.demo-side { width: 300px; flex: none; overflow-y: auto; padding: 12px; border-right: 1px solid #ddd; box-sizing: border-box; background: #fafafa; }
+.demo-side h1 { font-size: 16px; margin: 0 0 4px; }
+.demo-side h2 { font-size: 13px; margin: 14px 0 6px; color: #555; }
+.demo-side button { margin: 0 4px 4px 0; padding: 4px 8px; border: 1px solid #bbb; background: #fff; border-radius: 3px; cursor: pointer; font-size: 12px; }
+.demo-side button.is-on { background: #f26722; border-color: #f26722; color: #fff; }
+.demo-side button:disabled { opacity: .45; cursor: default; }
+.demo-side ul { list-style: none; margin: 0; padding-left: 14px; }
+.demo-side section > ul { padding-left: 0; }
+.demo-side label { cursor: pointer; }
+.demo-side input[type=text] { width: 170px; padding: 3px 5px; font-size: 12px; border: 1px solid #bbb; border-radius: 3px; }
+.demo-group { font-weight: bold; }
+.demo-note { color: #777; font-size: 12px; }
+.demo-sub { font-size: 12px; font-weight: bold; margin-top: 4px; }
+.demo-badge { display: inline-block; padding: 1px 6px; border-radius: 8px; background: #fff3e8; color: #b8470d; font-size: 11px; border: 1px solid #f5c9a6; }
+.demo-tag { margin-left: 6px; padding: 0 5px; border-radius: 8px; background: #fff3e8; color: #b8470d; font-size: 11px; border: 1px solid #f5c9a6; }
+.demo-check { margin: 4px 0; padding: 3px 6px; border-radius: 3px; font-size: 12px; }
+.demo-check.is-ok { background: #e8f5e9; color: #1b5e20; }
+.demo-check.is-bad { background: #fdecea; color: #b71c1c; }
+.demo-log { font: 11px/1.4 Consolas, monospace; background: #fff; border: 1px solid #ddd; height: 150px; overflow-y: auto; padding: 4px; white-space: pre-wrap; }
+.demo-result { display: block; width: 100%; text-align: left; }
+.demo-card { margin-top: 6px; padding: 6px 8px; background: #fff; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
+.demo-card-head { display: flex; align-items: center; }
+.demo-card-head button { margin: 0 0 0 auto; }
+.demo-card dl { display: grid; grid-template-columns: 70px 1fr; margin: 6px 0; row-gap: 2px; }
+.demo-card dt { color: #777; }
+.demo-card dd { margin: 0; }
+
+/* 지도 요소: 높이는 페이지가 준다. (a) create는 class "gm-root"가 필수 — ol.css 전체(.gm-root 안으로 한정)·축척 막대 모양·--gm-* 변수의 기준 */
+.demo-map { flex: 1; position: relative; min-width: 0; background: #e5e7eb; }
+/* 호스트 지도 위 업무 오버레이(attach 예제) */
+.host-pin { background: #1e40af; color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+/* OSM 타일 이용 조건: 지도 화면에 저작자 표시. (a) 번들은 OL 저작자 표시 컨트롤을 넣지 않으므로 페이지가 직접 보인다 */
+.demo-attrib { position: absolute; left: 6px; bottom: 6px; z-index: 1; font: 11px/1.4 Arial, sans-serif; color: #333; background: rgba(255, 255, 255, .8); padding: 1px 5px; border-radius: 3px; }
+.demo-attrib a { color: #0b57d0; }
+
+/* index.html */
+.demo-page { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; line-height: 1.6; }
+.demo-page h1 { font-size: 22px; margin: 0 0 4px; }
+.demo-page h2 { font-size: 16px; margin: 28px 0 8px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+.demo-page code, .demo-page pre { font: 12px/1.5 Consolas, monospace; background: #f3f4f6; border-radius: 3px; }
+.demo-page code { padding: 1px 4px; }
+.demo-page pre { padding: 8px 10px; overflow-x: auto; }
+.demo-page table { border-collapse: collapse; font-size: 13px; }
+.demo-page th, .demo-page td { border: 1px solid #ddd; padding: 4px 8px; text-align: left; }
+.demo-page .is-ok { color: #1b5e20; }
+.demo-page .is-bad { color: #b71c1c; }
+.demo-links li { margin: 4px 0; }
+
+@media (max-width: 600px) {
+    .demo { flex-direction: column; }
+    .demo-side { width: auto; max-height: 42%; border-right: 0; border-bottom: 1px solid #ddd; }
+    .demo-map { flex: 1; min-height: 240px; }
+    .demo-log { height: 80px; }
+}

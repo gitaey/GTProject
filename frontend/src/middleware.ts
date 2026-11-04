@@ -9,6 +9,11 @@ export function middleware(request: NextRequest) {
     const isLoginPage  = pathname === '/login'
     const isMapUser    = role === 'MAP_USER'
 
+    /* 공개 데모(/demo, /demo/**) — 토큰과 무관하게 통과(로그인 상태여도 그대로 연다). /demox 같은 이웃 경로는 해당 없음 */
+    if (pathname === '/demo' || pathname.startsWith('/demo/')) {
+        return NextResponse.next()
+    }
+
     /* 토큰 없이 보호된 페이지 접근 → 로그인으로 리다이렉트 */
     if (!token && !isLoginPage) {
         return NextResponse.redirect(new URL('/login', request.url))

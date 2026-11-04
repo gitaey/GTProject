@@ -90,7 +90,7 @@
 ## 다른 버전을 시험하려면
 
 1. 그 버전의 공식 full build `ol.js`·`ol.css`를 받는다 — 7.1.0 이상은 npm `ol@<버전>`의 `dist/ol.js`·`ol.css`, 그 아래는 GitHub 릴리스 자산(`v<버전>-dist.zip` 등).
-2. `npm run build:gis-umd`로 `dist/`를 만들고, `examples/jsp/attach.html` 사본에서 ol.js·ol.css 경로를 받은 파일로 바꿔 연다.
+2. `npm run build:gis-umd`로 `dist/`를 만들고, `npm run build:gis-demo`로 만든 `dist/gis-demo/`에서 `lib/ol/ol.js`·`ol.css`를 받은 파일로 바꿔 끼우고 `attach.html`을 연다(원본 `examples/gis-demo/attach.html`은 `lib/`가 없어 바로 열리지 않는다).
 3. 화면 왼쪽 위 `checkOl` 결과(7.1 미만이면 막힘이 정상), 붙이기 → 도구 10종(그리기·측정·반경·텍스트) → 떼기 뒤 기록 칸의 "레이어 · interaction · control · overlay" 수가
    붙이기 전과 같은지, 콘솔 오류 0을 본다. 7.1 미만을 시험하려면 붙이기 전에 콘솔에서 `ol.util.VERSION`을 7.1.0 이상 값으로 바꾼다(버전 검사만 건너뜀).
 4. 통과하면 이 표와 `TESTED_OL_MAX`(`src/core/olCompat.ts`)를 고친다. 최소 버전을 바꿀 때는 `MIN_OL_VERSION`도.

@@ -31,6 +31,7 @@ GTProject의 인증 스토어·환경 변수·전역 상태에 묶이면 옮길 
 | `src/react/` | `GisMapProvider`·`GisMapView`·훅 | + `react`, core |
 | `src/ui/` | 선택형 위젯(`MapShell` 등) | + `react`, `react-dom`, `lucide-react`, react·core |
 | `src/adapters/{rest,proxy}/` | 짝 백엔드 REST·호스트 프록시 형식 → `GisMapSources` | core만 |
+| `src/adapters/memory/` | 서버 없는 데이터 공급원: 이미 가진 데이터로 소스를 만든다(`memorySources`), 합성 샘플 한 벌(`demoSources`, 시드 고정·가상 PNU). 저장소는 호출마다 만든 객체(전역 상태 없음) | core만 |
 | `src/styles/` | `gis-map.css`(리셋·`--gm-*`·코어 DOM) · `gis-map-ui.css`(위젯) | — |
 | `src/standalone.ts` · `standalone-attach.ts` | UMD (a) 엔진이 지도 생성 / (b) 기존 ol 지도에 붙이기 | core·wind·adapters (React 금지) |
 
@@ -51,7 +52,7 @@ React는 `<GisMapProvider host={…}>`(바뀌면 `map.setHost`), UMD는 `GisMap.
 
 **GTProject 연결부(이식 안 함):** `app/map/page.tsx`(조립만) + `app/map/_gtp/`
 — `useGtpMapHost.ts`(authStore·menuStore·env → host), `gtpMap.tsx`(중심·브랜드 색·소스·바람길 플러그인·기타 패널 상수), `mapSession.ts`(앱 기억), `EtcPanel.tsx`.
-`app/map-admin/layer`는 엔진 없이 `usePersistentExpanded`와 `./types`만 쓴다. 앱은 공개 진입점 6개(`@gtp/gis-map/{core,core/wind,react,ui,adapters/rest,adapters/proxy}`)만 import한다.
+`app/map-admin/layer`는 엔진 없이 `usePersistentExpanded`와 `./types`만 쓴다. 앱은 공개 진입점 7개(`@gtp/gis-map/{core,core/wind,react,ui,adapters/rest,adapters/proxy,adapters/memory}`)만 import한다.
 
 **새 코드를 어디에 두나**
 
@@ -60,11 +61,12 @@ React는 `<GisMapProvider host={…}>`(바뀌면 `map.setHost`), UMD는 `GisMap.
 | 지도 동작(OL 레이어·interaction·계산), React와 무관 | `core/` — 상태는 인스턴스 필드 + `core/store.ts` 스토어, 엔진이 붙인 것은 `tracker`로 추적해 `destroy`에서 해제 |
 | 새 ol API를 core에서 사용 | `core/olCompat.ts` `REQUIRED_OL_API`에 추가(감사 15번이 강제). 타입만이면 `import type` |
 | 서버·프록시 URL과 응답 형식 | `adapters/rest` 또는 `adapters/proxy`. 새 데이터 종류면 `core/sources.ts` 인터페이스부터 |
+| 서버 없는 시연·시험용 가짜 데이터·소스 | `adapters/memory`(합성 생성기는 시드 고정, 가상 PNU는 `3611099900`+본번 9000번대 — 실제 지번과 겹치지 않게). 웹 데모(`app/demo`)·정적 예제(`examples/gis-demo`)가 같은 코드를 쓰므로 데이터 로직을 앱·예제 쪽에 따로 두지 않는다 |
 | 새 외부 값(인증·주소·키·권한) | `GisMapHost` 필드 + `DEFAULT_HOST` 기본값 → 앱은 `_gtp/useGtpMapHost.ts`에서 채움 |
 | React 훅·Provider | `react/` |
 | 화면 위젯 | `ui/` + `styles/gis-map-ui.css`(gm- 클래스, 동적 값만 인라인 style) |
 | 측정 툴팁·텍스트 입력·커서 안내 모양 | `styles/gis-map.css`(attach CSS는 빌드가 엔진 DOM 뿌리로 옮긴다) |
-| UMD 전역에 노출 | `standalone.ts` / `standalone-attach.ts` |
+| UMD 전역에 노출 | `standalone.ts` / `standalone-attach.ts`(`adapters: { rest, proxy, memory, demo }`) |
 | GTProject 전용(브랜드·중심좌표·기타 패널·페이지 이동 간 기억) | `app/map/_gtp/` |
 | 관리 화면 전용 타입·옵션 | `app/map-admin/layer/types.ts` |
 
@@ -88,6 +90,9 @@ React는 `<GisMapProvider host={…}>`(바뀌면 `map.setHost`), UMD는 `GisMap.
   attach UMD는 ol을 싣지 않고 전역 `ol` 하나만 바깥 모듈로 쓴다(가상 모듈 `olPath`/`olMember`, `vite.config.ts`). 최소 ol 7.1(`checkOl`, `COMPATIBILITY.md`).
 - CSS: (a) `gis-map.css`의 ol.css는 `.gm-root` 안으로 한정 → 엔진 지도 요소에 `gm-root` 필수. 호스트가 `--gm-*`·위젯 모양을 덮으려면 패키지 CSS **뒤**, `@layer` 밖.
   GTProject는 `app/globals.css`가 `ol/ol.css` 다음에 패키지 CSS 두 개를 상대 경로로 import한다.
+
+- 예제: `examples/standalone.html`(vite 개발 서버 전용) · `examples/jsp/{map,attach}.jsp`(JSTL 실연동 틀) · **`examples/gis-demo/`**(서버 없이 열리는 정적 예제 원본 — `index/create/attach.html`·`demo-data.js`(ES5, 설정 두 줄 `DEMO_BASEMAP`·`VWORLD_KEY` + 화면 조각, 데이터는 없다)·`demo.css`·`README.txt`).
+  `npm run build:gis-demo`(`frontend/scripts/build-gis-demo.mjs [--copy-to <dir>]`)가 UMD 산출물이 없거나 오래됐으면 스스로 vite build 두 번을 돌리고 `dist/gis-demo/`(+`lib/`·생성한 `map.jsp`)를 조립한다. 조립 뒤 이식성 검사(최상위 html·js·jsp에 서버 경로·절대 경로·`fetch`·`type="module"`·허용 목록 밖 외부 주소·없는 상대 파일)를 하며 위반이면 빌드가 실패한다. 이 폴더는 상대 경로만 쓰고 서버 호출 0이어야 한다(`file://`로도 열림).
 
 ## 백엔드 지도 도메인
 

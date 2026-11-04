@@ -88,7 +88,7 @@ GTProject 전용 값은 `frontend/src/app/map/_gtp/`로(map.md "새 코드를 �
    뷰가 3857이 아니면 그 좌표계 ↔ 4326 변환이 등록돼 있어야 한다(`projections` 옵션 또는 업무 쪽 `ol.proj.proj4.register`).
    업무 ol 좌표계 목록을 건드리기 싫으면 `projections: false`.
 4. 업무 화면이 Select·Draw를 늘 켜 두면 엔진 도구와 클릭이 겹칠 수 있다 — 업무 쪽을 끄는 것은 업무 화면 몫. `gis.destroy()`는 엔진이 붙인 것만 뗀다.
-5. 틀: `examples/jsp/attach.jsp`(서버 렌더), `attach.html`(정적, 붙였다 떼기 확인).
+5. 틀: `examples/jsp/attach.jsp`(서버 렌더), `examples/gis-demo/attach.html`(정적, 붙였다 떼기 확인 — `npm run build:gis-demo`로 `dist/gis-demo/`를 만든다).
 
 ### D. 백엔드
 

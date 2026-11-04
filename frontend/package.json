@@ -4,10 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "prebuild": "npm run build:gis-demo -- --copy-to public/demo/umd",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "build:gis-umd": "vite build -c packages/gis-map/vite.config.ts && vite build -c packages/gis-map/vite.config.ts --mode attach",
+    "build:gis-demo": "node scripts/build-gis-demo.mjs",
     "dev:gis-standalone": "vite -c packages/gis-map/vite.config.ts"
   },
   "dependencies": {

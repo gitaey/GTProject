@@ -462,9 +462,9 @@ echo "[10/15] 좌표계 하드코딩 (core의 'EPSG:3857'은 core/config.ts·cor
 mapfile -t CORE_NO_CFG < <(for f in "${CORE_FILES[@]}"; do case "${f#"$PKG"/}" in core/config.ts|core/projection.ts) ;; *) echo "$f" ;; esac; done)
 report 10 "$(g "['\"\`]EPSG:3857['\"\`]" "${CORE_NO_CFG[@]}")"
 
-echo "[11/15] 앱의 깊은 import (@gtp/gis-map/…는 공개 진입점 6개만, packages/gis-map 상대 경로 import 금지)"
+echo "[11/15] 앱의 깊은 import (@gtp/gis-map/…는 공개 진입점 7개만, packages/gis-map 상대 경로 import 금지)"
 report 11 "$(join_out \
-    "$(g "['\"]@gtp/gis-map[^'\"]*['\"]" "${APP_FILES[@]}" | gv "['\"]@gtp/gis-map/(core|core/wind|react|ui|adapters/rest|adapters/proxy)['\"]")" \
+    "$(g "['\"]@gtp/gis-map[^'\"]*['\"]" "${APP_FILES[@]}" | gv "['\"]@gtp/gis-map/(core|core/wind|react|ui|adapters/rest|adapters/proxy|adapters/memory)['\"]")" \
     "$(g "(from|import|require)[[:space:]]*\(?[[:space:]]*['\"][^'\"]*packages/gis-map" "${APP_FILES[@]}")")"
 
 echo "[12/15] 옛 폴더 잔존 (frontend/src의 components/map·hooks/map·stores/map — FE-5a에서 삭제됨, 다시 생기면 실패)"

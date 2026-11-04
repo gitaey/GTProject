@@ -10,6 +10,7 @@
         "./ui": "./src/ui/index.ts",
         "./adapters/rest": "./src/adapters/rest/index.ts",
         "./adapters/proxy": "./src/adapters/proxy/index.ts",
+        "./adapters/memory": "./src/adapters/memory/index.ts",
         "./styles/gis-map.css": "./src/styles/gis-map.css",
         "./styles/gis-map-ui.css": "./src/styles/gis-map-ui.css"
     },
