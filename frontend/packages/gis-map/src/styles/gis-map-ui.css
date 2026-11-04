@@ -870,12 +870,12 @@
     user-select: none;
 }
 
-/* 옛: flex flex-col rounded-md overflow-hidden (+ 인라인 SHADOW) — 줌·바람길·초기화 묶음 */
+/* 옛: flex flex-col rounded-md overflow-hidden (+ 인라인 SHADOW) — 줌·바람길·초기화 묶음
+   overflow는 두지 않는다: 툴팁(.gm-toolbar__tip-pop)이 묶음 왼쪽 밖으로 나와서 잘린다. 모서리는 버튼별 --first/--last/--single이 둥글린다 */
 .gm-toolbar__group {
     display: flex;
     flex-direction: column;
     border-radius: var(--gm-radius-md);
-    overflow: hidden;
 }
 
 /* 옛: relative flex flex-col bg-white rounded-md (+ 인라인 SHADOW) — 그리기·측정·반경 묶음(패널이 밖으로 나와야 해서 overflow 없음) */
