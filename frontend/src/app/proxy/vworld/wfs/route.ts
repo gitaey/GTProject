@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireLogin } from '../../_auth'
 
 const VWORLD_KEY = process.env.NEXT_PUBLIC_VWORLD_API_KEY ?? ''
 const VWORLD_WFS = 'https://api.vworld.kr/req/wfs'
@@ -7,6 +8,9 @@ const DOMAIN = process.env.NODE_ENV === 'production'
     : 'http://localhost:3000'
 
 export async function GET(req: NextRequest) {
+    const denied = await requireLogin(req)
+    if (denied) return denied
+
     const { searchParams } = req.nextUrl
     const params = new URLSearchParams(searchParams.toString())
     params.set('key', VWORLD_KEY)

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireLogin } from '../../_auth'
 
 const VWORLD_KEY = process.env.NEXT_PUBLIC_VWORLD_API_KEY ?? ''
 const VWORLD_DATA = 'https://api.vworld.kr/req/data'
@@ -27,6 +28,9 @@ function reject(status: number, code: string, text: string): NextResponse {
 }
 
 export async function GET(req: NextRequest) {
+    const denied = await requireLogin(req)
+    if (denied) return denied
+
     const { searchParams } = req.nextUrl
     const data = searchParams.get('data') ?? ''
     if (!ALLOWED_DATA.test(data)) return reject(400, 'PROXY_REJECTED', '허용 목록에 없는 data 레이어입니다.')

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireLogin } from '../../../_auth'
 
 const GS_URL  = process.env.GEOSERVER_URL           ?? 'https://geo.gitaey-dev.com/geoserver'
 const GS_USER = process.env.GEOSERVER_ADMIN_USER     ?? 'admin'
@@ -8,6 +9,9 @@ export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ name: string }> },
 ) {
+    const denied = await requireLogin(req)
+    if (denied) return denied
+
     const { name } = await params
     const auth = Buffer.from(`${GS_USER}:${GS_PASS}`).toString('base64')
 

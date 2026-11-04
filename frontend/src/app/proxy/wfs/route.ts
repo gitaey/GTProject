@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireLogin } from '../_auth'
 
 const VWORLD_KEY = process.env.NEXT_PUBLIC_VWORLD_API_KEY ?? ''
 
 export async function GET(req: NextRequest) {
+    const denied = await requireLogin(req)
+    if (denied) return denied
+
     const { searchParams } = new URL(req.url)
     const typenames = searchParams.get('TYPENAMES') ?? ''
     const bbox = searchParams.get('BBOX') ?? ''

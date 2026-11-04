@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireLogin } from '../_auth'
 
 export async function GET(req: NextRequest) {
+    const denied = await requireLogin(req)
+    if (denied) return denied
+
     const { searchParams } = new URL(req.url)
     const lon = searchParams.get('lon')
     const lat = searchParams.get('lat')

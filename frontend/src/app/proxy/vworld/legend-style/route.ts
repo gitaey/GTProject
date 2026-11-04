@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireLogin } from '../../_auth'
 
 const VWORLD_KEY = process.env.NEXT_PUBLIC_VWORLD_API_KEY ?? ''
 const DOMAIN = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.gitaey-dev.com'
 
 export async function GET(req: NextRequest) {
+    const denied = await requireLogin(req)
+    if (denied) return denied
+
     const layer = req.nextUrl.searchParams.get('layer') ?? ''
     if (!layer) return new NextResponse('layer required', { status: 400 })
 

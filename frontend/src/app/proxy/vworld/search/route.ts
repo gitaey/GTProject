@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireLogin } from '../../_auth'
 
 const VWORLD_KEY = process.env.NEXT_PUBLIC_VWORLD_API_KEY ?? ''
 const VWORLD_SEARCH = 'https://api.vworld.kr/req/search'
@@ -31,6 +32,9 @@ function parseItems(json: unknown): SearchItem[] {
 }
 
 export async function GET(req: NextRequest) {
+    const denied = await requireLogin(req)
+    if (denied) return denied
+
     const { searchParams } = req.nextUrl
     const query = searchParams.get('query') ?? ''
     const page  = searchParams.get('page')  ?? '1'
