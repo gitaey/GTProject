@@ -47,7 +47,8 @@ com.gtp
   컨트롤러에서 role 코드와 비교할 때는 `ROLE_` 접두사를 떼야 한다(지도 도메인은 `GisUserContext.currentRoleCodes()`가 떼서 준다).
 - **마지막 규칙이 `anyRequest().permitAll()`이다.** 새 엔드포인트를 만들면 SecurityConfig에 명시적으로
   `authenticated()`나 역할 제한을 추가하지 않는 한 **로그인 없이 열린다.** 새 API마다 반드시 확인한다.
-- SUPER_ADMIN 전용: `/api/admin/mymap/**`, `/api/roles/**`(GET 제외).
+- SUPER_ADMIN 전용: `/api/admin/mymap/**`, `/api/roles/**`(GET 제외), `/api/posts/**`(공개 조회 `GET /api/posts`·`/{slug}` 제외 — 쓰기·수정·삭제·`/admin/list`), `/api/categories/**`(공개 조회 `GET /api/categories` 제외).
+  블로그는 읽기(발행 글 목록·상세, 카테고리 목록)만 전체 공개이고 나머지는 전부 SUPER_ADMIN이다. 공개 조회는 서비스에서 `PUBLISHED`만 돌려준다.
 - CORS 허용 Origin은 `CorsConfig`에 있다. 새 배포 도메인이 생기면 여기에 추가한다.
 
 ## DB / 설정
