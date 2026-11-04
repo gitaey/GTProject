@@ -1,51 +1,24 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Tag, Calendar, BookOpen, LayoutDashboard, PenLine, Trash2, X, Star } from 'lucide-react'
-import type { Post, PostCategoryCode, PostFormState, PostRequest, PostStatusCode } from '@/types/post'
-import { CATEGORY_OPTIONS, GRADIENT_PRESETS } from '@/types/post'
-import { useAuthStore, getToken } from '@/stores/authStore'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import rehypeHighlight from 'rehype-highlight'
-import rehypeRaw from 'rehype-raw'
-import 'highlight.js/styles/github-dark.css'
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
-
-const CATEGORY_BADGE: Record<string, string> = {
-    DEV:       'bg-blue-100 text-blue-700',
-    PARENTING: 'bg-pink-100 text-pink-600',
-    DAILY:     'bg-amber-100 text-amber-600',
-}
-
-function PostContent({ content }: { content: string }) {
-    return (
-        <div className="prose prose-sm max-w-none
-            prose-headings:font-bold prose-headings:text-gray-900
-            prose-h1:text-2xl prose-h1:mt-8 prose-h1:mb-4
-            prose-h2:text-xl prose-h2:mt-8 prose-h2:mb-3 prose-h2:pb-2 prose-h2:border-b prose-h2:border-gray-200
-            prose-h3:text-base prose-h3:mt-5 prose-h3:mb-2
-            prose-p:text-gray-600 prose-p:leading-7 prose-p:my-2
-            prose-li:text-gray-600 prose-li:leading-relaxed
-            prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
-            prose-strong:text-gray-800 prose-strong:font-semibold
-            prose-code:text-pink-600 prose-code:bg-pink-50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-mono prose-code:before:content-none prose-code:after:content-none
-            prose-pre:bg-transparent prose-pre:p-0 prose-pre:my-4
-            prose-blockquote:border-l-4 prose-blockquote:border-blue-300 prose-blockquote:bg-blue-50 prose-blockquote:pl-4 prose-blockquote:py-1 prose-blockquote:text-blue-800 prose-blockquote:italic
-            prose-table:w-full prose-th:bg-gray-100 prose-th:text-gray-700 prose-td:text-gray-600
-            prose-hr:border-gray-200">
-            <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeHighlight, rehypeRaw]}
-            >
-                {content}
-            </ReactMarkdown>
-        </div>
-    )
-}
+import { ArrowLeft, PenLine, Trash2 } from 'lucide-react'
+import type { PostFormState } from '@/types/post'
+import { useAuthStore } from '@/stores/authStore'
+import BlogMasthead from '../_components/BlogMasthead'
+import BlogFooter from '../_components/BlogFooter'
+import PostMeta from '../_components/PostMeta'
+import GradientMark from '../_components/GradientMark'
+import MarkdownBody from '../_components/MarkdownBody'
+import { ErrorState, NotFoundState } from '../_components/StatusBlocks'
+import { ArticleSkeleton } from '../_components/Skeletons'
+import PostEditorModal from '../_components/PostEditorModal'
+import DeletePostDialog from '../_components/DeletePostDialog'
+import { deletePost, updatePost } from '../_lib/api'
+import { formFromPost } from '../_lib/postForm'
+import { useCategories, withCurrentCategory } from '../_lib/useCategories'
+import { usePost } from '../_lib/usePost'
 
 export default function BlogPostPage() {
     const params = useParams()
@@ -54,330 +27,115 @@ export default function BlogPostPage() {
     const { user } = useAuthStore()
     const isSuperAdmin = user?.role === 'SUPER_ADMIN'
 
-    const [post, setPost]               = useState<Post | null>(null)
-    const [loading, setLoading]         = useState(true)
-    const [notFound, setNotFound]       = useState(false)
-    const [showDeleteModal, setShowDeleteModal] = useState(false)
-    const [deleting, setDeleting]       = useState(false)
-    const [deleteError, setDeleteError] = useState<string | null>(null)
+    const { post, status, replacePost, reload } = usePost(slug)
+    const [editOpen, setEditOpen]     = useState(false)
+    const [deleteOpen, setDeleteOpen] = useState(false)
+    /* 카테고리는 수정 단추를 처음 누를 때 한 번만 부른다. 실패하면 고정 3개 */
+    const [editRequested, setEditRequested] = useState(false)
+    const { categories } = useCategories({ enabled: editRequested, fallback: true })
+    const editorCategories = post ? withCurrentCategory(categories, post.category, post.categoryLabel) : categories
 
-    const [showEditModal, setShowEditModal]   = useState(false)
-    const [editForm, setEditForm]             = useState<PostFormState | null>(null)
-    const [editError, setEditError]           = useState<string | null>(null)
-    const [editSubmitting, setEditSubmitting] = useState(false)
-
-    useEffect(() => {
-        fetch(`${API}/api/posts/${slug}`)
-            .then((r) => r.json())
-            .then((json) => { if (json.success) setPost(json.data); else setNotFound(true) })
-            .catch(() => setNotFound(true))
-            .finally(() => setLoading(false))
-    }, [slug])
-
-    const openEditModal = () => {
-        if (!post) return
-        setEditForm({
-            slug: post.slug, title: post.title, excerpt: post.excerpt ?? '',
-            content: post.content ?? '', category: post.category,
-            tags: post.tags.join(', '),
-            gradient: post.gradient ?? GRADIENT_PRESETS[0].value,
-            featured: post.featured, status: post.status,
-        })
-        setEditError(null)
-        setShowEditModal(true)
+    const openEditor = () => {
+        setEditRequested(true)
+        setEditOpen(true)
     }
 
-    const handleUpdate = async () => {
-        if (!post || !editForm) return
-        setEditSubmitting(true); setEditError(null)
-        try {
-            const token = getToken()
-            const req: PostRequest = {
-                slug: editForm.slug, title: editForm.title,
-                excerpt:  editForm.excerpt  || undefined,
-                content:  editForm.content  || undefined,
-                category: editForm.category,
-                tags: editForm.tags ? editForm.tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
-                gradient: editForm.gradient || undefined,
-                featured: editForm.featured, status: editForm.status,
-            }
-            const res = await fetch(`${API}/api/posts/${post.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                body: JSON.stringify(req),
-            })
-            const json = await res.json()
-            if (!json.success) throw new Error(json.message)
-            setPost(json.data)
-            setShowEditModal(false)
-        } catch (e) {
-            setEditError(e instanceof Error ? e.message : '수정에 실패했습니다.')
-        } finally { setEditSubmitting(false) }
+    const handleUpdate = async (form: PostFormState) => {
+        if (!post) return
+        const updated = await updatePost(post.id, form)
+        replacePost(updated)
+        setEditOpen(false)
     }
 
     const handleDelete = async () => {
         if (!post) return
-        setDeleting(true); setDeleteError(null)
-        try {
-            const token = getToken()
-            const res = await fetch(`${API}/api/posts/${post.id}`, {
-                method: 'DELETE',
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
-            })
-            if (res.status === 204 || res.ok) {
-                router.push('/blog')
-            } else {
-                const json = await res.json()
-                setDeleteError(json.message ?? '삭제에 실패했습니다.')
-            }
-        } catch {
-            setDeleteError('서버에 연결할 수 없습니다.')
-        } finally { setDeleting(false) }
+        await deletePost(post.id)
+        router.push('/blog')
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            {/* ── 네비게이션 ── */}
-            <nav className="bg-white border-b border-gray-100 sticky top-0 z-30 shadow-sm">
-                <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
-                    <Link href="/blog" className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                            <BookOpen size={15} className="text-white" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-bold text-gray-900 leading-none">기빵 블로그</p>
-                            <p className="text-[10px] text-gray-400 mt-0.5">개발 · 육아 · 일상</p>
-                        </div>
-                    </Link>
-                    <div className="flex items-center gap-3">
-                        <Link href="/blog" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors">
-                            <ArrowLeft size={14} /> 목록
+        <>
+            <BlogMasthead isSuperAdmin={isSuperAdmin} showBackToList />
+
+            <main className="blog-wrap">
+                {status === 'loading' && <ArticleSkeleton />}
+
+                {status === 'notFound' && <NotFoundState />}
+
+                {status === 'error' && (
+                    <ErrorState
+                        title="글을 불러오지 못했습니다"
+                        description="서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요."
+                        onRetry={reload}
+                        tall
+                    >
+                        <Link href="/blog" className="blog-btn blog-btn-ghost">
+                            <ArrowLeft size={16} aria-hidden="true" />
+                            목록으로
                         </Link>
-                        <Link href="/" className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-colors">
-                            <LayoutDashboard size={14} />
-                            <span className="hidden sm:inline">대시보드</span>
-                        </Link>
-                    </div>
-                </div>
-            </nav>
+                    </ErrorState>
+                )}
 
-            {/* ── 로딩 ── */}
-            {loading && (
-                <div className="flex justify-center items-center py-40">
-                    <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                </div>
-            )}
-
-            {/* ── 포스트 없음 ── */}
-            {!loading && (notFound || !post) && (
-                <div className="flex flex-col items-center justify-center py-40 text-gray-400">
-                    <p className="text-5xl mb-4">📭</p>
-                    <p className="text-base mb-4">포스트를 찾을 수 없습니다.</p>
-                    <Link href="/blog" className="flex items-center gap-1.5 text-sm text-blue-500 hover:text-blue-700 transition-colors">
-                        <ArrowLeft size={14} /> 목록으로 돌아가기
-                    </Link>
-                </div>
-            )}
-
-            {/* ── 포스트 콘텐츠 ── */}
-            {!loading && post && (
-                <div className="max-w-4xl mx-auto px-6 py-10 space-y-8">
-                    {/* 커버 */}
-                    <div className={`h-2 rounded-full bg-gradient-to-r ${post.gradient ?? 'from-gray-400 to-gray-600'}`} />
-
-                    {/* 헤더 */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
-                        <div className="flex flex-wrap items-center gap-3 mb-5">
-                            <span className={`text-xs font-semibold px-3 py-1.5 rounded-full ${CATEGORY_BADGE[post.category] ?? 'bg-gray-100 text-gray-600'}`}>
-                                {post.categoryLabel}
-                            </span>
-                            <span className="flex items-center gap-1.5 text-sm text-gray-400">
-                                <Calendar size={13} />
-                                {new Date(post.createdAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
-                            </span>
+                {status === 'ready' && post && (
+                    <article className="blog-article">
+                        <div className="blog-art-top">
+                            <PostMeta categoryLabel={post.categoryLabel} createdAt={post.createdAt} />
                             {isSuperAdmin && (
-                                <div className="flex items-center gap-1.5 ml-auto">
-                                    <button
-                                        onClick={openEditModal}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-                                    >
-                                        <PenLine size={13} /> 수정
+                                <div className="blog-adm">
+                                    <button type="button" onClick={openEditor}>
+                                        <PenLine size={14} aria-hidden="true" />
+                                        수정
                                     </button>
-                                    <button
-                                        onClick={() => { setShowDeleteModal(true); setDeleteError(null) }}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-500 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
-                                    >
-                                        <Trash2 size={13} /> 삭제
+                                    <button type="button" className="blog-adm-del" onClick={() => setDeleteOpen(true)}>
+                                        <Trash2 size={14} aria-hidden="true" />
+                                        삭제
                                     </button>
                                 </div>
                             )}
                         </div>
-                        <h1 className="text-3xl font-extrabold text-gray-900 leading-snug mb-5 tracking-tight">
-                            {post.title}
-                        </h1>
-                        {post.excerpt && (
-                            <p className="text-base text-gray-500 leading-relaxed border-l-4 border-blue-200 pl-4 mb-5">
-                                {post.excerpt}
-                            </p>
-                        )}
+                        <GradientMark gradient={post.gradient} />
+                        <h1 className="blog-title">{post.title}</h1>
+                        {post.excerpt && <p className="blog-dek">{post.excerpt}</p>}
                         {post.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                                {post.tags.map((tag) => (
-                                    <span key={tag} className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full">
-                                        <Tag size={10} /> {tag}
-                                    </span>
-                                ))}
+                            <div className="blog-art-tags">
+                                {post.tags.map((tag) => <span key={tag}>#{tag}</span>)}
                             </div>
                         )}
-                    </div>
-
-                    {/* 본문 */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
+                        <div className="blog-rule" />
                         {post.content
-                            ? <PostContent content={post.content} />
-                            : <p className="text-gray-400 text-sm">본문이 없습니다.</p>
-                        }
-                    </div>
+                            ? <MarkdownBody content={post.content} />
+                            : <p className="blog-empty-body">본문이 없습니다.</p>}
+                        <div className="blog-rule" />
+                        <div className="blog-endnav">
+                            <Link href="/blog" className="blog-btn blog-btn-ghost">
+                                <ArrowLeft size={16} aria-hidden="true" />
+                                목록으로
+                            </Link>
+                        </div>
+                    </article>
+                )}
+            </main>
 
-                    {/* 하단 버튼 */}
-                    <div className="flex justify-center">
-                        <Link href="/blog" className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:text-gray-900 hover:border-gray-300 transition-all shadow-sm">
-                            <ArrowLeft size={14} /> 목록으로
-                        </Link>
-                    </div>
+            <BlogFooter />
 
-                    {/* 푸터 */}
-                    <footer className="text-center py-6 border-t border-gray-100">
-                        <p className="text-sm text-gray-400">© 2026 기빵 블로그</p>
-                    </footer>
-                </div>
+            {isSuperAdmin && post && (
+                <>
+                    <PostEditorModal
+                        open={editOpen}
+                        mode="edit"
+                        initialForm={formFromPost(post)}
+                        categories={editorCategories}
+                        onClose={() => setEditOpen(false)}
+                        onSubmit={handleUpdate}
+                    />
+                    <DeletePostDialog
+                        open={deleteOpen}
+                        postTitle={post.title}
+                        onClose={() => setDeleteOpen(false)}
+                        onConfirm={handleDelete}
+                    />
+                </>
             )}
-
-            {/* ── 수정 모달 ── */}
-            {showEditModal && editForm && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-                            <h3 className="font-semibold text-gray-800">포스트 수정</h3>
-                            <button onClick={() => setShowEditModal(false)} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400">
-                                <X size={18} />
-                            </button>
-                        </div>
-                        <div className="overflow-y-auto px-6 py-5 space-y-4">
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1.5">카테고리 <span className="text-red-400">*</span></label>
-                                <select value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value as PostCategoryCode })}
-                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white">
-                                    {CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1.5">제목 <span className="text-red-400">*</span></label>
-                                <input type="text" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                                    placeholder="포스트 제목"
-                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1.5">요약 <span className="text-gray-400 font-normal">(선택)</span></label>
-                                <textarea value={editForm.excerpt} onChange={(e) => setEditForm({ ...editForm, excerpt: e.target.value })}
-                                    placeholder="포스트 목록에 표시될 요약 (최대 200자)" rows={2}
-                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1.5">본문 <span className="text-gray-400 font-normal">(마크다운)</span></label>
-                                <textarea value={editForm.content} onChange={(e) => setEditForm({ ...editForm, content: e.target.value })}
-                                    placeholder="## 제목&#10;&#10;본문 내용을 마크다운으로 작성하세요." rows={8}
-                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none font-mono" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1.5">태그 <span className="text-gray-400 font-normal">(쉼표 구분)</span></label>
-                                <input type="text" value={editForm.tags} onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })}
-                                    placeholder="React, TypeScript, 육아"
-                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1.5">커버 그라디언트</label>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {GRADIENT_PRESETS.map((g) => (
-                                        <button key={g.value} type="button" onClick={() => setEditForm({ ...editForm, gradient: g.value })}
-                                            className={`h-10 rounded-lg bg-gradient-to-br ${g.value} transition-all ${
-                                                editForm.gradient === g.value ? 'ring-2 ring-offset-2 ring-blue-500 scale-105' : 'hover:scale-105'
-                                            }`} title={g.label} />
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1.5">상태</label>
-                                    <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value as PostStatusCode })}
-                                        className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white">
-                                        <option value="PUBLISHED">발행</option>
-                                        <option value="DRAFT">임시저장</option>
-                                    </select>
-                                </div>
-                                <div className="flex items-end pb-2.5">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="checkbox" checked={editForm.featured}
-                                            onChange={(e) => setEditForm({ ...editForm, featured: e.target.checked })}
-                                            className="w-4 h-4 rounded border-gray-300 cursor-pointer" />
-                                        <span className="text-sm text-gray-700 flex items-center gap-1">
-                                            <Star size={14} className="text-amber-400" /> 추천 포스트
-                                        </span>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                        {editError && (
-                            <div className="px-6 py-2 shrink-0">
-                                <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{editError}</div>
-                            </div>
-                        )}
-                        <div className="flex gap-3 px-6 py-4 border-t border-gray-100 shrink-0">
-                            <button onClick={() => setShowEditModal(false)} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
-                                취소
-                            </button>
-                            <button onClick={handleUpdate} disabled={editSubmitting}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                                {editSubmitting ? '저장 중...' : '저장'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ── 삭제 확인 모달 ── */}
-            {showDeleteModal && post && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-                        <div className="px-6 pt-6 pb-4 text-center">
-                            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Trash2 size={22} className="text-red-500" />
-                            </div>
-                            <h3 className="font-semibold text-gray-800 mb-2">포스트 삭제</h3>
-                            <p className="text-sm text-gray-500">
-                                <span className="font-medium text-gray-700">&quot;{post.title}&quot;</span> 포스트를
-                                <br />정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
-                            </p>
-                            {deleteError && <p className="mt-3 text-xs text-red-500">{deleteError}</p>}
-                        </div>
-                        <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
-                            <button
-                                onClick={() => setShowDeleteModal(false)}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                            >
-                                취소
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                disabled={deleting}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors"
-                            >
-                                {deleting ? '삭제 중...' : '삭제'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
+        </>
     )
 }

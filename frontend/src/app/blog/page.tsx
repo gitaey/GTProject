@@ -1,461 +1,161 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { Search, Tag, ArrowUpRight, BookOpen, Heart, LayoutDashboard, Plus, X, Star } from 'lucide-react'
-import type { Category, Post, PostCategoryCode, PostFormState, PostPage, PostRequest, PostStatusCode } from '@/types/post'
-import { GRADIENT_PRESETS } from '@/types/post'
-import { useAuthStore, getToken } from '@/stores/authStore'
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
-
-function toSlug(title: string): string {
-    const base = title.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
-    const suffix = Date.now().toString(36)
-    return base ? `${base}-${suffix}` : `post-${suffix}`
-}
-
-const EMPTY_FORM: PostFormState = {
-    slug: '', title: '', excerpt: '', content: '',
-    category: 'DEV', tags: '', gradient: GRADIENT_PRESETS[0].value,
-    featured: false, status: 'PUBLISHED',
-}
-
-const CATEGORY_COLORS = [
-    'bg-blue-100 text-blue-700',
-    'bg-pink-100 text-pink-600',
-    'bg-amber-100 text-amber-600',
-    'bg-emerald-100 text-emerald-700',
-    'bg-violet-100 text-violet-700',
-    'bg-orange-100 text-orange-700',
-]
-
-function getCategoryBadge(idx: number) {
-    return CATEGORY_COLORS[Math.max(0, idx) % CATEGORY_COLORS.length]
-}
-
-function formatDate(iso: string) {
-    return new Date(iso).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
-}
-
-function FeaturedPost({ post, badgeClass }: { post: Post; badgeClass: string }) {
-    return (
-        <Link href={`/blog/${post.slug}`} className="group block h-full">
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 h-full flex flex-col overflow-hidden">
-                <div className={`h-3 bg-gradient-to-r ${post.gradient ?? 'from-gray-400 to-gray-600'} shrink-0`} />
-                <div className="p-7 flex flex-col flex-1">
-                    <div className="flex items-center gap-2 mb-4">
-                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${badgeClass}`}>
-                            {post.categoryLabel}
-                        </span>
-                        <span className="text-xs font-medium text-amber-500 bg-amber-50 px-2.5 py-1 rounded-full">✦ 추천</span>
-                    </div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-blue-600 transition-colors line-clamp-2 leading-snug">
-                        {post.title}
-                    </h2>
-                    <p className="text-sm text-gray-500 line-clamp-3 leading-relaxed flex-1">{post.excerpt}</p>
-                    <div className="flex items-center justify-between mt-5 pt-4 border-t border-gray-50">
-                        <div className="flex gap-1.5 flex-wrap">
-                            {post.tags.slice(0, 3).map((tag) => (
-                                <span key={tag} className="text-[11px] text-gray-400 px-2 py-0.5 bg-gray-50 rounded-md">#{tag}</span>
-                            ))}
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs text-gray-400 shrink-0">
-                            <span>{formatDate(post.createdAt)}</span>
-                            <ArrowUpRight size={14} className="text-gray-300 group-hover:text-blue-500 transition-colors" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </Link>
-    )
-}
-
-function PostCard({ post, badgeClass }: { post: Post; badgeClass: string }) {
-    return (
-        <Link href={`/blog/${post.slug}`} className="group block h-full">
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 h-full flex flex-col overflow-hidden">
-                <div className={`h-1.5 bg-gradient-to-r ${post.gradient ?? 'from-gray-400 to-gray-600'} shrink-0`} />
-                <div className="p-5 flex flex-col flex-1">
-                    <div className="flex items-center gap-2 mb-3">
-                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${badgeClass}`}>
-                            {post.categoryLabel}
-                        </span>
-                        <span className="text-[11px] text-gray-400 ml-auto">{formatDate(post.createdAt)}</span>
-                    </div>
-                    <h3 className="text-base font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors line-clamp-2 leading-snug">
-                        {post.title}
-                    </h3>
-                    <p className="text-xs text-gray-500 line-clamp-3 leading-relaxed flex-1">{post.excerpt}</p>
-                    {post.tags.length > 0 && (
-                        <div className="flex gap-1 flex-wrap mt-4 pt-3 border-t border-gray-50">
-                            {post.tags.slice(0, 3).map((tag) => (
-                                <span key={tag} className="text-[10px] text-gray-400 px-1.5 py-0.5 bg-gray-50 rounded-md">#{tag}</span>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-        </Link>
-    )
-}
+import { useState } from 'react'
+import { CloudOff, RotateCcw } from 'lucide-react'
+import type { PostFormState } from '@/types/post'
+import { useAuthStore } from '@/stores/authStore'
+import BlogMasthead from './_components/BlogMasthead'
+import BlogFooter from './_components/BlogFooter'
+import HeroIntro from './_components/HeroIntro'
+import FeaturedPost from './_components/FeaturedPost'
+import FilterBar from './_components/FilterBar'
+import PostList from './_components/PostList'
+import TagIndex from './_components/TagIndex'
+import { EmptyState, ErrorState } from './_components/StatusBlocks'
+import { ListSkeleton } from './_components/Skeletons'
+import PostEditorModal from './_components/PostEditorModal'
+import { createPost } from './_lib/api'
+import { EMPTY_FORM } from './_lib/postForm'
+import { FALLBACK_CATEGORIES } from './_lib/useCategories'
+import { usePostList } from './_lib/usePostList'
 
 export default function BlogPage() {
     const { user } = useAuthStore()
     const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+    const list = usePostList()
+    const [createOpen, setCreateOpen] = useState(false)
 
-    const [categories, setCategories]  = useState<Category[]>([])
-    const [page, setPage]             = useState<PostPage | null>(null)
-    const [loading, setLoading]       = useState(false)
-    const [category, setCategory]     = useState<PostCategoryCode | ''>('')
-    const [keyword, setKeyword]       = useState('')
-    const [tagFilter, setTagFilter]   = useState('')
-    const abortRef    = useRef<AbortController | null>(null)
-    const slugAutoRef = useRef(true)
+    const { category, keyword, tagFilter, isFiltered, featured, rest, status } = list
+    /* 작성 모달 카테고리: 목록이 이미 받은 API 카테고리(추가 요청 없음), 못 받았으면 고정 3개 */
+    const editorCategories = list.categories.length > 0 ? list.categories : FALLBACK_CATEGORIES
 
-    const [showCreateModal, setShowCreateModal] = useState(false)
-    const [createForm, setCreateForm]           = useState<PostFormState>(EMPTY_FORM)
-    const [createError, setCreateError]         = useState<string | null>(null)
-    const [createSubmitting, setCreateSubmitting] = useState(false)
-
-    useEffect(() => {
-        fetch(`${API}/api/categories`).then(r => r.json()).then(j => { if (j.success) setCategories(j.data) }).catch(() => {})
-    }, [])
-
-    const openCreateModal = () => {
-        slugAutoRef.current = true
-        setCreateForm(EMPTY_FORM)
-        setCreateError(null)
-        setShowCreateModal(true)
+    const handleCreate = async (form: PostFormState) => {
+        await createPost(form)
+        setCreateOpen(false)
+        list.reload()
     }
 
-    const handleCreate = async () => {
-        setCreateSubmitting(true); setCreateError(null)
-        try {
-            const token = getToken()
-            const req: PostRequest = {
-                slug: createForm.slug, title: createForm.title,
-                excerpt:  createForm.excerpt  || undefined,
-                content:  createForm.content  || undefined,
-                category: createForm.category,
-                tags: createForm.tags ? createForm.tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
-                gradient: createForm.gradient || undefined,
-                featured: createForm.featured, status: createForm.status,
-            }
-            const res = await fetch(`${API}/api/posts`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                body: JSON.stringify(req),
-            })
-            const json = await res.json()
-            if (!json.success) throw new Error(json.message)
-            setShowCreateModal(false)
-            load()
-        } catch (e) {
-            setCreateError(e instanceof Error ? e.message : '작성에 실패했습니다.')
-        } finally { setCreateSubmitting(false) }
-    }
+    /* 목록 머리: 필터가 있으면 그 이름, 없으면 "글 목록". 개수는 전체 건수(대표 글 제외) */
+    let heading = '글 목록'
+    if (tagFilter) heading = `#${tagFilter}`
+    else if (keyword) heading = `‘${keyword}’ 검색 결과`
+    else if (category) heading = list.categories.find((c) => c.code === category)?.label ?? category
+    const count = Math.max(0, list.totalElements - (featured ? 1 : 0))
+    const hasSearchFilter = !!(keyword || tagFilter)
 
-    const load = useCallback(async () => {
-        abortRef.current?.abort()
-        abortRef.current = new AbortController()
-        setLoading(true)
-        try {
-            const params = new URLSearchParams({ size: '20' })
-            if (category)  params.set('category', category)
-            if (keyword)   params.set('keyword', keyword)
-            if (tagFilter) params.set('keyword', tagFilter)
-            const res  = await fetch(`${API}/api/posts?${params}`, { signal: abortRef.current.signal })
-            const json = await res.json()
-            if (json.success) setPage(json.data)
-        } catch (e) {
-            if (e instanceof Error && e.name !== 'AbortError') console.error(e)
-        } finally { setLoading(false) }
-    }, [category, keyword, tagFilter])
-
-    useEffect(() => { load() }, [load])
-
-    const posts    = page?.content ?? []
-    const featured = !category && !keyword && !tagFilter ? posts.find((p) => p.featured) : undefined
-    const rest     = featured ? posts.filter((p) => p.id !== featured.id) : posts
-    const allTags  = Array.from(new Set(posts.flatMap((p) => p.tags)))
-
-    const countOf = (code: PostCategoryCode | '') =>
-        code === '' ? (page?.totalElements ?? 0) : posts.filter((p) => p.category === code).length
-
-    const badgeOf = (categoryCode: string) => {
-        const idx = categories.findIndex(c => c.code === categoryCode)
-        return getCategoryBadge(idx)
-    }
+    const emptyDescription = tagFilter
+        ? `#${tagFilter} 태그의 글이 없습니다.`
+        : keyword ? `‘${keyword}’와 맞는 글을 찾지 못했습니다.` : undefined
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            {/* ── 네비게이션 ── */}
-            <nav className="bg-white border-b border-gray-100 sticky top-0 z-30 shadow-sm">
-                <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-                    <Link href="/blog" className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                            <BookOpen size={15} className="text-white" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-bold text-gray-900 leading-none">기빵 블로그</p>
-                            <p className="text-[10px] text-gray-400 mt-0.5">개발 · 육아 · 일상</p>
-                        </div>
-                    </Link>
+        <>
+            <BlogMasthead isSuperAdmin={isSuperAdmin} onCreate={() => setCreateOpen(true)} />
 
-                    <div className="flex items-center gap-4">
-                        {/* 카테고리 */}
-                        <div className="hidden sm:flex items-center gap-1">
-                            {[{ code: '' as const, label: '전체' }, ...categories.map(c => ({ code: c.code, label: c.label }))].map(({ code, label }) => (
-                                <button key={code} onClick={() => { setCategory(code); setTagFilter('') }}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all cursor-pointer
-                                        ${category === code
-                                            ? 'bg-blue-50 text-blue-700'
-                                            : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
-                                        }`}>
-                                    {label}
-                                    {countOf(code) > 0 && (
-                                        <span className="text-[10px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full">{countOf(code)}</span>
-                                    )}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* 검색 */}
-                        <div className="relative">
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                            <input type="text" placeholder="검색..." value={keyword}
-                                onChange={(e) => { setKeyword(e.target.value); setTagFilter('') }}
-                                className="w-40 pl-8 pr-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 focus:w-52 transition-all" />
-                        </div>
-
-                        {/* 포스트 작성 (슈퍼관리자) */}
-                        {isSuperAdmin && (
-                            <button onClick={openCreateModal}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
-                                <Plus size={14} />
-                                <span className="hidden sm:inline">작성</span>
-                            </button>
-                        )}
-
-                        {/* 대시보드 이동 */}
-                        <Link href="/" className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-colors">
-                            <LayoutDashboard size={14} />
-                            <span className="hidden sm:inline">대시보드</span>
-                        </Link>
-                    </div>
-                </div>
-            </nav>
-
-            {/* ── 콘텐츠 ── */}
-            <div className="max-w-6xl mx-auto px-6 py-10 space-y-10">
-                {/* 히어로 */}
-                {!category && !keyword && !tagFilter && (
-                    <div className="text-center py-6">
-                        <h1 className="text-4xl font-extrabold text-gray-900 mb-3 tracking-tight">기빵의 블로그</h1>
-                        <p className="text-gray-500 text-base">개발 이야기, 육아 일기, 그리고 일상을 기록합니다.</p>
-                    </div>
+            <main className="blog-wrap">
+                {!isFiltered && (
+                    <HeroIntro title="기빵의 블로그" description="개발 이야기, 육아 일기, 그리고 일상을 기록합니다." />
                 )}
+                {featured && <FeaturedPost post={featured} />}
 
-                {/* 모바일 카테고리 탭 */}
-                <div className="sm:hidden flex gap-2 overflow-x-auto pb-1">
-                    {[{ code: '' as const, label: '전체' }, ...categories.map(c => ({ code: c.code, label: c.label }))].map(({ code, label }) => (
-                        <button key={code} onClick={() => { setCategory(code); setTagFilter('') }}
-                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all shrink-0 cursor-pointer
-                                ${category === code ? 'bg-gray-900 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
-                            {label}
-                        </button>
-                    ))}
+                <FilterBar
+                    categories={list.categories}
+                    category={category}
+                    keyword={keyword}
+                    compact={isFiltered}
+                    countOf={list.countOf}
+                    onCategoryChange={list.selectCategory}
+                    onKeywordChange={list.changeKeyword}
+                />
+                <div className="blog-progress" aria-live="polite">
+                    {list.refreshing && (
+                        <>
+                            <div className="blog-progress-bar" aria-hidden="true" />
+                            <span className="blog-sr">불러오는 중</span>
+                        </>
+                    )}
                 </div>
 
-                {/* 로딩 */}
-                {loading && (
-                    <div className="flex justify-center py-20">
-                        <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                    </div>
+                {status === 'loading' && <ListSkeleton />}
+
+                {status === 'error' && (
+                    <ErrorState
+                        title="글 목록을 불러오지 못했습니다"
+                        description="잠시 후 다시 시도해 주세요."
+                        onRetry={list.reload}
+                    />
                 )}
 
-                {/* 빈 상태 */}
-                {!loading && posts.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-28 text-gray-400">
-                        <BookOpen size={40} className="mb-4 opacity-25" />
-                        <p className="text-base">포스트가 없습니다.</p>
-                        {(keyword || tagFilter) && (
-                            <button onClick={() => { setKeyword(''); setTagFilter('') }}
-                                className="mt-3 text-sm text-blue-500 hover:text-blue-700">
-                                전체 보기
-                            </button>
-                        )}
-                    </div>
-                )}
-
-                {/* 피처드 포스트 */}
-                {!loading && featured && (
-                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                        <div className="lg:col-span-3">
-                            <FeaturedPost post={featured} badgeClass={badgeOf(featured.category)} />
-                        </div>
-                        <div className="lg:col-span-2 flex flex-col gap-6">
-                            {rest.slice(0, 2).map((p) => <PostCard key={p.id} post={p} badgeClass={badgeOf(p.category)} />)}
-                        </div>
-                    </div>
-                )}
-
-                {/* 포스트 그리드 */}
-                {!loading && (featured ? rest.slice(2) : rest).length > 0 && (
-                    <div>
-                        {featured && (
-                            <div className="flex items-center gap-4 mb-6">
-                                <h2 className="text-lg font-bold text-gray-900">전체 포스트</h2>
-                                <div className="flex-1 h-px bg-gray-200" />
-                                <span className="text-sm text-gray-400">{rest.length}개</span>
-                            </div>
-                        )}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {(featured ? rest.slice(2) : rest).map((p) => (
-                                <PostCard key={p.id} post={p} badgeClass={badgeOf(p.category)} />
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* 태그 클라우드 */}
-                {!loading && allTags.length > 0 && (
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                        <div className="flex items-center gap-2 mb-4">
-                            <Tag size={15} className="text-gray-400" />
-                            <h3 className="text-sm font-semibold text-gray-700">태그</h3>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {allTags.map((tag) => (
-                                <button key={tag}
-                                    onClick={() => { setTagFilter(tag); setKeyword(''); setCategory('') }}
-                                    className={`text-sm px-3.5 py-1.5 rounded-full border transition-colors
-                                        ${tagFilter === tag
-                                            ? 'bg-blue-600 text-white border-blue-600'
-                                            : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300 hover:text-blue-600'
-                                        }`}>
-                                    #{tag}
+                {status === 'ready' && (
+                    <>
+                        {list.refreshFailed && (
+                            <div className="blog-notice" role="alert">
+                                <CloudOff size={16} aria-hidden="true" />
+                                새 목록을 불러오지 못했습니다.
+                                <button type="button" className="blog-btn-text" onClick={list.reload}>
+                                    <RotateCcw size={16} aria-hidden="true" />
+                                    다시 시도
                                 </button>
-                            ))}
-                            {(tagFilter || keyword) && (
-                                <button onClick={() => { setTagFilter(''); setKeyword('') }}
-                                    className="text-sm px-3.5 py-1.5 rounded-full bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1">
-                                    <Heart size={11} /> 전체 보기
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* 푸터 */}
-                <footer className="text-center py-8 border-t border-gray-100">
-                    <p className="text-sm text-gray-400">© 2026 기빵 블로그</p>
-                    <Link href="/" className="inline-flex items-center gap-1.5 mt-2 text-sm text-gray-400 hover:text-gray-600 transition-colors">
-                        <LayoutDashboard size={13} /> 대시보드로 돌아가기
-                    </Link>
-                </footer>
-            </div>
-
-            {/* ── 포스트 작성 모달 ── */}
-            {showCreateModal && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-                            <h3 className="font-semibold text-gray-800">포스트 작성</h3>
-                            <button onClick={() => setShowCreateModal(false)} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400">
-                                <X size={18} />
-                            </button>
-                        </div>
-                        <div className="overflow-y-auto px-6 py-5 space-y-4">
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1.5">카테고리 <span className="text-red-400">*</span></label>
-                                <select value={createForm.category} onChange={(e) => setCreateForm({ ...createForm, category: e.target.value as PostCategoryCode })}
-                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white">
-                                    {categories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1.5">제목 <span className="text-red-400">*</span></label>
-                                <input type="text" value={createForm.title}
-                                    onChange={(e) => {
-                                        const title = e.target.value
-                                        if (slugAutoRef.current) {
-                                            setCreateForm({ ...createForm, title, slug: toSlug(title) })
-                                        } else {
-                                            setCreateForm({ ...createForm, title })
-                                        }
-                                    }}
-                                    placeholder="포스트 제목"
-                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1.5">요약 <span className="text-gray-400 font-normal">(선택)</span></label>
-                                <textarea value={createForm.excerpt} onChange={(e) => setCreateForm({ ...createForm, excerpt: e.target.value })}
-                                    placeholder="포스트 목록에 표시될 요약 (최대 200자)" rows={2}
-                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1.5">본문 <span className="text-gray-400 font-normal">(마크다운)</span></label>
-                                <textarea value={createForm.content} onChange={(e) => setCreateForm({ ...createForm, content: e.target.value })}
-                                    placeholder="## 제목&#10;&#10;본문 내용을 마크다운으로 작성하세요." rows={8}
-                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none font-mono" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1.5">태그 <span className="text-gray-400 font-normal">(쉼표 구분)</span></label>
-                                <input type="text" value={createForm.tags} onChange={(e) => setCreateForm({ ...createForm, tags: e.target.value })}
-                                    placeholder="React, TypeScript, 육아"
-                                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1.5">커버 그라디언트</label>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {GRADIENT_PRESETS.map((g) => (
-                                        <button key={g.value} type="button" onClick={() => setCreateForm({ ...createForm, gradient: g.value })}
-                                            className={`h-10 rounded-lg bg-gradient-to-br ${g.value} transition-all ${
-                                                createForm.gradient === g.value ? 'ring-2 ring-offset-2 ring-blue-500 scale-105' : 'hover:scale-105'
-                                            }`} title={g.label} />
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1.5">상태</label>
-                                    <select value={createForm.status} onChange={(e) => setCreateForm({ ...createForm, status: e.target.value as PostStatusCode })}
-                                        className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 bg-white">
-                                        <option value="PUBLISHED">발행</option>
-                                        <option value="DRAFT">임시저장</option>
-                                    </select>
-                                </div>
-                                <div className="flex items-end pb-2.5">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="checkbox" checked={createForm.featured}
-                                            onChange={(e) => setCreateForm({ ...createForm, featured: e.target.checked })}
-                                            className="w-4 h-4 rounded border-gray-300 cursor-pointer" />
-                                        <span className="text-sm text-gray-700 flex items-center gap-1">
-                                            <Star size={14} className="text-amber-400" /> 추천 포스트
-                                        </span>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                        {createError && (
-                            <div className="px-6 py-2 shrink-0">
-                                <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{createError}</div>
                             </div>
                         )}
-                        <div className="flex gap-3 px-6 py-4 border-t border-gray-100 shrink-0">
-                            <button onClick={() => setShowCreateModal(false)} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
-                                취소
-                            </button>
-                            <button onClick={handleCreate} disabled={createSubmitting}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                                {createSubmitting ? '발행 중...' : '발행'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+
+                        {list.posts.length === 0 && (
+                            <EmptyState
+                                description={emptyDescription}
+                                onReset={hasSearchFilter ? list.resetFilters : undefined}
+                            />
+                        )}
+
+                        {rest.length > 0 && (
+                            <PostList
+                                posts={rest}
+                                heading={heading}
+                                count={count}
+                                chip={!!tagFilter}
+                                showReset={hasSearchFilter}
+                                onReset={list.resetFilters}
+                                dimmed={list.refreshing}
+                            />
+                        )}
+
+                        {list.hasMore && (
+                            <div className="blog-more">
+                                <button
+                                    type="button"
+                                    className="blog-btn blog-btn-ghost"
+                                    onClick={list.loadMore}
+                                    disabled={list.loadingMore}
+                                >
+                                    {list.loadingMore ? '불러오는 중...' : list.loadMoreFailed ? '다시 시도' : '더 보기'}
+                                </button>
+                                {list.loadMoreFailed && <span role="alert">글을 더 불러오지 못했습니다.</span>}
+                            </div>
+                        )}
+
+                        {list.allTags.length > 0 && (
+                            <TagIndex
+                                tags={list.allTags}
+                                activeTag={tagFilter}
+                                showReset={hasSearchFilter}
+                                onSelect={list.selectTag}
+                                onReset={list.resetFilters}
+                            />
+                        )}
+                    </>
+                )}
+            </main>
+
+            <BlogFooter />
+
+            {isSuperAdmin && (
+                <PostEditorModal
+                    open={createOpen}
+                    mode="create"
+                    initialForm={EMPTY_FORM}
+                    categories={editorCategories}
+                    onClose={() => setCreateOpen(false)}
+                    onSubmit={handleCreate}
+                />
             )}
-        </div>
+        </>
     )
 }
