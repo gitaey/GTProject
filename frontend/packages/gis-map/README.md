@@ -87,6 +87,30 @@ export default function MapPage() {
 - 이미 만든 `ol.Map`에 붙이려면 `<GisMapProvider attachTo={olMap}>`(이때 `<GisMapView>`는 필요 없다). 앱과 패키지가 **같은 ol 사본**을 써야 한다.
 - GTProject 연결부 예시: `frontend/src/app/map/page.tsx`, `frontend/src/app/map/_gtp/`(호스트·설정·앱 기억). 이 파일들은 이식 대상이 아니다.
 
+### 화면 분할 — 2·3·4분할, 지도마다 레이어 따로 (`MapShell split`)
+
+한 화면에 지도 2~4개를 나란히 놓고 지도마다 레이어·투명도·배경지도를 따로 조정한다. **기본은 꺼짐**이라 `split`을 안 주면 지금과 똑같이 동작한다.
+
+```tsx
+<GisMapProvider host={host} config={CONFIG} setup={setup}>
+    <MapShell split={{ defaultSync: true }} panels={defaultPanels} />   {/* split / split={true}도 된다 */}
+</GisMapProvider>
+
+// setup은 지도 하나를 만들 때마다 불린다(분할로 지도가 늘어도). 두 번째 인자 info.pane이 지도 번호(0 = 첫 지도)다.
+// 바람길처럼 지도마다 켜면 안 되는 것(운영 서버 요청이 지도 수만큼 늘어난다)과 페이지 이동 간 기억 복원은 pane 0에서만 한다.
+const setup = (map: GisMap, info: GisMapSetupInfo) => {
+    if (info.pane !== 0) return
+    map.use(createWindPlugin())
+}
+```
+
+- 머리줄에 분할 셀렉트(분할 없음·2·3·4분할)와 "화면 연동" 단추가 생긴다. 3분할은 같은 크기 세로 3칸, 칸이 좁으면 번호 칩·지역명 배지가 줄고, 아주 좁으면 가로 띠로 쌓인다. 768px 미만(모바일)에서는 활성 칸 하나만 보인다.
+- **활성 지도**: 칸을 누르거나 레이어 패널 위쪽 "대상 지도" 탭을 누르면 바뀐다. 레이어 패널·배경지도 단추·도구 모음·검색·상태바·출력·필지 정보·영역 분석은 모두 **활성 지도에만** 적용된다(도구는 활성 지도를 바꾸면 이전 지도에서 꺼진다). 바람지도는 `setup`이 설치한 지도(보통 0번)에서만 보인다.
+- `split` 옵션: `defaultCount`(1~4)·`onCountChange`·`defaultSync`(기본 켬)·`initialPaneState`. 지도를 늘릴 때 새 지도의 처음 상태는 `'view-basemap'`(기본 — 활성 지도의 시점·배경지도만 복사, 주제 레이어는 기본값) · `'clone-layers'`(레이어·투명도까지 복제) · `'default'`. 줄이면 뒤 번호 지도부터 닫히고 상태는 버려진다.
+- 레이어 목록(트리)은 한 번만 받아 모든 지도가 나눠 쓴다(분할해도 목록 요청이 늘지 않는다). 나만의지도·GeoTIFF를 지울 때는 다른 지도에서도 사라진다.
+- 위젯을 따로 조립한다면 바깥에 `<GisMapSplitProvider>`를 두고 칸마다 `<GisMapPane index={i}>`, 상태는 `useGisMapSplit()`(`count`·`activeIndex`·`panes`)로 읽는다. 투어·패널 때문에 셸이 다시 마운트되는 화면(GTProject `/demo`)은 이 방식으로 지도를 셸 밖에서 소유한다.
+- 한계: `<GisMapProvider attachTo={olMap}>`(기존 지도에 붙이기)는 보조 지도를 만들 수 없어 분할을 지원하지 않는다. UMD(`GisMap.create`·`attach`)에는 분할 화면 UI가 없고 이동·확대 연동 도우미만 있다 — 아래 2·3절 참고.
+
 ## 2. JSP에서 — UMD (a) `GisMap.create`
 
 ```html
@@ -105,6 +129,8 @@ export default function MapPage() {
 ```
 
 서버 값(키·주소·CSRF 토큰)을 넘기는 법, `<c:url>`을 쓰지 않는 이유, bfcache·AMD 로더 대응은 **`examples/jsp/README.md`**에 있다.
+
+**지도 여러 개의 이동·확대 연동**: 지도를 `div` 둘에 따로 만들고 `var link = GisMap.linkViews([mapA, mapB]); … link.destroy();`(둘 이상이어도 된다. `link.add(map)`·`link.remove(map)`). 한쪽을 움직이면 나머지가 같은 중심·해상도·회전으로 따라간다. 지도마다 레이어는 따로 조정하며(분할 화면 셀렉트·패널은 React 위젯이라 UMD에는 없다), attach 번들도 같은 `GisMap.linkViews`를 쓴다. 뷰 좌표계가 같은 지도끼리만 묶인다.
 
 **서버 없이 시험·시연(`adapters/memory`)**: `sources: [GisMap.adapters.memory(data)]` — `data`(레이어 트리·나만의지도 레이어 GeoJSON·필지+건물·장소·지역·영역 분석 레이어·바람 프레임·공유 상대)에 넣은 항목의 소스만 만든다(없는 항목은 그 기능이 꺼짐). 저장소(나만의지도 수정·삭제·공유)는 호출마다 새로 만든 객체라 소스를 다시 만들면 처음 상태다. `GisMap.adapters.demo({ basemap: 'osm' | 'vworld' | 'both' | 'none', vworldKey, bigCounts })`은 합성 샘플 한 벌(세종 인근 가상 필지 300개·건물·시설·노선·큰 점 데이터·바람 9프레임, 시드 고정, 가상 PNU는 `3611099900` + 본번 9000번대)과 배경지도 설정을 `{ sources, config, view, notice, data }`로 돌려준다. 서버 호출 0 — 업로드 계열은 안내 문구로 reject한다. 이 어댑터로 만든 정적 예제는 `examples/gis-demo/`.
 

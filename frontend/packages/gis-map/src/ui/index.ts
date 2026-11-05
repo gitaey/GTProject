@@ -13,7 +13,7 @@
 
 // 셸·패널
 export { default as MapShell } from './shell/MapShell'
-export type { MapShellProps } from './shell/MapShell'
+export type { MapShellProps, MapShellSplitOptions } from './shell/MapShell'
 export type { MapPanelDef, MapShellBrand, MapUserMenuItem } from './shell/types'
 export { default as MapRoot } from './shell/MapRoot'
 export type { MapRootProps } from './shell/MapRoot'
@@ -43,6 +43,12 @@ export type { MapStatusBarProps } from './statusbar/MapStatusBar'
 export { default as RegionBadge } from './overlay/RegionBadge'
 export { default as WindLegend } from './overlay/WindLegend'
 export { default as MobileLayerButton } from './mobile/MobileLayerButton'
+// 화면 분할 위젯(MapShell split이 쓴다 — 따로 조립할 때는 GisMapSplitProvider(react) 아래에 둔다)
+export { default as MapSplitSelect } from './split/MapSplitSelect'
+export type { MapSplitSelectProps } from './split/MapSplitSelect'
+export { default as MapSplitTargetTabs } from './split/MapSplitTargetTabs'
+export { default as SplitStage } from './split/SplitStage'
+export type { SplitStageProps } from './split/SplitStage'
 
 // 공유(자원 공통) — React 호스트가 자기 자원(ShareTargetSource)에 재사용한다. UMD 비대상
 export { default as ShareDialog } from './share/ShareDialog'

@@ -60,6 +60,8 @@ export interface RasterOverlayControllerOptions {
     resources: MapResources
     source?: GeoTiffSource
     zIndex: number
+    /** 목록에서 삭제했을 때(이 지도에서 숨긴 뒤) 엔진이 이벤트로 알리는 데 쓴다 */
+    onRemoved?: (id: number) => void
 }
 
 /** 백엔드가 준 경위도 범위(4개 다 있을 때만) */
@@ -190,7 +192,10 @@ export class RasterOverlayControllerImpl implements RasterOverlayController {
     openCatalog(opts?: { autoLoad?: boolean }): GeoTiffCatalog {
         const catalog: GeoTiffCatalog = new GeoTiffCatalogImpl(
             this.destroyed ? undefined : this.opts.source,
-            id => this.hide(id),
+            id => {
+                this.hide(id)
+                this.opts.onRemoved?.(id)
+            },
             () => {
                 this.catalogs.delete(catalog)
             },

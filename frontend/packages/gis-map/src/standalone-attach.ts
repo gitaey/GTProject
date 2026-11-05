@@ -60,3 +60,6 @@ export { saveBlob, GisPrintError } from './core'
 
 /** 필지 정보(gis.parcelInfo) 지목 부호 → 정식 명칭: GisMap.jimokName('도') → '도로' */
 export { jimokName } from './core'
+
+/** 지도 여러 개의 이동·확대 연동: var link = GisMap.linkViews([gisA, gisB]); link.destroy() (분할 화면 UI는 React 위젯이라 UMD에는 없다) */
+export { linkViews } from './core'

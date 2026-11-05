@@ -35,10 +35,13 @@ export interface MapHeaderProps {
     /** 사용자 표시를 누르면 펼칠 메뉴 항목(호스트가 만든다 — 대시보드 이동·로그아웃 등). 없거나 비면 사용자 표시는 지금 그대로(누를 수 없음).
      *  사용자 표시가 보일 때(showUser·right 없음·host.getCurrentUser()가 사용자를 줌)만 쓰인다 */
     userMenuItems?: readonly MapUserMenuItem[]
+    /** 화면 분할 셀렉트 자리(검색창과 오른쪽 영역 사이, `right`와 무관하게 보인다 — 호스트가 오른쪽 영역을 통째로 바꿔도 남는다).
+     *  MapShell이 `split`을 켰을 때 <MapSplitSelect />를 넣는다. 태블릿 이상에서만 보인다 */
+    split?: ReactNode
 }
 
 export default function MapHeader({
-    brand = DEFAULT_MAP_BRAND, showSearch = true, right, showBasemapSwitcher = true, showUser = true, userMenuItems,
+    brand = DEFAULT_MAP_BRAND, showSearch = true, right, showBasemapSwitcher = true, showUser = true, userMenuItems, split,
 }: MapHeaderProps) {
     // 현재 사용자는 호스트 주입값(GisMapHost.getCurrentUser) — 호스트가 바뀌면(setHost) 다시 그린다
     const user = useGisHost().getCurrentUser()
@@ -65,6 +68,14 @@ export default function MapHeader({
 
             {/* 검색창 */}
             {showSearch && <SearchBar />}
+
+            {/* 화면 분할 셀렉트(split을 줬을 때만) */}
+            {split != null && (
+                <div className="gm-header__split">
+                    {split}
+                    <div className="gm-header__divider" />
+                </div>
+            )}
 
             {/* 우측 액션 */}
             <div className={cx('gm-header__actions', menuShown && 'gm-header__actions--menu')}>

@@ -7,10 +7,11 @@ import { defaultLayerCrossOrigin, isVWorldUrl } from '@gtp/gis-map/core'
 import type { GisMap, GisMapConfig, LayerCrossOriginResolver } from '@gtp/gis-map/core'
 import { createWindPlugin } from '@gtp/gis-map/core/wind'
 import { browserExpandedStorage } from '@gtp/gis-map/react'
+import type { GisMapSetupInfo } from '@gtp/gis-map/react'
 import { restSources } from '@gtp/gis-map/adapters/rest'
 import { proxySources } from '@gtp/gis-map/adapters/proxy'
 import { defaultPanels, windPanel } from '@gtp/gis-map/ui'
-import type { MapPanelDef, MapShellBrand } from '@gtp/gis-map/ui'
+import type { MapPanelDef, MapShellBrand, MapShellSplitOptions } from '@gtp/gis-map/ui'
 import { useAuthStore } from '@/stores/authStore'
 import { useMenuStore } from '@/stores/menuStore'
 import EtcPanel from './EtcPanel'
@@ -79,8 +80,19 @@ function isGtpPanelVisible(panelId: string): boolean {
     return !loaded || isAllowed(panel.featureId)
 }
 
-/** 엔진이 만들어질 때마다 1번(StrictMode에서 엔진을 다시 만들면 그 엔진에 다시): 바람길 플러그인 + 떠나기 전 그리기·도구 상태 되살리기 */
-export function setupGtpMap(map: GisMap): void {
+/**
+ * 화면 분할 설정(모듈 상수 — MapShell이 참조로 비교하지 않아도 렌더마다 새 객체를 만들지 않는다). 처음엔 분할 없음, 화면 연동 켬.
+ * 분할 상태는 기억하지 않는다(새로고침·페이지 이동 뒤에는 분할 없음)
+ */
+export const GTP_SPLIT: Readonly<MapShellSplitOptions> = Object.freeze({ defaultCount: 1, defaultSync: true })
+
+/**
+ * 엔진이 만들어질 때마다 1번(StrictMode에서 엔진을 다시 만들면 그 엔진에 다시): 바람길 플러그인 + 떠나기 전 그리기·도구 상태 되살리기.
+ * 분할로 더 만든 지도(info.pane 1~3)에는 둘 다 하지 않는다 — 바람길은 1번 지도만(칸마다 프레임을 받으면 느리다),
+ * 앱 기억(mapSession)은 이름 하나(SESSION)에 지도 하나분이라 1번만 기억한다(2~4번이 덮어쓰지 않게)
+ */
+export function setupGtpMap(map: GisMap, info: GisMapSetupInfo): void {
+    if (info.pane !== 0) return
     map.use(createWindPlugin())
     restoreMapSession(map, SESSION, sessionOwner())
 }

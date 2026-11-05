@@ -52,6 +52,11 @@ export interface LayerTreeController {
     readonly store: ReadableStore<LayerTreeState>
     /** 소스에서 트리를 다시 받는다. 실패해도 throw하지 않는다(state.error). 소스가 없으면 아무것도 안 함 */
     load(): Promise<void>
+    /**
+     * 소스 없이 트리를 넣는다(분할 지도끼리 한 번 받은 트리를 나눠 쓸 때). 같은 객체면 아무것도 안 한다.
+     * state는 { tree, loading: false, error: null }. 체크·투명도·배경지도·펼침 상태는 그대로 두고 OL 레이어만 다시 만든다. destroy 뒤엔 무시
+     */
+    setTree(tree: LayerTree): void
     /** 체크 토글. 배경지도 레이어면 배경지도 모드도 체크 상태에 맞게 다시 정한다 */
     toggleLayer(layerId: number): void
     /** 그룹의 잎 레이어가 전부 켜져 있으면 전부 끄고, 아니면 전부 켠다(배경지도 모드는 안 바꿈 — 옛 동작) */
@@ -62,6 +67,8 @@ export interface LayerTreeController {
     /** 이름이 같은 첫 레이어를 켠다(이미 켜져 있으면 그대로) */
     enableLayerByName(name: string): void
     toggleExpanded(groupId: number, defaultExpanded?: boolean): void
+    /** 그룹 펼침 상태를 통째로 바꾼다(expandedStorage에도 쓴다). 같은 객체면 아무것도 안 한다 */
+    setExpanded(expanded: Readonly<Record<number, boolean>>): void
     /** 저장된 값이 없으면 true */
     isExpanded(groupId: number): boolean
     /** 트리의 모든 잎 레이어(그룹 재귀 → 미분류) */
@@ -135,6 +142,12 @@ export class LayerTreeControllerImpl implements LayerTreeController {
             if (this.destroyed) return
             this.state.setState({ loading: false, error: errorMessage(err) })
         }
+    }
+
+    setTree(tree: LayerTree): void {
+        if (this.destroyed) return
+        if (this.state.getState().tree === tree) return
+        this.state.setState({ tree, loading: false, error: null })
     }
 
     allLayers(): LayerDef[] {
@@ -222,6 +235,15 @@ export class LayerTreeControllerImpl implements LayerTreeController {
         const expanded = this.state.getState().expanded
         const current = groupId in expanded ? expanded[groupId] : defaultExpanded
         const next = { ...expanded, [groupId]: !current }
+        this.saveExpanded(next)
+        this.state.setState({ expanded: next })
+    }
+
+    setExpanded(expanded: Readonly<Record<number, boolean>>): void {
+        if (this.destroyed) return
+        if (this.state.getState().expanded === expanded) return
+        // 상태는 불변으로 다루므로 같은 객체를 공유해도 된다(바깥에서 고치지 않는 전제 — Readonly로 받는다)
+        const next = expanded as Record<number, boolean>
         this.saveExpanded(next)
         this.state.setState({ expanded: next })
     }

@@ -154,6 +154,8 @@ export interface VectorOverlayControllerOptions {
     tools?: ToolManager
     /** 나눠 불러오기·묶음 설정(config.myMap). 없으면 기본값 */
     config?: GisMapMyMapConfig
+    /** 목록에서 삭제했을 때(이 지도에서 숨긴 뒤) 엔진이 이벤트로 알리는 데 쓴다 */
+    onRemoved?: (id: number) => void
 }
 
 /** 옛 styleFor 그대로: 채우기는 색 + 알파 '33', 선 2px, 점은 반지름 5 + 흰 테두리 */
@@ -860,6 +862,7 @@ export class VectorOverlayControllerImpl implements VectorOverlayController {
         this.saved.delete(id)
         this.names.delete(id)
         this.previews.delete(id)
+        if (!this.destroyed) this.opts.onRemoved?.(id)
     }
 
     openCatalog(opts?: { autoLoad?: boolean }): MyMapCatalog {

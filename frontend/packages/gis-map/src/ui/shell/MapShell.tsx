@@ -7,7 +7,8 @@
 // → 페이지를 떠났다 돌아와도 이어지게 하려면 호스트(앱)가 기억했다가 다음 마운트 때 defaultPanel로 다시 넘긴다.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { GisMapView, useGisMap } from '../../react'
+import { GisMapSplitProvider, GisMapView, useGisMap, useGisMapSplit } from '../../react'
+import type { GisMapSplitCount, GisMapSplitInitialState } from '../../react'
 import { cx } from '../cx'
 import { defaultPanels } from '../panels/defaultPanels'
 import MapStatusBar from '../statusbar/MapStatusBar'
@@ -15,11 +16,31 @@ import MapToolbar from '../toolbar/MapToolbar'
 import MobileLayerButton from '../mobile/MobileLayerButton'
 import RegionBadge from '../overlay/RegionBadge'
 import WindLegend from '../overlay/WindLegend'
+import MapSplitSelect from '../split/MapSplitSelect'
+import SplitStage from '../split/SplitStage'
 import MapHeader from './MapHeader'
 import MapRoot from './MapRoot'
 import NavRail from './NavRail'
 import SidePanel from './SidePanel'
 import type { MapPanelDef, MapShellBrand, MapUserMenuItem } from './types'
+
+/** 화면 분할 옵션(MapShell split). 전부 선택 */
+export interface MapShellSplitOptions {
+    /** 처음 분할 수. 기본 1. 바깥에 GisMapSplitProvider가 있으면 무시(그 Provider 값을 쓴다) */
+    defaultCount?: GisMapSplitCount
+    /** 분할 수가 바뀔 때(처음 값은 알리지 않음). 바깥 Provider가 있으면 무시 */
+    onCountChange?: (count: GisMapSplitCount) => void
+    /** 화면 연동 처음 값. 기본 true. 바깥 Provider가 있으면 무시 */
+    defaultSync?: boolean
+    /** 새로 만든 지도의 처음 상태. 기본 'view-basemap'(활성 지도의 시점·배경지도만 복사). 바깥 Provider가 있으면 무시 */
+    initialPaneState?: GisMapSplitInitialState
+    /** 셀렉트 선택지(순서대로). 기본 [1, 2, 3, 4] */
+    counts?: readonly GisMapSplitCount[]
+    /** 이보다 좁은 칸은 촘촘 모드(번호만·작은 배지). 기본 400 */
+    compactPaneWidth?: number
+    /** 이보다 좁으면 2·3분할을 가로 띠로 쌓는다. 기본 280 */
+    minPaneWidth?: number
+}
 
 export interface MapShellProps {
     /** 루트(gm-root gm-map-view)에 더할 class */
@@ -66,6 +87,13 @@ export interface MapShellProps {
     showStatusBar?: boolean
     /** 상태바의 두 번째 좌표계. 기본 'EPSG:5186' */
     statusBarProjection?: string
+    /**
+     * 화면 분할(머리줄 셀렉트 + 지도 2~4개). 기본 false = 지금과 완전히 같다. true = 기본 옵션.
+     * 바깥에 GisMapSplitProvider가 있으면 새로 만들지 않고 그것을 쓴다(셸을 다시 마운트해도 분할 유지).
+     * 붙이기(attachTo) 모드의 Provider 안에서는 분할을 쓸 수 없어 셀렉트도 나오지 않는다.
+     * 지도를 하나 더 만들 때마다 setup이 불리므로 호스트 setup은 info.pane으로 번호를 구분한다
+     */
+    split?: boolean | MapShellSplitOptions
     /** 지도 위에 더 올릴 호스트 위젯(지도 영역 안, 기본 위젯들 뒤) */
     children?: ReactNode
 }
@@ -76,13 +104,38 @@ function initialPanelId(panels: readonly MapPanelDef[], defaultPanel: string | n
     return panels.length > 0 ? panels[0].id : null
 }
 
-export default function MapShell({
+/**
+ * split을 켜면 분할 Provider 아래에서 그린다. 바깥에 이미 있으면 그것을 쓰고(새로 만들지 않는다), 없으면 여기서 만든다.
+ * split을 안 주면 분할 코드는 아무것도 거치지 않는다(MapShellView를 그대로 그린다 — DOM·동작 변화 없음).
+ */
+export default function MapShell(props: MapShellProps) {
+    const outerSplit = useGisMapSplit()
+    const { split } = props
+    if (!split) return <MapShellView {...props} />
+    const view = <MapShellView {...props} />
+    if (outerSplit) return view
+    const options = typeof split === 'object' ? split : undefined
+    return (
+        <GisMapSplitProvider defaultCount={options?.defaultCount} onCountChange={options?.onCountChange} defaultSync={options?.defaultSync}
+            initialPaneState={options?.initialPaneState}>
+            {view}
+        </GisMapSplitProvider>
+    )
+}
+
+function MapShellView({
     className, brand, panels = defaultPanels, defaultPanel, onPanelChange,
     showHeader = true, showSearch = true, showBasemapSwitcher = true, showUser = true, headerRight, userMenuItems,
     showNavRail = true, showToolbar = true, showPrint = true, showAreaAnalysis = true, showParcelInfo = true, showRegionBadge = true, showMobileLayerButton = true, showWindLegend = true,
-    showStatusBar = true, statusBarProjection, children,
+    showStatusBar = true, statusBarProjection, split, children,
 }: MapShellProps) {
     const map = useGisMap()
+
+    // 화면 분할: split을 켰고 분할 Provider가 쓸 수 있을 때만(붙이기 모드·Provider 없음이면 분할 없는 셸과 같다). 칸이 2개 이상일 때만 격자
+    const splitOptions = typeof split === 'object' ? split : undefined
+    const splitState = useGisMapSplit()
+    const splitUi = !!split && splitState !== null && splitState.available
+    const splitActive = splitUi && splitState.count > 1
 
     // 열린 패널: 같은 패널 아이콘을 다시 누르면 닫힘(옛 panelStore.togglePanel)
     const [activePanel, setActivePanel] = useState<string | null>(() => initialPanelId(panels, defaultPanel))
@@ -107,21 +160,32 @@ export default function MapShell({
         <MapRoot className={cx('gm-map-view', className)}>
             {showHeader && (
                 <MapHeader brand={brand} showSearch={showSearch} right={headerRight}
-                    showBasemapSwitcher={showBasemapSwitcher} showUser={showUser} userMenuItems={userMenuItems} />
+                    showBasemapSwitcher={showBasemapSwitcher} showUser={showUser} userMenuItems={userMenuItems}
+                    split={splitUi ? <MapSplitSelect counts={splitOptions?.counts} /> : undefined} />
             )}
 
             <div className="gm-map-view__body">
                 {showNavRail && <NavRail panels={panels} activePanel={activePanel} togglePanel={togglePanel} />}
-                <SidePanel panel={panel} map={map} />
+                <SidePanel panel={panel} map={map} split={splitActive} />
 
                 {/* 커서 안내·텍스트 입력창은 엔진(코어 DOM)이 지도 요소 안에, 측정 툴팁은 ol.Overlay로 그린다 */}
                 <div className="gm-map-view__stage">
-                    <GisMapView className="gm-map-view__map" />
-                    {showRegionBadge && <RegionBadge />}
+                    {/* 분할 중에는 칸마다 지도·번호 칩·(활성 칸) 지역명·바람 범례를 SplitStage가 그린다. 분할 없음 = 지금 그대로 */}
+                    {splitActive
+                        ? <SplitStage showRegionBadge={showRegionBadge} showWindLegend={showWindLegend}
+                            compactPaneWidth={splitOptions?.compactPaneWidth} minPaneWidth={splitOptions?.minPaneWidth} />
+                        : <GisMapView className="gm-map-view__map" />}
+                    {showRegionBadge && !splitActive && <RegionBadge />}
 
-                    {showToolbar && <MapToolbar showPrint={showPrint} showAreaAnalysis={showAreaAnalysis} showParcelInfo={showParcelInfo} />}
+                    {/* 도구 모음·모바일 레이어 버튼은 무대에 하나 — 대상은 활성 지도. 활성 지도가 바뀌면 key로 새로 마운트해
+                        열려 있던 그리기·출력·영역 분석 패널을 닫고 옛 지도의 틀·결과를 정리한다 */}
+                    {showToolbar && (
+                        <MapToolbar key={splitActive && map ? map.id : undefined}
+                            targetLabel={splitActive ? '지도 ' + (splitState.activeIndex + 1) : undefined}
+                            showPrint={showPrint} showAreaAnalysis={showAreaAnalysis} showParcelInfo={showParcelInfo} />
+                    )}
                     {showMobileLayerButton && <MobileLayerButton />}
-                    {showWindLegend && <WindLegend />}
+                    {showWindLegend && !splitActive && <WindLegend />}
                     {children}
                 </div>
             </div>

@@ -5957,3 +5957,327 @@
         border-radius: var(--gm-radius-xl) var(--gm-radius-xl) 0 0;
     }
 }
+
+/* ── 화면 분할 (ui/split · MapHeader split 슬롯 · MapToolbar targetLabel) ── */
+/* 머리줄 분할 셀렉트 자리: 검색창과 오른쪽 영역 사이. 태블릿(768px) 이상에서만 보인다. 이 자리가 오른쪽 끝으로 밀고 오른쪽 영역은 바로 붙는다 */
+.gm-header__split {
+    display: none;
+    align-items: center;
+    gap: calc(var(--gm-spacing) * 3);
+    margin-left: auto;
+}
+
+.gm-header__split + .gm-header__actions {
+    margin-left: 0;
+}
+
+@media (min-width: 48rem) {
+    .gm-header__split {
+        display: flex;
+    }
+}
+
+.gm-split-ctl {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--gm-spacing) * 1.5);
+}
+
+/* 셀렉트: 왼쪽 아이콘 + 네이티브 select + 오른쪽 화살표. 포커스는 주 색 테두리 */
+.gm-split-select {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 30px;
+    padding-left: 8px;
+    border: 1px solid var(--gm-color-gray-200);
+    border-radius: var(--gm-radius-lg);
+    background-color: var(--gm-color-white);
+    color: var(--gm-color-gray-500);
+}
+
+.gm-split-select:focus-within {
+    border-color: var(--gm-primary);
+    box-shadow: 0 0 0 3px rgba(var(--gm-primary-rgb), .15);
+}
+
+.gm-split-select__icon {
+    flex-shrink: 0;
+}
+
+.gm-split-select__select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    height: 28px;
+    padding: 0 26px 0 6px;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 12.5px;
+    color: var(--gm-color-gray-800);
+    cursor: pointer;
+    outline: none;
+}
+
+.gm-split-select__chev {
+    position: absolute;
+    right: 6px;
+    color: var(--gm-color-gray-400);
+    pointer-events: none;
+}
+
+/* 화면 연동 토글: 켜짐 = 주 색 글자 + 연한 배경 */
+.gm-split-sync {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 30px;
+    padding: 0 10px;
+    border: 1px solid var(--gm-color-gray-200);
+    border-radius: var(--gm-radius-lg);
+    background-color: var(--gm-color-white);
+    color: var(--gm-color-gray-500);
+    font: inherit;
+    font-size: 12.5px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.gm-split-sync.gm-is-active {
+    color: var(--gm-primary);
+    background-color: rgba(var(--gm-primary-rgb), .08);
+    border-color: rgba(var(--gm-primary-rgb), .35);
+}
+
+/* 격자: 3분할 = 같은 크기 세로 3칸, 4분할 = 2×2, stacked = 칸 폭이 좁을 때 1열 N행(2·3분할). 칸 사이 2px는 무대 배경이 비친다 */
+.gm-split {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    gap: 2px;
+    grid-auto-rows: minmax(0, 1fr);
+    background-color: var(--gm-color-gray-300);
+}
+
+.gm-split--n1 {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.gm-split--n2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.gm-split--n3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.gm-split--n4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.gm-split--stacked {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+/* 칸: 지도 캔버스만 자른다(떠 있는 패널은 칸 밖 무대에 있어 안 잘린다). 활성 칸은 안쪽 주 색 테두리 */
+.gm-split__pane {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.gm-split__pane.gm-is-active::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    box-shadow: inset 0 0 0 2px var(--gm-primary);
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* 번호 칩: 번호 원 + 배경지도 이름. 활성 칸은 번호 원이 주 색 */
+.gm-split__chip {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 9px 0 3px;
+    border-radius: 12px;
+    background-color: rgba(255, 255, 255, .95);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .15);
+    font-size: 11.5px;
+    color: var(--gm-color-gray-700);
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.gm-split__chip.gm-is-active {
+    color: var(--gm-color-gray-800);
+    font-weight: 600;
+}
+
+.gm-split__chip-num {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background-color: var(--gm-color-gray-200);
+    color: var(--gm-color-gray-700);
+    font-size: 11px;
+}
+
+.gm-split__chip.gm-is-active .gm-split__chip-num {
+    background-color: var(--gm-primary);
+    color: var(--gm-color-white);
+}
+
+/* 칸 안 지역명 배지: 칩(왼쪽 48px)과 도구 모음(맨 오른쪽 열은 56px)을 피한 가운데, 넘치면 말줄임 */
+.gm-split__pane .gm-region-badge {
+    left: 48px;
+    right: 12px;
+    translate: none;
+    display: flex;
+    justify-content: center;
+}
+
+.gm-split__pane--edge .gm-region-badge {
+    right: 56px;
+}
+
+.gm-split__pane .gm-region-badge__pill {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.gm-split__pane .gm-region-badge__text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 촘촘 모드(280 ≤ 칸 폭 < 400): 칩은 번호만(이름은 title), 배지는 작게, 바람 범례 막대 120px */
+.gm-split__pane--compact .gm-split__chip {
+    padding-right: 3px;
+}
+
+.gm-split__pane--compact .gm-split__chip-label {
+    display: none;
+}
+
+.gm-split__pane--compact .gm-region-badge__pill {
+    padding-block: 4px;
+    padding-inline: 10px;
+}
+
+.gm-split__pane--compact .gm-region-badge__text {
+    font-size: 12px;
+}
+
+.gm-split__pane--compact .gm-wind-legend__bar {
+    width: 120px;
+}
+
+/* 도구 모음 맨 위 칩: 이 도구 모음이 조작하는 지도 번호 */
+.gm-toolbar__target {
+    text-align: center;
+    padding-block: 3px;
+    padding-inline: 0;
+    border-radius: 8px;
+    background-color: var(--gm-primary);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .2);
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--gm-color-white);
+    white-space: nowrap;
+}
+
+/* 모바일(768px 미만): 활성 칸 하나만 보인다. 숨긴 칸은 크기가 0이라 그리지도 타일을 받지도 않는다 */
+@media (max-width: 47.99rem) {
+    .gm-root .gm-split {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr);
+    }
+
+    .gm-split__pane:not(.gm-is-active) {
+        display: none;
+    }
+
+    .gm-split__pane.gm-is-active::after {
+        box-shadow: none;
+    }
+}
+
+/* ── 대상 지도 탭 (ui/split/MapSplitTargetTabs): 사이드 패널 위, 분할 중에만. 번호 상자가 활성 지도 ── */
+.gm-split-tabs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--gm-color-gray-200);
+    background-color: var(--gm-color-gray-50);
+}
+
+.gm-split-tabs__label {
+    margin-right: 2px;
+    font-style: normal;
+    font-size: 11px;
+    color: var(--gm-color-gray-500);
+}
+
+.gm-split-tabs__tab {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--gm-color-gray-200);
+    border-radius: 6px;
+    background-color: var(--gm-color-white);
+    font: inherit;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--gm-color-gray-500);
+    cursor: pointer;
+}
+
+.gm-split-tabs__tab:hover:not(:disabled) {
+    border-color: var(--gm-primary);
+    color: var(--gm-primary);
+}
+
+.gm-split-tabs__tab.gm-is-active,
+.gm-split-tabs__tab.gm-is-active:hover {
+    border-color: var(--gm-primary);
+    background-color: var(--gm-primary);
+    color: var(--gm-color-white);
+}
+
+.gm-split-tabs__tab:disabled {
+    opacity: .45;
+    cursor: default;
+}
+
+/* 분할 중 패널 내용 자리: 탭 아래 남은 높이를 채운다(.gm-panel이 height:100%라 이 상자가 높이를 정해 줘야 한다) */
+.gm-side-panel__body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.gm-side-panel__body > .gm-panel {
+    flex: 1;
+    height: auto;
+    min-height: 0;
+}

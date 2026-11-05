@@ -5,8 +5,13 @@ export const GIS_MAP_VERSION = '0.1.0'
 
 // 엔진
 export { createGisMap, attachGisMap } from './GisMap'
-export type { GisMap, GisMapEvents, FlyToRequest } from './GisMap'
+export type { GisMap, GisMapEvents, GisOverlayRemoved, FlyToRequest } from './GisMap'
 export type { GisMapPlugin } from './plugin'
+// 화면 연동(여러 지도의 중심·축척·회전을 맞춘다 — React 없이 쓴다)
+export { linkViews } from './split/linkViews'
+export type { LinkViewsOptions, ViewLink } from './split/linkViews'
+export { copyMapState } from './split/paneState'
+export type { CopyMapStateOptions } from './split/paneState'
 
 // 도구(도구 관리자·그리기·커서 안내)
 export { DEFAULT_DRAW_STYLE } from './tools/DrawController'

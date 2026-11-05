@@ -57,9 +57,11 @@ export interface MapToolbarProps {
     showAreaAnalysis?: boolean
     /** 필지 정보(필지를 눌러 속성·건물 보기) 단추와 카드. 기본 true(메뉴 권한 map.tool.parcel-info도 통과하고, 지도에 parcel.infoAt 소스가 있어야 보인다) */
     showParcelInfo?: boolean
+    /** 도구 모음 맨 위 작은 칩(예: 분할 중 '지도 2' — 이 도구 모음이 어느 지도를 조작하는지). 없으면 칩을 그리지 않는다 */
+    targetLabel?: string
 }
 
-export default function MapToolbar({ showPrint = true, showAreaAnalysis = true, showParcelInfo = true }: MapToolbarProps = {}) {
+export default function MapToolbar({ showPrint = true, showAreaAnalysis = true, showParcelInfo = true, targetLabel }: MapToolbarProps = {}) {
     // 바람길 토글은 엔진의 바람길 플러그인(설치: app/map/page.tsx의 setup)
     const wind = useWindPlugin()
     const windLayerVisible = useWindState(selectWindVisible)
@@ -128,7 +130,8 @@ export default function MapToolbar({ showPrint = true, showAreaAnalysis = true, 
     const showMeasD   = show('map.tool.measure-distance')
     const showMeasA   = show('map.tool.measure-area')
     const showRadius  = show('map.tool.radius-search')
-    const showWind    = show('map.tool.wind')
+    // 바람 단추는 이 지도에 바람길 플러그인이 있을 때만(분할의 2~4번 지도처럼 플러그인이 없는 지도에서는 누를 곳이 없다)
+    const showWind    = show('map.tool.wind') && wind !== null
     const showPrintBtn = showPrint && show('map.tool.print')
     const showAnalysisBtn = showAreaAnalysis && show('map.tool.area-analysis')
     const showParcelBtn = showParcelInfo && show('map.tool.parcel-info') && !!gis?.parcelInfo.available
@@ -142,6 +145,8 @@ export default function MapToolbar({ showPrint = true, showAreaAnalysis = true, 
 
     return (
         <div className="gm-toolbar">
+
+            {targetLabel != null && <div className="gm-toolbar__target">{targetLabel}</div>}
 
             {/* ── 줌 ── */}
             {show('map.tool.zoom') && (

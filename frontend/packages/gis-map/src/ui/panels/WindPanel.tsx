@@ -394,14 +394,14 @@ function WindPanelBody({ wind }: { wind: WindPlugin }) {
     )
 }
 
-/** 바람길 플러그인이 설치되지 않은 지도에서 열렸을 때 */
+/** 바람길 플러그인이 설치되지 않은 지도에서 열렸을 때(분할로 만든 2~4번 지도 등) */
 function WindPanelEmpty() {
     return (
         <div className="gm-panel">
             <div className="gm-panel__header">
                 <span className="gm-panel__title">바람지도</span>
             </div>
-            <div className="gm-panel__empty">바람길이 설치되지 않았습니다</div>
+            <div className="gm-panel__empty">이 지도에는 바람길이 없습니다</div>
         </div>
     )
 }

@@ -54,7 +54,15 @@ export interface FlyToRequest {
     zoom?: number
 }
 
+/** 목록에서 삭제한 오버레이(GeoTIFF·나만의지도). 서버에서 지운 것이라 다른 지도(분할)에 켜 둔 같은 레이어도 숨겨야 할 때 쓴다 */
+export interface GisOverlayRemoved {
+    readonly kind: 'vector' | 'raster'
+    readonly id: number
+}
+
 export interface GisMapEvents {
+    /** 이 지도의 목록(패널)에서 오버레이를 삭제했을 때(그 지도에서는 이미 숨김). hide()·destroy는 알리지 않는다 */
+    overlayremoved: GisOverlayRemoved
     clear: undefined
     hostchange: GisMapHost
     destroy: undefined
@@ -213,11 +221,13 @@ class GisMapEngine implements GisMap {
         // 오버레이·기능: 만들 때는 아무것도 붙이지 않는다(레이어는 표시할 때, 이동 리스너는 지역명 구독자가 생길 때)
         this.rasterController = new RasterOverlayControllerImpl({
             olMap, resources: this.resources, source: this.sources.geoTiff, zIndex: this.zIndex.raster,
+            onRemoved: id => this.events.emit('overlayremoved', { kind: 'raster', id }),
         })
         this.raster = this.rasterController
         this.vectorController = new VectorOverlayControllerImpl({
             olMap, resources: this.resources, source: this.sources.myMap, zIndex: this.zIndex.vector,
             defaultColor: this.theme.primary, tools: this.toolManager, config: options.myMap,
+            onRemoved: id => this.events.emit('overlayremoved', { kind: 'vector', id }),
         })
         this.vector = this.vectorController
         this.parcelHighlighter = new ParcelHighlighterImpl({
