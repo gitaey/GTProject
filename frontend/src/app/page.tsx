@@ -1,312 +1,81 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import { useEffect, useMemo, useState } from 'react'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
 import { useAuthStore } from '@/stores/authStore'
 import { useMenuStore } from '@/stores/menuStore'
+import BotCard from './_dashboard/BotCard'
+import { DashboardNoAccess, DashboardSkeleton } from './_dashboard/CardState'
+import { SectionHeading } from './_dashboard/DashboardCard'
+import MapSection from './_dashboard/MapSection'
+import RecentPostsCard from './_dashboard/RecentPostsCard'
+import { opsGridLayout, readDevOverrides, resolveDashboardSections } from './_dashboard/sections'
+import type { DashDevOverrides } from './_dashboard/sections'
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
-
-interface DailyStats {
-    total: number
-    successCount: number
-    failCount: number
-    byType: Record<string, number>
-}
-
-interface BotLogItem {
-    id: number
-    type: string
-    room: string
-    sender: string
-    command: string
-    detail?: string
-    success: boolean
-    createdAt: string
-}
-
-interface PartyInfo {
-    raidName: string
-    time: string
-    members: string[]
-}
-
-interface UserItem {
-    userId: string
-    userName: string
-    nickname: string
-    roleLabel: string
-}
-
-interface PostItem {
-    id: number
-    title: string
-    categoryLabel: string
-    createdAt: string
-}
-
-function KpiCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color: string }) {
-    return (
-        <div className="rounded-lg p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-            <p className="text-xs mb-2" style={{ color: 'var(--text-faint)' }}>{label}</p>
-            <p className="text-2xl font-bold mb-1" style={{ color }}>{value}</p>
-            {sub && <p className="text-xs" style={{ color: 'var(--text-faint)' }}>{sub}</p>}
-        </div>
-    )
-}
-
-function Widget({ title, href, linkLabel = '전체 보기 →', subHref, subLinkLabel, className, children }: {
-    title: string; href: string; linkLabel?: string; subHref?: string; subLinkLabel?: string; className?: string; children: React.ReactNode
-}) {
-    return (
-        <div className={`rounded-lg flex flex-col ${className ?? ''}`} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-            <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{title}</span>
-                <div className="flex items-center gap-3">
-                    {subHref && subLinkLabel && (
-                        <Link href={subHref} className="text-xs" style={{ color: 'var(--text-faint)' }}>{subLinkLabel}</Link>
-                    )}
-                    <Link href={href} className="text-xs" style={{ color: 'var(--accent)' }}>{linkLabel}</Link>
-                </div>
-            </div>
-            <div className="p-4">{children}</div>
-        </div>
-    )
-}
-
-function Empty({ text }: { text: string }) {
-    return <p className="text-xs" style={{ color: 'var(--text-faint)' }}>{text}</p>
-}
-
+/**
+ * 로그인 사용자 대시보드 — 위 줄 "지도"(지도 칸 + 지도 현황), 아래 줄 "운영 현황"(기빵봇 · 최근 게시글).
+ * 이 파일은 조립만 한다. 권한 계산은 sections.ts, 카드는 _dashboard/ 아래.
+ */
 export default function Home() {
-    const { token, user } = useAuthStore()
-    const { isAllowed, loaded } = useMenuStore()
+    const user = useAuthStore((s) => s.user)
+    const loaded = useMenuStore((s) => s.loaded)
+    const allowedMenus = useMenuStore((s) => s.allowedMenus)
 
-    const isSuperAdmin = user?.role === 'SUPER_ADMIN'
-    const show = (menuId: string) => isSuperAdmin || !loaded || isAllowed(menuId)
-
-    const showBot      = show('sidebar.bot-log')
-    const showBlog     = show('sidebar.blog-view')
-    const showUser     = show('sidebar.system-user')
-    const showMap      = show('sidebar.map-view')
-    const showMapLayer = show('sidebar.map-layer')
-
-    const [stats, setStats]         = useState<DailyStats | null>(null)
-    const [userTotal, setUserTotal] = useState<number>(0)
-    const [logs, setLogs]           = useState<BotLogItem[]>([])
-    const [parties, setParties]     = useState<PartyInfo[]>([])
-    const [users, setUsers]         = useState<UserItem[]>([])
-    const [posts, setPosts]         = useState<PostItem[]>([])
-
+    // 개발 전용 ?dashMenus·?dashFail. null = 아직 마운트 전(서버 렌더와 첫 렌더를 똑같이 뼈대로 맞춰 hydration 불일치를 막는다)
+    const [dev, setDev] = useState<DashDevOverrides | null>(null)
     useEffect(() => {
-        const today = new Date().toISOString().split('T')[0]
-        const auth: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+        setDev(readDevOverrides(window.location.search))
+    }, [])
 
-        if (showBot) {
-            fetch(`${API}/api/bot-log/stats/daily?date=${today}`)
-                .then(r => r.json()).then(d => { if (d.success) setStats(d.data) }).catch(() => {})
+    const role = user?.role ?? null
+    const sections = useMemo(
+        () =>
+            resolveDashboardSections(
+                role === null ? null : { role },
+                { loaded, isAllowed: (menuId: string) => allowedMenus.has(menuId) },
+                dev?.menus ?? null,
+            ),
+        [role, loaded, allowedMenus, dev],
+    )
 
-            fetch(`${API}/api/bot-log?page=0&size=5&type=COMMAND`)
-                .then(r => r.json()).then(d => { if (d.success) setLogs(d.data?.content ?? []) }).catch(() => {})
-
-            fetch(`${API}/api/schedule/today`)
-                .then(r => r.json()).then(d => { if (d.success) setParties(d.data ?? []) }).catch(() => {})
-        }
-
-        if (showUser) {
-            fetch(`${API}/api/users?page=0&size=5`, { headers: auth })
-                .then(r => r.json()).then(d => {
-                    if (d.success) {
-                        setUsers(d.data?.content ?? [])
-                        setUserTotal(d.data?.page?.totalElements ?? 0)
-                    }
-                }).catch(() => {})
-        }
-
-        if (showBlog) {
-            fetch(`${API}/api/posts?page=0&size=5`)
-                .then(r => r.json()).then(d => { if (d.success) setPosts(d.data?.content ?? []) }).catch(() => {})
-        }
-    }, [token, loaded])
-
-    const successRate = stats && stats.total > 0
-        ? Math.round((stats.successCount / stats.total) * 100)
-        : 0
+    const ready = dev !== null && sections.ready
+    const showOps = sections.bot || sections.blog
+    const ops = opsGridLayout({ bot: sections.bot, blog: sections.blog })
 
     return (
         <div className="flex min-h-screen" style={{ background: 'var(--bg-page)' }}>
             <Sidebar />
-            <div className="flex-1 flex flex-col min-w-0">
+            <div className="flex min-w-0 flex-1 flex-col">
                 <Header title="대시보드" />
-                <main className="flex-1 p-6 space-y-4">
+                <main className="flex-1 space-y-5 px-3 py-4 sm:p-6">
+                    <h1 className="sr-only">대시보드</h1>
 
-                    {/* KPI 카드 */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        {showBot && <>
-                            <KpiCard
-                                label="오늘 명령어"
-                                value={String(stats?.byType?.COMMAND ?? 0)}
-                                sub="오늘 처리된 명령어"
-                                color="var(--accent)"
-                            />
-                            <KpiCard
-                                label="성공률"
-                                value={`${successRate}%`}
-                                sub={`성공 ${stats?.successCount ?? 0} / 전체 ${stats?.total ?? 0}`}
-                                color="#22c55e"
-                            />
-                            <KpiCard
-                                label="오류"
-                                value={String(stats?.byType?.API_ERROR ?? 0)}
-                                sub="API 오류 건수"
-                                color="#ef4444"
-                            />
-                        </>}
-                        {showUser && (
-                            <KpiCard
-                                label="총 사용자"
-                                value={String(userTotal)}
-                                sub="등록된 사용자"
-                                color="var(--text-secondary)"
-                            />
-                        )}
-                    </div>
+                    {!ready && <DashboardSkeleton />}
 
-                    {/* 중단 위젯 (봇 권한 있을 때만) */}
-                    {showBot && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <Widget title="최근 봇 로그" href="/admin/bot-log">
-                                {logs.length === 0
-                                    ? <Empty text="오늘 명령어 로그 없음" />
-                                    : <ul className="space-y-2.5">
-                                        {logs.map(log => (
-                                            <li key={log.id} className="flex items-start gap-2 text-xs">
-                                                <span
-                                                    className="shrink-0 rounded-full"
-                                                    style={{
-                                                        width: 6, height: 6, marginTop: 4,
-                                                        background: log.success ? '#22c55e' : '#ef4444',
-                                                        flexShrink: 0,
-                                                    }}
-                                                />
-                                                <div className="min-w-0">
-                                                    <p className="font-mono truncate" style={{ color: 'var(--text-primary)' }}>
-                                                        {log.command}{log.detail ? ` ${log.detail}` : ''}
-                                                    </p>
-                                                    <p className="truncate" style={{ color: 'var(--text-faint)' }}>
-                                                        {[log.room, log.sender, log.createdAt?.slice(11, 16)].filter(Boolean).join(' · ')}
-                                                    </p>
-                                                </div>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                }
-                            </Widget>
+                    {ready && !sections.map && !showOps && <DashboardNoAccess />}
 
-                            <Widget title="오늘의 레이드" href="/admin/bot-log" linkLabel="봇 로그 →">
-                                {parties.length === 0
-                                    ? <Empty text="오늘 등록된 레이드 없음" />
-                                    : <ul className="space-y-3">
-                                        {parties.map((p, i) => (
-                                            <li key={i}>
-                                                <p className="text-xs font-semibold mb-0.5" style={{ color: 'var(--text-primary)' }}>
-                                                    ◆ {p.raidName}
-                                                    {p.time && (
-                                                        <span className="ml-1 font-normal" style={{ color: 'var(--text-faint)' }}>
-                                                            {p.time}
-                                                        </span>
-                                                    )}
-                                                </p>
-                                                <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
-                                                    {p.members.join(' · ')}
-                                                </p>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                }
-                            </Widget>
-                        </div>
+                    {ready && dev && sections.map && (
+                        <MapSection canManageLayers={sections.mapLayerAdmin} failKeys={dev.fail} />
                     )}
 
-                    {/* 하단 위젯 */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-
-                        {showUser && (
-                            <Widget title="사용자 목록" href="/admin/user" linkLabel="관리 →">
-                                {users.length === 0
-                                    ? <Empty text="사용자 없음" />
-                                    : <ul className="space-y-2">
-                                        {users.map(u => (
-                                            <li key={u.userId} className="flex items-center justify-between text-xs">
-                                                <div className="min-w-0">
-                                                    <span style={{ color: 'var(--text-primary)' }}>
-                                                        {u.nickname || u.userName}
-                                                    </span>
-                                                    <span className="ml-1" style={{ color: 'var(--text-faint)' }}>
-                                                        ({u.userId})
-                                                    </span>
-                                                </div>
-                                                <span
-                                                    className="shrink-0 px-1.5 py-0.5 rounded text-[10px]"
-                                                    style={{ background: 'var(--accent-bg)', color: 'var(--accent)' }}
-                                                >
-                                                    {u.roleLabel}
-                                                </span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                }
-                            </Widget>
-                        )}
-
-                        {showMap && (
-                            <Widget title="지도" href="/map" linkLabel="바로가기 →">
-                                <div className="flex flex-col gap-2">
-                                    <Link
-                                        href="/map"
-                                        className="flex items-center justify-center gap-2 rounded-md py-3 text-sm font-medium transition-colors"
-                                        style={{ background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid var(--accent-border)' }}
-                                    >
-                                        지도 보기
-                                    </Link>
-                                    {showMapLayer && (
-                                        <Link
-                                            href="/map-admin/layer"
-                                            className="flex items-center justify-center gap-2 rounded-md py-2 text-xs transition-colors"
-                                            style={{ background: 'var(--bg-page)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
-                                        >
-                                            레이어 관리
-                                        </Link>
-                                    )}
-                                </div>
-                            </Widget>
-                        )}
-
-                        {showBlog && (
-                            <Widget title="최근 게시글" href="/admin/blog" linkLabel="관리 →" subHref="/blog" subLinkLabel="블로그 →">
-                                {posts.length === 0
-                                    ? <Empty text="게시글 없음" />
-                                    : <ul className="space-y-2.5">
-                                        {posts.map(post => (
-                                            <li key={post.id} className="flex items-start gap-2 text-xs">
-                                                <div className="min-w-0">
-                                                    <p className="truncate" style={{ color: 'var(--text-primary)' }}>
-                                                        {post.title}
-                                                    </p>
-                                                    <p style={{ color: 'var(--text-faint)' }}>
-                                                        {post.categoryLabel} · {post.createdAt?.slice(0, 10)}
-                                                    </p>
-                                                </div>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                }
-                            </Widget>
-                        )}
-                    </div>
-
+                    {ready && dev && showOps && (
+                        <section aria-labelledby="dash-ops-heading" className="space-y-3">
+                            <SectionHeading id="dash-ops-heading" title="운영 현황" hint="기빵봇 · 블로그" />
+                            <div className="grid grid-cols-12 gap-4">
+                                {sections.bot && (
+                                    <div className={`${ops.bot} min-w-0`}>
+                                        <BotCard failBot={dev.fail.has('bot')} failSchedule={dev.fail.has('schedule')} />
+                                    </div>
+                                )}
+                                {sections.blog && (
+                                    <div className={`${ops.blog} min-w-0`}>
+                                        <RecentPostsCard canManage={sections.blogAdmin} forceFail={dev.fail.has('posts')} />
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+                    )}
                 </main>
             </div>
         </div>
