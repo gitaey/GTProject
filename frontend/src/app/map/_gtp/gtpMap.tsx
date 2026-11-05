@@ -15,6 +15,13 @@ import type { MapPanelDef, MapShellBrand, MapShellSplitOptions } from '@gtp/gis-
 import { useAuthStore } from '@/stores/authStore'
 import { useMenuStore } from '@/stores/menuStore'
 import EtcPanel from './EtcPanel'
+import {
+    GTP_BRAND_PRIMARY,
+    GTP_VIEW_CENTER,
+    GTP_VIEW_MAX_ZOOM,
+    GTP_VIEW_MIN_ZOOM,
+    GTP_VIEW_ZOOM,
+} from './gtpView'
 import { readMapSession, rememberMapPanel, restoreMapSession } from './mapSession'
 
 /** 앱 쪽 기억(mapSession)의 이름 — /map의 지도는 하나 */
@@ -41,8 +48,13 @@ const gtpLayerCrossOrigin: LayerCrossOriginResolver = (layer, url) => {
  * 레이어 그룹 펼침 상태는 localStorage 'layer-group-expanded'(/map-admin/layer와 같은 키 → 펼침 상태 공유)
  */
 export const GTP_MAP_CONFIG: Omit<GisMapConfig, 'target' | 'host'> = {
-    view: { center: [127.289, 36.48], zoom: 10, minZoom: 7, maxZoom: 21 },
-    theme: { primary: '#F26722' },
+    view: {
+        center: [GTP_VIEW_CENTER[0], GTP_VIEW_CENTER[1]],
+        zoom: GTP_VIEW_ZOOM,
+        minZoom: GTP_VIEW_MIN_ZOOM,
+        maxZoom: GTP_VIEW_MAX_ZOOM,
+    },
+    theme: { primary: GTP_BRAND_PRIMARY },
     sources: [restSources(), proxySources()],
     layers: { expandedStorage: browserExpandedStorage('layer-group-expanded'), crossOrigin: gtpLayerCrossOrigin },
     // 지도 출력: 머리줄 기관명. 출처는 켜진 레이어에 vworld.kr이 있으면 기본 문구('배경지도: 브이월드(국토교통부)')가 자동으로 붙는다
