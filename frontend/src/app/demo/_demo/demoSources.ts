@@ -5,8 +5,8 @@ import { demoSources, demoLayerCrossOrigin } from '@gtp/gis-map/adapters/memory'
 import type { DemoBasemap, DemoSources } from '@gtp/gis-map/adapters/memory'
 import { geoserverLegendUrl, proxyAreaQuery } from '@gtp/gis-map/adapters/proxy'
 import type {
-    AreaQueryLayerInfo, AreaQueryPage, AreaQuerySource, GisMapSourcesFactory, LayerCrossOriginResolver, LayerDef, LayerGroupDef,
-    LegendSource, SourceContext,
+    AreaQueryLayerInfo, AreaQueryPage, AreaQuerySource, GeoJsonObject, GisMapSourcesFactory, LayerCrossOriginResolver, LayerDef, LayerGroupDef,
+    LegendSource, MyMapSource, SourceContext,
 } from '@gtp/gis-map/core'
 import { DEMO_GEOSERVER_URL } from './demoHost'
 
@@ -111,6 +111,31 @@ function bigLabelOf(count: number): string {
     return count >= 10000 ? count / 10000 + '만' : String(count)
 }
 
+/**
+ * 나만의지도 소스의 `geojson(id)` 결과를 id별로 한 번만 만들어 여러 지도(화면 분할 1~4번)가 같은 객체를 나눠 쓰게 한다.
+ * 메모리 소스는 `geojson()`을 부를 때마다 10만 점을 새로 만든다 → 칸 수만큼 생성 시간이 든다. 엔진은 입력을 읽기만 해서(피처마다 readFeature) 공유해도 안전하다.
+ * 캐시는 이 함수를 부를 때마다 만들어지는 클로저의 Map이다(모듈 전역 아님 — 데모 한 벌마다 하나, "데모 초기화"하면 새로).
+ * 실패한 요청은 캐시에 남기지 않고, 삭제(`remove`)하면 그 id의 캐시도 버린다. 합성 데이터는 바뀌지 않으므로 그 밖의 무효화는 없다.
+ */
+export function cacheMyMapGeojson(src: MyMapSource): MyMapSource {
+    const cache = new Map<number, Promise<GeoJsonObject>>()
+    return {
+        ...src,
+        geojson(id: number): Promise<GeoJsonObject> {
+            const hit = cache.get(id)
+            if (hit) return hit
+            const made = src.geojson(id)
+            cache.set(id, made)
+            made.catch(() => { if (cache.get(id) === made) cache.delete(id) })
+            return made
+        },
+        remove(id: number): Promise<void> {
+            cache.delete(id)
+            return src.remove(id)
+        },
+    }
+}
+
 export function createDemoBundle(opts: DemoBundleOptions): DemoBundle {
     const hasKey = opts.vworldKey.trim() !== ''
     const basemap: DemoBasemap = hasKey ? 'both' : 'osm'
@@ -118,8 +143,11 @@ export function createDemoBundle(opts: DemoBundleOptions): DemoBundle {
     const demo = demoSources({
         basemap, vworldKey: opts.vworldKey, bigCounts: Array.from(counts), extraGroups: [boundaryGroup()], seed: opts.seed, now: opts.now,
     })
+    // 번들 한 벌에 하나(팩토리 밖) — 팩토리는 엔진마다 불리지만 이 캐시는 모든 지도가 함께 쓴다
+    const myMap = demo.sources.myMap ? cacheMyMapGeojson(demo.sources.myMap) : undefined
     const sources: GisMapSourcesFactory = ctx => ({
         ...demo.sources,
+        ...(myMap ? { myMap } : {}),
         areaQuery: routeAreaQuery(demo.sources.areaQuery, proxyAreaQuery(ctx)),
         legend: demoLegend(ctx),
     })

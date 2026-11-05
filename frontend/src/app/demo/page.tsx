@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import {
-    ArrowRight, ChartPie, CodeXml, FolderTree, Globe, Github, Grip, LandPlot, Layers, Lock, LogIn, MapPinned, Play,
+    ArrowRight, ChartPie, CodeXml, FolderTree, Globe, Github, Grip, LandPlot, Layers, LayoutGrid, Lock, LogIn, MapPinned, Play,
     Printer, Table2, Wind,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -8,7 +8,7 @@ import type { LucideIcon } from 'lucide-react'
 /*
  * 공개 소개 페이지(/demo) — 서버 컴포넌트, 로그인·백엔드 호출 없음. 미들웨어가 /demo 경로를 로그인 없이 연다.
  * 지도 데모(/demo/map)와 정적 예제(/demo/umd/)는 다른 단계에서 만든다 — 여기서는 링크만 건다.
- * 기능 카드의 step id 는 /demo/map?step=<id> 계약(layers, parcel, mymap-style, table-export, big-data, area, print, wind).
+ * 기능 카드의 step id 는 /demo/map?step=<id> 계약(layers, split, parcel, mymap-style, table-export, big-data, area, print, wind).
  */
 
 const GITHUB_URL = 'https://github.com/gitaey/GTProject'
@@ -29,6 +29,7 @@ interface FeatureCard {
 
 const FEATURES: FeatureCard[] = [
     { step: 'layers', title: '레이어·배경지도', desc: '레이어 트리, 투명도, 범례, 일반/위성 배경.', tag: '실제 GeoServer', kind: 'real', Icon: Layers },
+    { step: 'split', title: '화면 분할', desc: '2·3·4분할, 지도마다 레이어·배경지도 따로, 화면 연동.', tag: '브라우저', kind: 'sample', Icon: LayoutGrid },
     { step: 'parcel', title: '필지 정보', desc: '필지를 누르면 지번·지목·면적·공시지가와 건물 목록.', tag: '샘플', kind: 'sample', Icon: LandPlot },
     { step: 'mymap-style', title: '나만의지도 스타일', desc: '값별·구간별 색, 라벨, 클릭 팝업을 바로 미리보기.', tag: '샘플', kind: 'sample', Icon: MapPinned },
     { step: 'table-export', title: '속성 표·내보내기', desc: '정렬·필터, GeoJSON·엑셀로 좌표계를 골라 저장.', tag: '샘플', kind: 'sample', Icon: Table2 },
@@ -194,7 +195,7 @@ export default function DemoPage() {
                         <Tag kind="sample">샘플</Tag> 브라우저 안 가짜 데이터
                         <Tag kind="real">실제</Tag> 실제 외부 서버 호출
                     </p>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                         {FEATURES.map(({ step, title, desc, tag, kind, Icon }) => (
                             <Link
                                 key={step}

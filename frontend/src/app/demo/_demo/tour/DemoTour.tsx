@@ -5,7 +5,9 @@
 // 진행을 강제하지 않는다 — 목록에서 아무 단계나 누를 수 있고 "해 보기"는 선택이다. 단계 글·동작·강조 선택자는 steps.ts 한 곳.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, ChevronUp, Compass, ExternalLink, Play, X } from 'lucide-react'
-import { useGisMap } from '@gtp/gis-map/react'
+import type { GisMap } from '@gtp/gis-map/core'
+import { useGisMap, useGisMapSplit } from '@gtp/gis-map/react'
+import type { GisMapSplitState } from '@gtp/gis-map/react'
 import { TOUR_TAG_LABEL } from './steps'
 import type { TourContext, TourPanel, TourStep } from './steps'
 
@@ -25,6 +27,14 @@ function cx(...parts: Array<string | false | null | undefined>): string {
     return parts.filter(Boolean).join(' ')
 }
 
+/** 1번 지도(바람 플러그인이 있는 지도)를 활성으로 만들고 돌려준다. 분할이 없거나 1번이 아직 없으면 활성 지도 그대로 */
+export function mainMapOf(active: GisMap, split: GisMapSplitState | null): GisMap {
+    const main = split?.panes[0] ?? null
+    if (!split || !main) return active
+    if (split.activeIndex !== 0) split.setActive(0)
+    return main
+}
+
 function focusSelector(selector: string): void {
     const el = document.querySelector(selector)
     if (el instanceof HTMLElement) el.focus()
@@ -37,7 +47,8 @@ export function highlightCss(selectors: readonly string[] | undefined): string |
 }
 
 export default function DemoTour({ steps, index, onIndexChange, open, onOpenChange, mobile, openPanel, center, bigLayerId }: DemoTourProps) {
-    const map = useGisMap()
+    const map = useGisMap() // 분할 중이면 활성 지도
+    const split = useGisMapSplit()
     const step = steps[index]
     const [visited, setVisited] = useState<readonly number[]>([])
     const [busy, setBusy] = useState(false)
@@ -46,7 +57,7 @@ export default function DemoTour({ steps, index, onIndexChange, open, onOpenChan
 
     // 최신 값을 effect 정리에서 쓰려고 ref에 둔다(매 렌더 갱신)
     const ctxRef = useRef<TourContext | null>(null)
-    ctxRef.current = map ? { map, openPanel, focus: focusSelector, center, bigLayerId } : null
+    ctxRef.current = map ? { map, split, mainMap: () => mainMapOf(map, split), openPanel, focus: focusSelector, center, bigLayerId } : null
 
     useEffect(() => {
         setVisited(v => (v.includes(index) ? v : [...v, index]))

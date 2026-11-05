@@ -4,12 +4,13 @@
 // 강조 선택자: 도구 모음·네비 단추에는 aria-label·title이 없어 단추 안 lucide 아이콘 class(lucide-<이름>)로 찾는다(:has — 지원 안 하는 브라우저는 강조만 빠진다).
 import type { GisMap } from '@gtp/gis-map/core'
 import type { WindPlugin } from '@gtp/gis-map/core/wind'
+import type { GisMapSplitState } from '@gtp/gis-map/react'
 import { DEMO_BOUNDARY_LAYER } from '../demoSources'
 
 export const GITHUB_URL = 'https://github.com/gitaey/GTProject'
 export const STATIC_DEMO_URL = '/demo/umd/index.html'
 
-export type TourStepId = 'layers' | 'search' | 'measure' | 'parcel' | 'mymap-style' | 'table-export' | 'big-data' | 'area' | 'print' | 'wind' | 'export'
+export type TourStepId = 'layers' | 'split' | 'search' | 'measure' | 'parcel' | 'mymap-style' | 'table-export' | 'big-data' | 'area' | 'print' | 'wind' | 'export'
 export type TourTag = 'sample' | 'real' | 'browser'
 
 export const TOUR_TAG_LABEL: Readonly<Record<TourTag, string>> = Object.freeze({
@@ -20,7 +21,12 @@ export const TOUR_TAG_LABEL: Readonly<Record<TourTag, string>> = Object.freeze({
 export type TourPanel = 'layer' | 'mymap' | 'wind'
 
 export interface TourContext {
+    /** 활성 지도(분할 중이면 지금 고른 칸의 지도, 분할이 없으면 하나뿐인 지도) — 측정·필지·출력 등 "지금 보는 지도"에 하는 해 보기 */
     map: GisMap
+    /** 화면 분할 상태(분할 Provider 밖이면 null) */
+    split: GisMapSplitState | null
+    /** 1번 지도를 활성으로 만들고 1번 엔진을 돌려준다 — 바람(1번에만 플러그인)·큰 데이터 단계용. 분할이 없으면 `map` 그대로 */
+    mainMap(): GisMap
     /** 왼쪽 패널 열기(null = 닫기) — MapShell을 다시 마운트해 defaultPanel로 연다 */
     openPanel(panel: TourPanel | null): void
     /** 화면의 입력창 등에 포커스(선택자) */
@@ -82,6 +88,18 @@ export const TOUR_STEPS: readonly TourStep[] = Object.freeze([
         },
     },
     {
+        id: 'split', title: '화면 분할', tags: ['browser'] as const, panel: 'layer', desktopOnly: true,
+        body: "머리줄의 '분할 없음'을 '2분할'로 바꿔 보세요. 지도 칸을 누르면 그 지도에 주황 테두리가 생기고, 왼쪽 레이어 패널·배경지도·도구 모음은 그 지도에만 적용됩니다. 한쪽은 위성, 다른 쪽은 일반으로 두고 경계를 켜서 비교해 보세요. '화면 연동'을 끄면 지도를 따로 움직일 수 있습니다. 바람지도는 1번 지도에서만 켜집니다.",
+        highlight: ['.gm-split-select'],
+        action: {
+            label: '2분할로 보기',
+            run: ({ split, openPanel }) => {
+                openPanel('layer')
+                split?.setCount(2)
+            },
+        },
+    },
+    {
         id: 'search', title: '장소 검색', tags: ['sample'] as const,
         body: "머리줄 검색창에 '세종'을 입력하고 결과를 고르면 지도에 핀이 꽂히고 그 필지가 강조됩니다. 검색 대상은 샘플(가상) 장소 목록입니다.",
         highlight: ['.gm-search__field'],
@@ -131,8 +149,8 @@ export const TOUR_STEPS: readonly TourStep[] = Object.freeze([
     },
     {
         id: 'big-data', title: '큰 데이터 묶음', tags: ['sample', 'browser'] as const,
-        body: '합성 점 레이어를 켜 보세요. 화면 안 점이 많으면 격자 원(숫자 = 점 개수)으로 묶여 보이고, 원을 누르거나 확대하면 풀립니다. 점은 브라우저가 시드 고정으로 만든 가상 데이터입니다. 데스크톱은 10만 점, 모바일은 메모리 때문에 2만 점까지입니다.',
-        action: { label: '큰 합성 점 켜기', run: async ({ map, bigLayerId }) => { await map.vector.zoomTo(bigLayerId) } },
+        body: '합성 점 레이어를 켜 보세요. 화면 안 점이 많으면 격자 원(숫자 = 점 개수)으로 묶여 보이고, 원을 누르거나 확대하면 풀립니다. 점은 브라우저가 시드 고정으로 만든 가상 데이터입니다. 데스크톱은 10만 점, 모바일은 메모리 때문에 2만 점까지입니다. 화면을 나눈 상태에서는 1번 지도에 켭니다(10만 점은 칸마다 메모리를 따로 쓰니 여러 칸에 켜면 느려질 수 있습니다).',
+        action: { label: '큰 합성 점 켜기', run: async ({ mainMap, bigLayerId }) => { await mainMap().vector.zoomTo(bigLayerId) } },
     },
     {
         id: 'area', title: '영역 분석', tags: ['sample', 'real'] as const,
@@ -152,13 +170,15 @@ export const TOUR_STEPS: readonly TourStep[] = Object.freeze([
     },
     {
         id: 'wind', title: '바람지도', tags: ['sample'] as const, panel: 'wind',
-        body: '바람지도 패널에서 가상 예보 프레임(9시간)을 재생해 보세요. 입자 흐름과 풍속 색이 프레임마다 바뀝니다. 바람 자료는 브라우저가 만든 가상 값이며 실제 기상 자료가 아닙니다.',
+        body: '바람지도 패널에서 가상 예보 프레임(9시간)을 재생해 보세요. 입자 흐름과 풍속 색이 프레임마다 바뀝니다. 바람 자료는 브라우저가 만든 가상 값이며 실제 기상 자료가 아닙니다. 화면을 나눈 상태에서는 바람이 1번 지도에만 켜집니다.',
         highlight: [navItem('wind')],
         action: {
             label: '바람 켜기',
-            run: ({ map, openPanel }) => {
+            run: ({ mainMap, openPanel }) => {
+                // 바람길 플러그인은 1번 지도에만 있다 — 먼저 1번을 활성으로 만들어 패널이 1번 지도를 보게 한다
+                const main = mainMap()
                 openPanel('wind')
-                map.getPlugin<WindPlugin>('wind')?.setVisible(true)
+                main.getPlugin<WindPlugin>('wind')?.setVisible(true)
             },
         },
     },

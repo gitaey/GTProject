@@ -6,8 +6,9 @@ import { Earth, Info, LogIn } from 'lucide-react'
 import type { GisMap, GisMapConfig, LayerDef, LayerGroupDef, LayerTree, LayerTreeState } from '@gtp/gis-map/core'
 import { createWindPlugin } from '@gtp/gis-map/core/wind'
 import { useLayerTreeState } from '@gtp/gis-map/react'
+import type { GisMapSetupInfo, GisMapSplitCount } from '@gtp/gis-map/react'
 import { layerPanel, myMapPanel, windPanel } from '@gtp/gis-map/ui'
-import type { MapPanelDef, MapShellBrand, MapUserMenuItem } from '@gtp/gis-map/ui'
+import type { MapPanelDef, MapShellBrand, MapShellSplitOptions, MapUserMenuItem } from '@gtp/gis-map/ui'
 import { demoCrossOrigin } from './demoSources'
 import type { DemoBundle } from './demoSources'
 
@@ -38,8 +39,18 @@ export function buildDemoConfig(bundle: DemoBundle): Omit<GisMapConfig, 'target'
     }
 }
 
-/** 엔진이 만들어질 때마다 1번: 바람길 플러그인(가상 바람 소스를 읽는다) */
-export function setupDemoMap(map: GisMap): void {
+/**
+ * 화면 분할 UI 옵션(모듈 상수). 분할 Provider는 페이지(demo/map/page.tsx)가 바깥에 두므로 처음 개수·연동 값은 거기서 정하고, 여기는 셀렉트 선택지만 쓴다.
+ * 1~4분할 전부 허용(칸이 좁아지는 처리는 패키지가 한다)
+ */
+export const DEMO_SPLIT: Readonly<MapShellSplitOptions> = Object.freeze({ counts: Object.freeze<GisMapSplitCount[]>([1, 2, 3, 4]) })
+
+/**
+ * 엔진이 만들어질 때마다 1번: 바람길 플러그인(가상 바람 소스를 읽는다).
+ * 분할로 더 만든 지도(info.pane 1~3)에는 깔지 않는다 — 바람은 1번 지도만(칸마다 프레임을 만들면 느리다)
+ */
+export function setupDemoMap(map: GisMap, info: GisMapSetupInfo): void {
+    if (info.pane !== 0) return
     map.use(createWindPlugin())
 }
 
