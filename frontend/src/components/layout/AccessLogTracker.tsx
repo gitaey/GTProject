@@ -15,6 +15,7 @@ const PAGE_TITLES: Record<string, string> = {
     '/admin/bot/command': '명령어 관리',
     '/admin/bot/room': '방 모니터링',
     '/admin/bot/schedule': '자동 전송 관리',
+    '/admin/geoserver/connect': 'GeoServer 접속 설정',
     '/admin/geoserver/publish': 'GeoServer 발행',
     '/admin/geoserver/styles': 'GeoServer 스타일',
     '/admin/access-log': '접속 로그',

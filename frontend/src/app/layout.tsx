@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
     title: 'GTP',
-    description: '기빵 프로젝트',
+    description: '시스넷 프로젝트',
 }
 
 export default function RootLayout({
@@ -37,4 +37,3 @@ export default function RootLayout({
         </html>
     )
 }
-

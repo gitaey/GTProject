@@ -46,6 +46,7 @@ const menuItems: MenuItem[] = [
         id: 'geoserver',
         label: 'GeoServer',
         children: [
+            { id: 'geoserver-connect', label: '접속 설정', href: '/admin/geoserver/connect' },
             { id: 'geoserver-publish', label: '레이어 발행', href: '/admin/geoserver/publish' },
             { id: 'geoserver-styles', label: '스타일 관리', href: '/admin/geoserver/styles' },
         ],
@@ -138,7 +139,7 @@ export default function Sidebar() {
             >
                 <div className="w-2 h-2 rounded-full shrink-0" style={{ background: 'var(--accent)' }} />
                 <span className="text-sm font-medium tracking-tight" style={{ color: 'var(--text-primary)' }}>
-                    기빵 프로젝트
+                    시스넷 프로젝트
                 </span>
             </Link>
 

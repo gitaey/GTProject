@@ -4,13 +4,16 @@ import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false })
-import { getToken } from '@/stores/authStore'
-import { RefreshCw, Save, Trash2, Plus, CheckSquare, Square, Search } from 'lucide-react'
+import { RefreshCw, Save, Trash2, Plus, CheckSquare, Square, Search, Unplug, Plug } from 'lucide-react'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
+import ConnectionBadge from '../_shared/ConnectionBadge'
+import NotConnectedNotice from '../_shared/NotConnectedNotice'
+import ReconnectDialog from '../_shared/ReconnectDialog'
+import { GeoServerConnectionLostError, gsFetch, gsFetchBlob, serverLabel } from '../_shared/connection'
+import { useGeoServerConnection } from '../_shared/useGeoServerConnection'
 
-const API    = process.env.NEXT_PUBLIC_API_URL      ?? 'http://localhost:8080'
-const GS_URL = process.env.NEXT_PUBLIC_GEOSERVER_URL ?? 'http://localhost:8600/geoserver'
+const enc = encodeURIComponent
 
 const DEFAULT_SLD = `<?xml version="1.0" encoding="UTF-8"?>
 <StyledLayerDescriptor version="1.0.0"
@@ -41,22 +44,22 @@ const DEFAULT_SLD = `<?xml version="1.0" encoding="UTF-8"?>
   </NamedLayer>
 </StyledLayerDescriptor>`
 
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-    const token = getToken()
-    const headers: Record<string, string> = {
-        ...(options?.headers as Record<string, string> ?? {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    }
-    if (options?.body && typeof options.body === 'string') {
-        headers['Content-Type'] = 'application/json'
-    }
-    const res  = await fetch(`${API}${path}`, { ...options, headers })
-    const json = await res.json()
-    if (!json.success) throw new Error(json.message ?? '오류가 발생했습니다.')
-    return json.data
-}
-
 export default function GeoServerStylesPage() {
+    // 연결 — 번호표가 없으면 이 화면은 GeoServer API를 부르지 않는다
+    const conn = useGeoServerConnection()
+    const connected = conn.state === 'connected'
+    const [lostAction, setLostAction]       = useState<string | null>(null)
+    const [showReconnect, setShowReconnect] = useState(false)
+    const target = conn.info ? serverLabel(conn.info.url) : ''
+
+    /** 428이면 화면(편집 내용)은 그대로 두고 띠만 띄운다. 처리했으면 true */
+    const handleLost = (e: unknown, action: string): boolean => {
+        if (!(e instanceof GeoServerConnectionLostError)) return false
+        setLostAction(action)
+        conn.markLost(e.message)
+        return true
+    }
+
     // 스타일 편집
     const [styles, setStyles]             = useState<string[]>([])
     const [selected, setSelected]         = useState<string | null>(null)
@@ -97,29 +100,23 @@ export default function GeoServerStylesPage() {
 
     // legendSld 변경 시 백엔드 프록시로 범례 이미지 fetch
     useEffect(() => {
-        if (!legendSld) { setLegendBlobUrl(null); return }
+        if (!legendSld || !connected) { if (!legendSld) setLegendBlobUrl(null); return }
+        let cancelled = false
         setLegendLoading(true)
         setLegendError(false)
-        const token = getToken()
-        fetch(`${API}/api/geoserver/legend`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            body: JSON.stringify({ sld: legendSld }),
-        })
-            .then(res => {
-                if (!res.ok) throw new Error()
-                return res.blob()
-            })
+        gsFetchBlob('/api/geoserver/legend', { sld: legendSld })
             .then(blob => {
+                if (cancelled) return
                 const url = URL.createObjectURL(blob)
                 setLegendBlobUrl(prev => { if (prev) URL.revokeObjectURL(prev); return url })
             })
-            .catch(() => setLegendError(true))
-            .finally(() => setLegendLoading(false))
-    }, [legendSld])
+            .catch(e => {
+                if (cancelled) return
+                if (!handleLost(e, '범례를 불러오')) setLegendError(true)
+            })
+            .finally(() => { if (!cancelled) setLegendLoading(false) })
+        return () => { cancelled = true }
+    }, [legendSld, connected])
 
     const showMsg = (text: string, ok: boolean) => {
         setMsg({ text, ok })
@@ -128,40 +125,52 @@ export default function GeoServerStylesPage() {
 
     const loadStyles = () => {
         setLoadingList(true)
-        apiFetch<string[]>('/api/geoserver/styles')
+        gsFetch<string[]>('/api/geoserver/styles')
             .then(setStyles)
-            .catch(() => showMsg('스타일 목록을 불러오지 못했습니다.', false))
+            .catch(e => {
+                if (!handleLost(e, '스타일 목록을 불러오')) showMsg('스타일 목록을 불러오지 못했습니다.', false)
+            })
             .finally(() => setLoadingList(false))
     }
 
+    // 상태 확인이 끝나 연결됨이 된 뒤에만 불러온다. 다시 연결에 성공하면 스타일 목록과, 끊겨서 비어 버린 SLD·레이어 목록만 다시 받는다(편집 중인 SLD는 건드리지 않음)
     useEffect(() => {
+        if (conn.state !== 'connected') return
+        setLostAction(null)
         loadStyles()
-        apiFetch<{ workspaces: string[] }>('/api/geoserver/workspaces')
-            .then(d => setWorkspaces(d.workspaces))
-            .catch(() => {})
-    }, [])
+        if (workspaces.length === 0) {
+            gsFetch<{ workspaces: string[] }>('/api/geoserver/workspaces')
+                .then(d => setWorkspaces(d.workspaces))
+                .catch(e => { handleLost(e, '작업공간을 불러오') })
+        }
+        if (selected && !isNew && sld === '') selectStyleItem(selected)
+        else if (applyWs && wsLayers.length === 0) onWsChange(applyWs)
+    }, [conn.state])
 
     const selectStyleItem = (name: string) => {
+        if (!connected) return
         setIsNew(false)
         setSelected(name)
         setStyleName(name)
         setLoadingSld(true)
         setSld('')
-        apiFetch<string>(`/api/geoserver/styles/${name}`)
+        gsFetch<string>(`/api/geoserver/styles/${enc(name)}`)
             .then(setSld)
-            .catch(() => showMsg('SLD를 불러오지 못했습니다.', false))
+            .catch(e => {
+                if (!handleLost(e, 'SLD를 불러오')) showMsg('SLD를 불러오지 못했습니다.', false)
+            })
             .finally(() => setLoadingSld(false))
 
         // 워크스페이스가 선택된 상태면 레이어 목록 새로 불러오기
         if (applyWs) {
             setSelectedLayers([])
             setLoadingLayers(true)
-            apiFetch<LayerWithStyle[]>(`/api/geoserver/workspaces/${applyWs}/layers`)
+            gsFetch<LayerWithStyle[]>(`/api/geoserver/workspaces/${enc(applyWs)}/layers`)
                 .then(layers => {
                     setWsLayers(layers)
                     setSelectedLayers(layers.filter(l => l.currentStyle === name).map(l => l.name))
                 })
-                .catch(() => {})
+                .catch(e => { handleLost(e, '레이어 목록을 불러오') })
                 .finally(() => setLoadingLayers(false))
         }
     }
@@ -176,10 +185,12 @@ export default function GeoServerStylesPage() {
     const save = async () => {
         if (!styleName.trim()) { showMsg('스타일 이름을 입력하세요.', false); return }
         if (!sld.trim())       { showMsg('SLD를 입력하세요.', false); return }
+        if (!isNew && selected && styleName !== selected
+            && !confirm(`'${selected}' 스타일 이름을 '${styleName}'(으)로 바꿉니다.\n${target} 서버에 새 스타일을 만든 뒤 옛 스타일을 삭제합니다. 계속하시겠습니까?`)) return
         setSaving(true)
         try {
             if (isNew) {
-                await apiFetch<null>('/api/geoserver/styles', {
+                await gsFetch<null>('/api/geoserver/styles', {
                     method: 'POST',
                     body: JSON.stringify({ name: styleName, sld }),
                 })
@@ -189,23 +200,23 @@ export default function GeoServerStylesPage() {
                 loadStyles()
             } else if (styleName !== selected) {
                 // 이름 변경: 새 이름으로 생성 후 기존 삭제
-                await apiFetch<null>('/api/geoserver/styles', {
+                await gsFetch<null>('/api/geoserver/styles', {
                     method: 'POST',
                     body: JSON.stringify({ name: styleName, sld }),
                 })
-                await apiFetch<null>(`/api/geoserver/styles/${selected}`, { method: 'DELETE' })
+                await gsFetch<null>(`/api/geoserver/styles/${enc(selected ?? '')}`, { method: 'DELETE' })
                 showMsg('스타일 이름이 변경되었습니다.', true)
                 setSelected(styleName)
                 loadStyles()
             } else {
-                await apiFetch<null>(`/api/geoserver/styles/${selected}`, {
+                await gsFetch<null>(`/api/geoserver/styles/${enc(selected ?? '')}`, {
                     method: 'PUT',
                     body: JSON.stringify({ name: styleName, sld }),
                 })
                 showMsg('스타일이 업데이트되었습니다.', true)
             }
         } catch (e) {
-            showMsg(e instanceof Error ? e.message : '저장에 실패했습니다.', false)
+            if (!handleLost(e, '스타일을 저장하')) showMsg(e instanceof Error ? e.message : '저장에 실패했습니다.', false)
         } finally {
             setSaving(false)
         }
@@ -213,17 +224,17 @@ export default function GeoServerStylesPage() {
 
     const deleteStyle = async () => {
         if (!selected) return
-        if (!confirm(`'${selected}' 스타일을 삭제하시겠습니까?`)) return
+        if (!confirm(`'${selected}' 스타일을 ${target} 서버에서 삭제하시겠습니까?`)) return
         setDeleting(true)
         try {
-            await apiFetch<null>(`/api/geoserver/styles/${selected}`, { method: 'DELETE' })
+            await gsFetch<null>(`/api/geoserver/styles/${enc(selected)}`, { method: 'DELETE' })
             showMsg('스타일이 삭제되었습니다.', true)
             setSelected(null)
             setStyleName('')
             setSld('')
             loadStyles()
         } catch (e) {
-            showMsg(e instanceof Error ? e.message : '삭제에 실패했습니다.', false)
+            if (!handleLost(e, '스타일을 삭제하')) showMsg(e instanceof Error ? e.message : '삭제에 실패했습니다.', false)
         } finally {
             setDeleting(false)
         }
@@ -235,14 +246,14 @@ export default function GeoServerStylesPage() {
         setSelectedLayers([])
         if (!ws) return
         setLoadingLayers(true)
-        apiFetch<LayerWithStyle[]>(`/api/geoserver/workspaces/${ws}/layers`)
+        gsFetch<LayerWithStyle[]>(`/api/geoserver/workspaces/${enc(ws)}/layers`)
             .then(layers => {
                 setWsLayers(layers)
                 if (selected) {
                     setSelectedLayers(layers.filter(l => l.currentStyle === selected).map(l => l.name))
                 }
             })
-            .catch(() => {})
+            .catch(e => { handleLost(e, '레이어 목록을 불러오') })
             .finally(() => setLoadingLayers(false))
     }
 
@@ -265,16 +276,19 @@ export default function GeoServerStylesPage() {
             showMsg('워크스페이스, 레이어, 스타일을 모두 선택하세요.', false)
             return
         }
+        if (!confirm(`${selectedLayers.length}개 레이어(${applyWs})에 '${selected}' 스타일을 ${target} 서버에서 적용하시겠습니까?`)) return
         setApplying(true)
         try {
             const results = await Promise.allSettled(
                 selectedLayers.map(layer =>
-                    apiFetch<null>(`/api/geoserver/workspaces/${applyWs}/layers/${layer}/style`, {
+                    gsFetch<null>(`/api/geoserver/workspaces/${enc(applyWs)}/layers/${enc(layer)}/style`, {
                         method: 'PUT',
                         body: JSON.stringify({ styleName: selected }),
                     })
                 )
             )
+            const lost = results.find(r => r.status === 'rejected' && r.reason instanceof GeoServerConnectionLostError)
+            if (lost && lost.status === 'rejected' && handleLost(lost.reason, '레이어에 스타일을 적용하')) return
             const failed = results.filter(r => r.status === 'rejected').length
             showMsg(
                 failed === 0
@@ -299,7 +313,50 @@ export default function GeoServerStylesPage() {
             <div className="flex-1 flex flex-col min-w-0">
                 <Header title="스타일 관리" breadcrumb={['GeoServer', '스타일 관리']} />
 
-                <main className="flex-1 p-6 min-h-0">
+                <main className="flex-1 p-4 sm:p-6 min-h-0 min-w-0">
+                    <div className="flex justify-end mb-3 min-w-0">
+                        <ConnectionBadge state={conn.state} info={conn.info} />
+                    </div>
+
+                    {conn.state === 'checking' && (
+                        <div className="flex items-center justify-center py-16">
+                            <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
+                                style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
+                        </div>
+                    )}
+
+                    {conn.state === 'none' && <NotConnectedNotice kind="none" what="스타일 저장·삭제·레이어 적용" />}
+
+                    {conn.state === 'expired' && !lostAction && (
+                        <NotConnectedNotice kind="expired" what="스타일 저장·삭제·레이어 적용" info={conn.info}
+                            onReconnect={() => setShowReconnect(true)} />
+                    )}
+
+                    {conn.state === 'expired' && lostAction && (
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5 px-4 py-3 rounded-lg text-sm"
+                            style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: 'var(--text-primary)' }}>
+                            <span className="flex items-center gap-2 min-w-0 flex-1" style={{ minWidth: '200px' }}>
+                                <Unplug size={18} className="shrink-0" style={{ color: '#ef4444' }} />
+                                <span>
+                                    <b className="block">GeoServer 연결이 만료되어 {lostAction}지 못했습니다</b>
+                                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                                        편집 중인 내용은 그대로 있습니다. 다시 연결하기 전까지 목록·레이어 적용 조작은 잠기고 저장·삭제는 막힙니다.
+                                    </span>
+                                </span>
+                            </span>
+                            {conn.stored && (
+                                <button onClick={() => setShowReconnect(true)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg cursor-pointer"
+                                    style={{ background: 'var(--accent)', color: '#fff' }}>
+                                    <Plug size={12} />
+                                    다시 연결
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {(connected || (conn.state === 'expired' && lostAction)) && (
+                    <>
                     {msg && (
                         <div className="mb-4 px-4 py-3 rounded-lg text-sm"
                             style={{
@@ -311,11 +368,12 @@ export default function GeoServerStylesPage() {
                         </div>
                     )}
 
-                    <div className="flex gap-4 h-[calc(100vh-140px)]">
+                    <div className="flex gap-4 h-[calc(100vh-180px)] min-h-[420px]">
 
                         {/* 패널 1: 스타일 목록 */}
                         <div className="w-52 shrink-0 flex flex-col rounded-xl overflow-hidden"
-                            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
+                            inert={conn.state === 'expired'}
+                            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', opacity: conn.state === 'expired' ? 0.55 : 1 }}>
                             <div className="flex items-center justify-between px-4 py-3"
                                 style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-hover)' }}>
                                 <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>스타일 목록</span>
@@ -417,14 +475,14 @@ export default function GeoServerStylesPage() {
                                             </button>
                                             <div className="w-px h-3.5 mx-1" style={{ background: 'rgba(255,255,255,0.12)' }} />
                                             {!isNew && selected && (
-                                                <button onClick={deleteStyle} disabled={deleting}
+                                                <button onClick={deleteStyle} disabled={deleting || !connected}
                                                     className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded cursor-pointer disabled:opacity-40"
                                                     style={{ background: 'rgba(239,68,68,0.2)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}>
                                                     <Trash2 size={11} />
                                                     {deleting ? '삭제 중' : '삭제'}
                                                 </button>
                                             )}
-                                            <button onClick={save} disabled={saving}
+                                            <button onClick={save} disabled={saving || !connected}
                                                 className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded cursor-pointer disabled:opacity-40"
                                                 style={{ background: 'var(--accent)', color: '#fff' }}>
                                                 <Save size={11} />
@@ -479,7 +537,8 @@ export default function GeoServerStylesPage() {
 
                         {/* 패널 3: 범례 미리보기 + 레이어 적용 */}
                         {hasEditor && (
-                            <div className="w-64 shrink-0 flex flex-col gap-3">
+                            <div className="w-64 shrink-0 flex flex-col gap-3" inert={conn.state === 'expired'}
+                                style={conn.state === 'expired' ? { opacity: 0.55 } : undefined}>
                                 {/* 범례 미리보기 */}
                                 <div className="rounded-xl overflow-hidden shrink-0"
                                     style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
@@ -592,7 +651,7 @@ export default function GeoServerStylesPage() {
 
                                         {selectedLayers.length > 0 && (
                                             <div className="p-3 shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
-                                                <button onClick={applyToLayers} disabled={applying}
+                                                <button onClick={applyToLayers} disabled={applying || !connected}
                                                     className="w-full py-2 text-sm font-medium rounded-lg cursor-pointer disabled:opacity-40"
                                                     style={{ background: 'var(--accent)', color: '#fff' }}>
                                                     {applying ? '적용 중...' : `${selectedLayers.length}개 레이어에 적용`}
@@ -604,8 +663,13 @@ export default function GeoServerStylesPage() {
                             </div>
                         )}
                     </div>
+                    </>
+                    )}
                 </main>
             </div>
+            {showReconnect && conn.stored && (
+                <ReconnectDialog stored={conn.stored} onConnected={conn.setConnected} onClose={() => setShowReconnect(false)} />
+            )}
         </div>
     )
 }

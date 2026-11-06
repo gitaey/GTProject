@@ -1,30 +1,21 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getToken } from '@/stores/authStore'
-import { RefreshCw, Upload, ChevronDown } from 'lucide-react'
+import { RefreshCw, Upload, ChevronDown, Unplug, Plug } from 'lucide-react'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
+import ConnectionBadge from '../_shared/ConnectionBadge'
+import NotConnectedNotice from '../_shared/NotConnectedNotice'
+import ReconnectDialog from '../_shared/ReconnectDialog'
+import { GeoServerConnectionLostError, gsFetch, serverLabel } from '../_shared/connection'
+import { useGeoServerConnection } from '../_shared/useGeoServerConnection'
 
 interface LayerItem {
     name: string
     published: boolean
 }
 
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-    const token = getToken()
-    const headers: Record<string, string> = {
-        ...(options?.headers as Record<string, string> ?? {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    }
-    if (options?.body) headers['Content-Type'] = 'application/json'
-    const res = await fetch(`${API}${path}`, { ...options, headers })
-    const json = await res.json()
-    if (!json.success) throw new Error(json.message ?? '오류가 발생했습니다.')
-    return json.data
-}
+const enc = encodeURIComponent
 
 const selectStyle: React.CSSProperties = {
     background: 'var(--bg-page)',
@@ -54,24 +45,56 @@ export default function GeoServerPublishPage() {
     const [wsError, setWsError]       = useState<string | null>(null)
     const [filter, setFilter]         = useState<'all' | 'published' | 'unpublished'>('all')
 
+    // 연결 — 번호표가 없으면 이 화면은 GeoServer API를 부르지 않는다
+    const conn = useGeoServerConnection()
+    const connected = conn.state === 'connected'
+    const [lostAction, setLostAction]       = useState<string | null>(null)
+    const [showReconnect, setShowReconnect] = useState(false)
+
+    /** 428이면 화면은 그대로 두고 띠만 띄운다. 처리했으면 true */
+    const handleLost = (e: unknown, action: string): boolean => {
+        if (!(e instanceof GeoServerConnectionLostError)) return false
+        setLostAction(action)
+        conn.markLost(e.message)
+        return true
+    }
+
     const loadWorkspaces = () => {
         setLoadingWs(true)
         setWsError(null)
-        apiFetch<{ workspaces: string[] }>('/api/geoserver/workspaces')
+        gsFetch<{ workspaces: string[] }>('/api/geoserver/workspaces')
             .then(d => setWorkspaces(d.workspaces))
-            .catch(e => setWsError(e instanceof Error ? e.message : 'GeoServer 작업공간을 불러오지 못했습니다.'))
+            .catch(e => {
+                if (handleLost(e, '작업공간을 불러오')) return
+                setWsError(e instanceof Error ? e.message : 'GeoServer 작업공간을 불러오지 못했습니다.')
+            })
             .finally(() => setLoadingWs(false))
     }
 
-    useEffect(() => { loadWorkspaces() }, [])
-
-    useEffect(() => {
+    const loadDatastores = () => {
         if (!workspace) { setDatastores([]); setDatastore(''); return }
         setLoadingDs(true)
-        apiFetch<{ datastores: string[] }>(`/api/geoserver/workspaces/${workspace}/datastores`)
+        gsFetch<{ datastores: string[] }>(`/api/geoserver/workspaces/${enc(workspace)}/datastores`)
             .then(d => { setDatastores(d.datastores); setDatastore('') })
-            .catch(e => setError(e instanceof Error ? e.message : '저장소를 불러오지 못했습니다.'))
+            .catch(e => {
+                if (handleLost(e, '저장소를 불러오')) return
+                setError(e instanceof Error ? e.message : '저장소를 불러오지 못했습니다.')
+            })
             .finally(() => setLoadingDs(false))
+    }
+
+    // 상태 확인이 끝나 연결됨이 된 뒤에만 불러온다. 다시 연결에 성공하면 연결이 끊겨 실패했던 불러오기만 다시 한다
+    useEffect(() => {
+        if (conn.state !== 'connected') return
+        const failed = lostAction
+        setLostAction(null)
+        if (workspaces.length === 0) loadWorkspaces()
+        else if (failed === '저장소를 불러오') loadDatastores()
+        else if (failed === '레이어 목록을 불러오') loadLayers()
+    }, [conn.state])
+
+    useEffect(() => {
+        loadDatastores()
     }, [workspace])
 
     const loadLayers = () => {
@@ -80,13 +103,18 @@ export default function GeoServerPublishPage() {
         setSelected(new Set())
         setResults([])
         setError(null)
-        apiFetch<LayerItem[]>(`/api/geoserver/workspaces/${workspace}/datastores/${datastore}/layers`)
+        gsFetch<LayerItem[]>(`/api/geoserver/workspaces/${enc(workspace)}/datastores/${enc(datastore)}/layers`)
             .then(setLayers)
-            .catch(() => setError('레이어 목록을 불러오지 못했습니다.'))
+            .catch(e => {
+                if (handleLost(e, '레이어 목록을 불러오')) return
+                setError('레이어 목록을 불러오지 못했습니다.')
+            })
             .finally(() => setLoadingLy(false))
     }
 
-    useEffect(() => { loadLayers() }, [datastore])
+    useEffect(() => {
+        loadLayers()
+    }, [datastore])
 
     const toggle = (name: string) => {
         setSelected(prev => {
@@ -112,14 +140,14 @@ export default function GeoServerPublishPage() {
         setResults([])
         setError(null)
         try {
-            const data = await apiFetch<{ layer: string; success: boolean; message: string }[]>('/api/geoserver/publish', {
+            const data = await gsFetch<{ layer: string; success: boolean; message: string }[]>('/api/geoserver/publish', {
                 method: 'POST',
                 body: JSON.stringify({ workspace, datastore, layers: Array.from(selected) }),
             })
             setResults(data)
             loadLayers()
         } catch (e) {
-            setError(e instanceof Error ? e.message : '발행에 실패했습니다.')
+            if (!handleLost(e, '레이어를 발행하')) setError(e instanceof Error ? e.message : '발행에 실패했습니다.')
         } finally {
             setPublishing(false)
         }
@@ -131,13 +159,57 @@ export default function GeoServerPublishPage() {
             <div className="flex-1 flex flex-col min-w-0">
                 <Header title="레이어 발행" breadcrumb={['GeoServer', '레이어 발행']} />
 
-                <main className="flex-1 p-6 space-y-4">
-                    <div className="flex items-center justify-between">
-                        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                <main className="flex-1 p-4 sm:p-6 space-y-4 min-w-0">
+                    <div className="flex flex-wrap items-center justify-between gap-2.5 min-w-0">
+                        <p className="text-sm m-0" style={{ color: 'var(--text-muted)' }}>
                             작업공간과 저장소를 선택하고 레이어를 일괄 발행합니다.
                         </p>
+                        <ConnectionBadge state={conn.state} info={conn.info} />
                     </div>
 
+                    {conn.state === 'checking' && (
+                        <div className="flex items-center justify-center py-16">
+                            <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
+                                style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
+                        </div>
+                    )}
+
+                    {conn.state === 'none' && <NotConnectedNotice kind="none" what="레이어 발행" />}
+
+                    {conn.state === 'expired' && !lostAction && (
+                        <NotConnectedNotice kind="expired" what="레이어 발행" info={conn.info}
+                            onReconnect={() => setShowReconnect(true)} />
+                    )}
+
+                    {(connected || (conn.state === 'expired' && lostAction)) && (
+                    <>
+                    {/* 작업 중 만료 — 화면은 그대로 두고 띠만 */}
+                    {conn.state === 'expired' && lostAction && (
+                        <div className="flex flex-wrap items-center justify-between gap-2.5 px-4 py-3 rounded-lg text-sm"
+                            style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: 'var(--text-primary)' }}>
+                            <span className="flex items-center gap-2 min-w-0 flex-1" style={{ minWidth: '200px' }}>
+                                <Unplug size={18} className="shrink-0" style={{ color: '#ef4444' }} />
+                                <span>
+                                    <b className="block">GeoServer 연결이 만료되어 {lostAction}지 못했습니다</b>
+                                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                                        선택한 내용은 그대로 있습니다. 다시 연결하기 전까지 아래 조작(선택·새로고침·발행)은 잠깁니다.
+                                    </span>
+                                </span>
+                            </span>
+                            {conn.stored && (
+                                <button onClick={() => setShowReconnect(true)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg cursor-pointer"
+                                    style={{ background: 'var(--accent)', color: '#fff' }}>
+                                    <Plug size={12} />
+                                    다시 연결
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 만료 띠가 떠 있는 동안 GeoServer를 부르는 조작을 잠근다(inert: 클릭·포커스 모두 막힘). 다시 연결하면 풀린다 */}
+                    <div className="space-y-4" inert={conn.state === 'expired'}
+                        style={conn.state === 'expired' ? { opacity: 0.55 } : undefined}>
                     {/* workspace 에러 */}
                     {wsError && (
                         <div className="px-4 py-3 rounded-lg text-sm flex items-center justify-between"
@@ -264,12 +336,17 @@ export default function GeoServerPublishPage() {
                     {/* 발행 버튼 */}
                     {layers.length > 0 && (
                         <div className="flex items-center gap-3">
-                            <button onClick={publish} disabled={selected.size === 0 || publishing}
+                            <button onClick={publish} disabled={selected.size === 0 || publishing || !connected}
                                 className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                 style={{ background: 'var(--accent)', color: '#fff' }}>
                                 <Upload size={14} />
                                 {publishing ? '발행 중...' : `선택한 ${selected.size}개 발행`}
                             </button>
+                            {conn.info && (
+                                <span className="text-xs min-w-0 break-all" style={{ color: 'var(--text-faint)' }}>
+                                    대상: <span className="font-mono">{serverLabel(conn.info.url)}</span>
+                                </span>
+                            )}
                         </div>
                     )}
 
@@ -293,8 +370,14 @@ export default function GeoServerPublishPage() {
                             </ul>
                         </div>
                     )}
+                    </div>
+                    </>
+                    )}
                 </main>
             </div>
+            {showReconnect && conn.stored && (
+                <ReconnectDialog stored={conn.stored} onConnected={conn.setConnected} onClose={() => setShowReconnect(false)} />
+            )}
         </div>
     )
 }
