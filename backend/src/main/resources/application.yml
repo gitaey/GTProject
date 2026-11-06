@@ -102,12 +102,14 @@ titiler:
   url: ${TITILER_URL:http://localhost:8000}
   container-name: ${TITILER_CONTAINER_NAME:gtp-titiler-local}
 
+# GeoServer 관리 도구 — 접속 정보(주소·계정)는 설정에 두지 않는다. 사용자가 접속 설정 화면에서 연결하면 서버 메모리에 보관하고 번호표(헤더)만 돌려준다
 geoserver:
-  url: ${GEOSERVER_URL:https://geo.gitaey-dev.com/geoserver}
-  admin:
-    user: ${GEOSERVER_ADMIN_USER:admin}
-    password: ${GEOSERVER_ADMIN_PASSWORD:sis3047!@}
-  legend-layer: ${GEOSERVER_LEGEND_LAYER:gtp:tl_scco_ctprvn}
+  connection:
+    idle-minutes: 120          # 마지막 사용 후 이 시간(분) 쓰지 않으면 만료(슬라이딩)
+    max-hours: 12              # 연결한 지 이 시간이 지나면 써도 만료(절대 상한)
+    per-user-max: 5            # 사용자당 보관 연결 수(탭 수)
+    total-max: 200             # 서버 전체 보관 연결 수
+    attempts-per-minute: 10    # 연결 시험·연결 시도 제한(사용자당 1분)
 
 # 바람길 레이어 (기상청 LDAPS 국지예보모델 약 1km 격자, 하루 4회 발표 KST 03·09·15·21시 — 매시 30분에 갱신을 시도한다)
 wind:

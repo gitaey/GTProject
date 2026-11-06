@@ -127,7 +127,7 @@ GTProject 구현은 JWT principal 문자열을 읽는다(`SecurityContextGisUser
 | W3 | GET `/api/wind/frames/{id}` | 익명 | A | 선택: 바람지도 탭(패널) |
 | W5 | GET `/api/wind/fields/{id}` | 익명 | A | 선택: 기온·습도 오버레이 |
 | W4 | POST `/api/wind/refresh` | SUPER_ADMIN·MAP_ADMIN | - | 운영용(수동 갱신) |
-| S1 | `/api/geoserver/**` (13개) | 로그인(`GET /sld/**`만 익명) | M | 관리(지도 화면과 무관, 8절) |
+| S1 | `/api/geoserver/**` (15개: 연결 4 + 관리 11) | SUPER_ADMIN·MAP_ADMIN + 연결 번호표 헤더(없으면 428) | M | 관리(지도 화면과 무관, 8절) |
 
 보안 메모(발견만, 고치지 않음 — 설계문서 "발견한 범위 밖 문제"와 같음): T4~T6은 로그인 없이 업로드(최대 2GB)·삭제가 된다.
 L7~L12, G2~G4는 로그인한 아무 사용자나 호출할 수 있다. **이식할 때는 관리 API에 관리자 권한을 거는 것을 권장**한다.
@@ -681,18 +681,16 @@ DELETE FROM tbl_wind_scalar WHERE cycle_date < #{d} OR (cycle_date = #{d} AND cy
 ## 8. GeoServer (`domain/geoserver`) — DB 없음
 
 지도 화면(패키지)은 이 API를 부르지 않는다. GeoServer 이미지 범례는 브라우저가 `geoserverUrl`로 GeoServer에 직접 요청한다
-(코드 확인: `adapters/proxy/legend.ts:35-40`). 관리 화면용 외부 호출 목록(코드 확인: `GeoServerService.java`, 설정 키 `geoserver.url`,
-`geoserver.admin.user`, `geoserver.admin.password`, `geoserver.legend-layer` ← 환경 변수 `GEOSERVER_URL`, `GEOSERVER_ADMIN_USER`,
-`GEOSERVER_ADMIN_PASSWORD`, `GEOSERVER_LEGEND_LAYER`):
+(코드 확인: `adapters/proxy/legend.ts:35-40`). 관리 화면용 외부 호출 목록(코드 확인: `GeoServerService.java`). 접속 주소·계정은 설정 키가 아니라 **사용자가 `POST /api/geoserver/connection`으로 연결**한 값이고, 서버가 메모리에 보관한 뒤 번호표(헤더 `X-GeoServer-Connection`)로 찾는다. 외부 호출은 `GeoServerHttp` 한 곳(요청마다 IP 검사·리다이렉트 안 따라감·시간/크기 제한):
 
 | 백엔드 경로 | GeoServer 호출(Basic 인증) |
 |---|---|
+| POST `/connection/test`, POST·GET·DELETE `/connection` | 연결 시험(`GET {url}/rest/about/version.json`, `/rest/workspaces.json`)·번호표 발급·상태·해제 |
 | GET `/workspaces`, `/workspaces/{ws}/datastores`, `/workspaces/{ws}/layers`, `/workspaces/{ws}/datastores/{ds}/layers` | `GET {url}/rest/workspaces…`, featuretypes `?list=published|available`, 레이어별 상세(병렬 `CompletableFuture`) |
 | POST `/publish` | `POST {url}/rest/workspaces/{ws}/datastores/{ds}/featuretypes` (레이어마다) |
 | GET/POST/PUT/DELETE `/styles…` | `{url}/rest/styles…` (`.sld`, `?purge=true&recurse=true`) |
 | PUT `/workspaces/{ws}/layers/{layer}/style` | `PUT {url}/rest/layers/{ws}:{layer}` |
-| POST `/legend` (SLD 본문 → PNG) | `GET {url}/ows?…request=GetLegendGraphic&LAYER=<legend-layer>&SLD_BODY=…` |
-| GET `/sld/{name}`, `/sld/{name}/{layers}` (익명) | `GET {url}/rest/styles/{name}.sld` (+ 레이어명 치환) |
+| POST `/legend` (SLD 본문 → PNG) | `GET {url}/ows?…request=GetLegendGraphic&LAYER=<연결별 자동 선택 레이어>&SLD_BODY=…` |
 
 ---
 

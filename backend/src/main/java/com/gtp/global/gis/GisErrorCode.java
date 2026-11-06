@@ -59,7 +59,22 @@ public enum GisErrorCode implements BaseErrorCode {
     SHARE_TARGET_INVALID(HttpStatus.BAD_REQUEST, "찾을 수 없는 대상이 있습니다: {0}"),
     SHARE_TARGET_LIMIT(HttpStatus.BAD_REQUEST, "공유 대상은 100개까지입니다."),
     SHARE_BULK_INVALID(HttpStatus.BAD_REQUEST, "일괄 공유 요청이 올바르지 않습니다(레이어 1~50개, 대상 1~100개, 방식 ADD/REMOVE)."),
-    SHARE_CONFLICT(HttpStatus.CONFLICT, "다른 변경과 겹쳤습니다. 다시 시도하세요.");
+    SHARE_CONFLICT(HttpStatus.CONFLICT, "다른 변경과 겹쳤습니다. 다시 시도하세요."),
+
+    // GeoServer 접속·관리 — {0}·{1}은 exception(...)으로 채운다. 메시지는 ERROR 로그에도 남으므로 비밀번호·번호표·응답 본문을 넣지 않는다
+    GEOSERVER_NOT_CONNECTED(HttpStatus.PRECONDITION_REQUIRED, "GeoServer 연결이 없거나 만료되었습니다(서버가 다시 시작되었을 수 있습니다). 접속 설정에서 다시 연결하세요."),
+    GEOSERVER_AUTH_REJECTED(HttpStatus.PRECONDITION_REQUIRED, "GeoServer가 이 계정을 거부했습니다(비밀번호가 바뀌었을 수 있습니다). 접속 설정에서 다시 연결하세요."),
+    GEOSERVER_ADDRESS_BLOCKED(HttpStatus.BAD_REQUEST, "이 주소로는 연결할 수 없습니다(링크로컬·클라우드 메타데이터 주소)."),
+    GEOSERVER_UNREACHABLE(HttpStatus.FAILED_DEPENDENCY, "GeoServer에 연결할 수 없습니다: {0}"),
+    GEOSERVER_TIMEOUT(HttpStatus.FAILED_DEPENDENCY, "GeoServer 응답 시간이 초과되었습니다."),
+    GEOSERVER_TLS_FAILED(HttpStatus.FAILED_DEPENDENCY, "GeoServer 인증서를 확인할 수 없습니다."),
+    GEOSERVER_REDIRECTED(HttpStatus.FAILED_DEPENDENCY, "GeoServer가 다른 주소로 보냈습니다: {0}"),
+    GEOSERVER_REQUEST_FAILED(HttpStatus.FAILED_DEPENDENCY, "GeoServer {0} 실패 (HTTP {1})"),
+    GEOSERVER_RESPONSE_INVALID(HttpStatus.FAILED_DEPENDENCY, "GeoServer 응답을 읽을 수 없습니다."),
+    GEOSERVER_LEGEND_UNAVAILABLE(HttpStatus.FAILED_DEPENDENCY, "범례 미리보기에 쓸 레이어가 서버에 없습니다."),
+    GEOSERVER_INPUT_INVALID(HttpStatus.BAD_REQUEST, "{0}"),
+    GEOSERVER_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "연결 시도가 너무 많습니다. 잠시 후 다시 시도하세요."),
+    GEOSERVER_CONNECTION_LIMIT(HttpStatus.TOO_MANY_REQUESTS, "보관 중인 GeoServer 연결이 너무 많습니다. 잠시 후 다시 시도하세요.");
 
     private final HttpStatus status;
     private final String message;

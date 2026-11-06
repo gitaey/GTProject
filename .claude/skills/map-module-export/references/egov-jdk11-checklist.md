@@ -99,7 +99,7 @@ switch (cell.getCellType()) {
 
 | Boot에서 쓰는 것 (코드 확인) | 전자정부(Spring 5, XML)에서 할 일 |
 |---|---|
-| `@Value` 키: `geoserver.url`, `geoserver.admin.user`, `geoserver.admin.password`, `geoserver.legend-layer`(모두 **기본값 없음**), `kma.api-key`, `wind.forecast-hours`(**기본값 없음**), `kma.base-url`, `wind.output.resolution-deg`, `wind.source-stride`, `titiler.url`, `titiler.container-name`, `geotiff.upload-dir`, `mymap.upload-dir`(기본값 있음) | `globals.properties`(또는 프로젝트 설정 파일) + `<context:property-placeholder>`. 기본값 없는 키가 빠지면 **기동 실패**. 비밀 값(비밀번호·API 키)은 저장소에 넣지 않고 서버 환경 변수·암호화 설정으로 |
+| `@Value` 키: `geoserver.connection.{idle-minutes,max-hours,per-user-max,total-max,attempts-per-minute}`(기본값 있음 — GeoServer 접속 주소·계정은 설정이 아니라 사용자 입력), `kma.api-key`, `wind.forecast-hours`(**기본값 없음**), `kma.base-url`, `wind.output.resolution-deg`, `wind.source-stride`, `titiler.url`, `titiler.container-name`, `geotiff.upload-dir`, `mymap.upload-dir`(기본값 있음) | `globals.properties`(또는 프로젝트 설정 파일) + `<context:property-placeholder>`. 기본값 없는 키가 빠지면 **기동 실패**. 비밀 값(비밀번호·API 키)은 저장소에 넣지 않고 서버 환경 변수·암호화 설정으로 |
 | `@EnableJpaAuditing` (`GtpApplication`) | 불필요. `created_at`/`updated_at`/`uploaded_at`은 INSERT·UPDATE SQL에서 `now()`(Oracle `SYSTIMESTAMP`) |
 | `@EnableAsync` (`GtpApplication`) + `@Async` 2곳 | `<task:annotation-driven executor="gisExecutor"/>` + `<task:executor id="gisExecutor" pool-size="2-4" queue-capacity="50"/>`. Boot는 스레드 풀을 자동으로 만들지만, 순수 Spring 기본(`SimpleAsyncTaskExecutor`)은 **요청마다 새 스레드**를 만든다(추론) |
 | `@EnableScheduling` + `@Scheduled` 1곳 (`WindDataService.java:72`) | `<task:annotation-driven scheduler="gisScheduler"/>` + `<task:scheduler id="gisScheduler" pool-size="1"/>` 또는 `<task:scheduled-tasks>`. WAS가 여러 대면 **중복 실행** → 한 대에서만 켜기 |

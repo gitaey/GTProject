@@ -49,6 +49,7 @@ com.gtp
   `authenticated()`나 역할 제한을 추가하지 않는 한 **로그인 없이 열린다.** 새 API마다 반드시 확인한다.
 - SUPER_ADMIN 전용: `/api/admin/mymap/**`, `/api/roles/**`(GET 제외), `/api/posts/**`(공개 조회 `GET /api/posts`·`/{slug}` 제외 — 쓰기·수정·삭제·`/admin/list`), `/api/categories/**`(공개 조회 `GET /api/categories` 제외).
   블로그는 읽기(발행 글 목록·상세, 카테고리 목록)만 전체 공개이고 나머지는 전부 SUPER_ADMIN이다. 공개 조회는 서비스에서 `PUBLISHED`만 돌려준다.
+- `/api/geoserver/**`는 SUPER_ADMIN·MAP_ADMIN 전용이고, GeoServer 접속 정보는 설정이 아니라 사용자가 입력한 연결을 서버 메모리 번호표(헤더 `X-GeoServer-Connection`, 없으면 428)로 받는다.
 - CORS 허용 Origin은 `CorsConfig`에 있다. 새 배포 도메인이 생기면 여기에 추가한다.
 
 ## DB / 설정

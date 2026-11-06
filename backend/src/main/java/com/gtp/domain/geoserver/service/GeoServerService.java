@@ -2,294 +2,353 @@ package com.gtp.domain.geoserver.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.gtp.domain.geoserver.connection.GeoServerConnection;
+import com.gtp.domain.geoserver.connection.GeoServerHttp;
+import com.gtp.domain.geoserver.connection.GeoServerHttp.Req;
+import com.gtp.domain.geoserver.connection.GeoServerHttp.Resp;
 import com.gtp.domain.geoserver.dto.LayerItem;
+import com.gtp.domain.geoserver.dto.LayerWithStyle;
 import com.gtp.domain.geoserver.dto.PublishResult;
+import com.gtp.global.exception.CustomException;
+import com.gtp.global.gis.GisErrorCode;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.UriUtils;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * 연결된 GeoServer(REST)에 대한 작업. 접속 정보를 설정에서 읽지 않고 호출마다 {@link GeoServerConnection}을 받는다.
+ * 외부 호출은 전부 {@link GeoServerHttp}를 지난다. 요청 본문(SLD 포함)·응답 본문 전체는 로그에 남기지 않는다.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class GeoServerService {
 
-    @Value("${geoserver.url}")
-    private String geoserverUrl;
+    private static final String SLD_TYPE = "application/vnd.ogc.sld+xml";
+    private static final String JSON = "application/json";
+    private static final int LAYER_DETAIL_CONCURRENCY = 8;
 
-    @Value("${geoserver.admin.user}")
-    private String adminUser;
-
-    @Value("${geoserver.admin.password}")
-    private String adminPassword;
-
-    @Value("${geoserver.legend-layer}")
-    private String legendLayer;
-
+    private final GeoServerHttp http;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .build();
 
-    private String basicAuth() {
-        return "Basic " + Base64.getEncoder().encodeToString((adminUser + ":" + adminPassword).getBytes());
-    }
+    /** 레이어 상세 조회 전용 실행기 — 남의 GeoServer에 레이어 수백 개를 한꺼번에 요청하지 않도록 8개로 제한. */
+    private final ExecutorService detailExecutor = Executors.newFixedThreadPool(LAYER_DETAIL_CONCURRENCY, new java.util.concurrent.ThreadFactory() {
+        private final AtomicInteger seq = new AtomicInteger();
 
-    private HttpRequest.Builder baseRequest(String path) {
-        return HttpRequest.newBuilder()
-                .uri(URI.create(geoserverUrl + "/rest" + path))
-                .header("Authorization", basicAuth())
-                .header("Accept", "application/json");
-    }
-
-    private void checkStatus(HttpResponse<String> res, String context) {
-        int code = res.statusCode();
-        if (code < 200 || code >= 300) {
-            String preview = res.body() == null ? "" : res.body().substring(0, Math.min(200, res.body().length()));
-            log.error("[GeoServer] {} → HTTP {} : {}", context, code, preview);
-            throw new RuntimeException("GeoServer " + context + " 실패 (HTTP " + code + ")");
+        @Override
+        public Thread newThread(Runnable r) {
+            Thread t = new Thread(r, "geoserver-detail-" + seq.incrementAndGet());
+            t.setDaemon(true);
+            return t;
         }
+    });
+
+    @PreDestroy
+    void shutdown() {
+        detailExecutor.shutdownNow();
     }
 
-    public List<String> getWorkspaces() throws Exception {
-        HttpRequest req = baseRequest("/workspaces").GET().build();
-        HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-        checkStatus(res, "작업공간 조회");
-        JsonNode root = objectMapper.readTree(res.body());
-        List<String> names = new ArrayList<>();
-        JsonNode ws = root.path("workspaces").path("workspace");
-        if (ws.isArray()) {
-            ws.forEach(n -> names.add(n.path("name").asText()));
-        }
-        return names;
+    // ── 조회 ────────────────────────────────────────────────────
+
+    public List<String> getWorkspaces(GeoServerConnection c) {
+        JsonNode root = getJson(c, "작업공간 조회", "/workspaces");
+        return names(root.path("workspaces").path("workspace"));
     }
 
-    public List<String> getDatastores(String workspace) throws Exception {
-        HttpRequest req = baseRequest("/workspaces/" + workspace + "/datastores").GET().build();
-        HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-        checkStatus(res, "저장소 조회");
-        JsonNode root = objectMapper.readTree(res.body());
-        List<String> names = new ArrayList<>();
-        JsonNode ds = root.path("dataStores").path("dataStore");
-        if (ds.isArray()) {
-            ds.forEach(n -> names.add(n.path("name").asText()));
-        }
-        return names;
+    public List<String> getDatastores(GeoServerConnection c, String workspace) {
+        JsonNode root = getJson(c, "저장소 조회", "/workspaces/" + seg("작업공간", workspace) + "/datastores");
+        return names(root.path("dataStores").path("dataStore"));
     }
 
-    public List<LayerItem> getFeatureTypes(String workspace, String datastore) throws Exception {
+    public List<LayerItem> getFeatureTypes(GeoServerConnection c, String workspace, String datastore) {
+        String base = "/workspaces/" + seg("작업공간", workspace) + "/datastores/" + seg("저장소", datastore) + "/featuretypes";
         // 발행된 레이어 목록
-        HttpRequest publishedReq = baseRequest("/workspaces/" + workspace + "/datastores/" + datastore + "/featuretypes?list=published").GET().build();
-        HttpResponse<String> publishedRes = httpClient.send(publishedReq, HttpResponse.BodyHandlers.ofString());
-        checkStatus(publishedRes, "발행된 레이어 조회");
-        log.info("[GeoServer] published response: {}", publishedRes.body());
-        Set<String> published = new HashSet<>();
-        JsonNode pubRoot = objectMapper.readTree(publishedRes.body());
-        JsonNode pubList = pubRoot.path("featureTypes").path("featureType");
-        if (pubList.isArray()) {
-            pubList.forEach(n -> published.add(n.path("name").asText()));
-        }
+        JsonNode pubRoot = getJson(c, "발행된 레이어 조회", base + "?list=published");
+        List<String> publishedNames = names(pubRoot.path("featureTypes").path("featureType"));
+        Set<String> published = new HashSet<>(publishedNames);
 
-        // available: {"list":{"string":[...]}}
-        HttpRequest allReq = baseRequest("/workspaces/" + workspace + "/datastores/" + datastore + "/featuretypes?list=available").GET().build();
-        HttpResponse<String> allRes = httpClient.send(allReq, HttpResponse.BodyHandlers.ofString());
-        checkStatus(allRes, "사용 가능한 레이어 조회");
-        log.info("[GeoServer] available response: {}", allRes.body());
-        JsonNode allRoot = objectMapper.readTree(allRes.body());
-        JsonNode allList = allRoot.path("list").path("string");
-
+        // available: {"list":{"string":[...]}} (하나면 배열 대신 문자열)
+        JsonNode allRoot = getJson(c, "사용 가능한 레이어 조회", base + "?list=available");
         List<LayerItem> items = new ArrayList<>();
-        if (allList.isArray()) {
-            allList.forEach(n -> {
-                String name = n.asText();
-                if (!name.isBlank()) items.add(new LayerItem(name, published.contains(name)));
-            });
+        for (JsonNode n : asList(allRoot.path("list").path("string"))) {
+            String name = n.asText();
+            if (!name.isBlank()) items.add(new LayerItem(name, published.contains(name)));
         }
         // available에 없는 발행된 레이어도 포함
-        pubList.forEach(n -> {
-            String name = n.path("name").asText();
-            if (!name.isBlank() && items.stream().noneMatch(i -> i.getName().equals(name))) {
-                items.add(new LayerItem(name, true));
-            }
-        });
+        Set<String> listed = new HashSet<>();
+        items.forEach(i -> listed.add(i.getName()));
+        for (String name : publishedNames) {
+            if (listed.add(name)) items.add(new LayerItem(name, true));
+        }
         items.sort((a, b) -> a.getName().compareToIgnoreCase(b.getName()));
         return items;
     }
 
-    public List<com.gtp.domain.geoserver.dto.LayerWithStyle> getWorkspaceLayers(String workspace) throws Exception {
-        HttpRequest req = baseRequest("/workspaces/" + workspace + "/layers").GET().build();
-        HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-        checkStatus(res, "워크스페이스 레이어 조회");
-        JsonNode root = objectMapper.readTree(res.body());
-        List<String> names = new ArrayList<>();
-        JsonNode layers = root.path("layers").path("layer");
-        if (layers.isArray()) {
-            layers.forEach(n -> names.add(n.path("name").asText()));
-        }
+    public List<LayerWithStyle> getWorkspaceLayers(GeoServerConnection c, String workspace) {
+        String ws = seg("작업공간", workspace);
+        JsonNode root = getJson(c, "워크스페이스 레이어 조회", "/workspaces/" + ws + "/layers");
+        List<String> names = names(root.path("layers").path("layer"));
         names.sort(String::compareToIgnoreCase);
 
-        // 각 레이어의 defaultStyle 병렬 조회
-        List<java.util.concurrent.CompletableFuture<com.gtp.domain.geoserver.dto.LayerWithStyle>> futures = names.stream()
-                .map(name -> java.util.concurrent.CompletableFuture.supplyAsync(() -> {
-                    try {
-                        HttpRequest detailReq = baseRequest("/workspaces/" + workspace + "/layers/" + name).GET().build();
-                        HttpResponse<String> detailRes = httpClient.send(detailReq, HttpResponse.BodyHandlers.ofString());
-                        JsonNode detail = objectMapper.readTree(detailRes.body());
-                        String style = detail.path("layer").path("defaultStyle").path("name").asText("");
-                        return new com.gtp.domain.geoserver.dto.LayerWithStyle(name, style);
-                    } catch (Exception e) {
-                        return new com.gtp.domain.geoserver.dto.LayerWithStyle(name, "");
-                    }
-                }))
+        // 각 레이어의 defaultStyle 병렬 조회(최대 8개 동시)
+        List<CompletableFuture<LayerWithStyle>> futures = names.stream()
+                .map(name -> CompletableFuture.supplyAsync(() -> new LayerWithStyle(name, layerStyle(c, ws, name)), detailExecutor))
                 .toList();
-
-        return futures.stream()
-                .map(java.util.concurrent.CompletableFuture::join)
-                .toList();
-    }
-
-    public List<String> getStyles() throws Exception {
-        HttpRequest req = baseRequest("/styles").GET().build();
-        HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-        checkStatus(res, "스타일 목록 조회");
-        JsonNode root = objectMapper.readTree(res.body());
-        List<String> names = new ArrayList<>();
-        JsonNode styles = root.path("styles").path("style");
-        if (styles.isArray()) {
-            styles.forEach(n -> names.add(n.path("name").asText()));
-        }
-        return names;
-    }
-
-    public String getStyleSld(String name) throws Exception {
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(geoserverUrl + "/rest/styles/" + name + ".sld"))
-                .header("Authorization", basicAuth())
-                .header("Accept", "application/vnd.ogc.sld+xml")
-                .GET().build();
-        HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-        return res.body();
-    }
-
-    /** VWorld WMS SLD 파라미터용: GeoServer 스타일의 UserStyle을 지정 레이어명으로 재조립하여 반환 */
-    public String getStyleSldForLayers(String styleName, List<String> layerNames) throws Exception {
-        String sld = getStyleSld(styleName);
-        // GeoServer는 sld: prefix를 붙여서 반환하므로 optional prefix로 매칭
-        java.util.regex.Matcher m = java.util.regex.Pattern
-                .compile("<(?:sld:)?UserStyle>[\\s\\S]*?</(?:sld:)?UserStyle>")
-                .matcher(sld);
-        if (!m.find()) return sld;
-        String userStyle = m.group();
-        String p = sld.contains("sld:") ? "sld:" : "";
-        StringBuilder namedLayers = new StringBuilder();
-        for (String layerName : layerNames) {
-            namedLayers.append("<").append(p).append("NamedLayer>")
-                       .append("<").append(p).append("Name>").append(layerName).append("</").append(p).append("Name>")
-                       .append(userStyle)
-                       .append("</").append(p).append("NamedLayer>");
-        }
-        return java.util.regex.Pattern
-                .compile("<(?:sld:)?NamedLayer>[\\s\\S]*</(?:sld:)?NamedLayer>")
-                .matcher(sld)
-                .replaceFirst(java.util.regex.Matcher.quoteReplacement(namedLayers.toString()));
-    }
-
-    public void createStyle(String name, String sld) throws Exception {
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(geoserverUrl + "/rest/styles?name=" + name))
-                .header("Authorization", basicAuth())
-                .header("Content-Type", "application/vnd.ogc.sld+xml")
-                .POST(HttpRequest.BodyPublishers.ofString(sld))
-                .build();
-        HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-        if (res.statusCode() != 201) throw new RuntimeException("스타일 생성 실패: " + res.body());
-    }
-
-    public void updateStyle(String name, String sld) throws Exception {
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(geoserverUrl + "/rest/styles/" + name))
-                .header("Authorization", basicAuth())
-                .header("Content-Type", "application/vnd.ogc.sld+xml")
-                .PUT(HttpRequest.BodyPublishers.ofString(sld))
-                .build();
-        HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-        if (res.statusCode() != 200) throw new RuntimeException("스타일 업데이트 실패: " + res.body());
-    }
-
-    public void deleteStyle(String name) throws Exception {
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(geoserverUrl + "/rest/styles/" + name + "?purge=true&recurse=true"))
-                .header("Authorization", basicAuth())
-                .DELETE().build();
-        httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-    }
-
-    public byte[] getLegendGraphic(String sld) throws Exception {
-        // 백엔드 → GeoServer 구간은 nginx를 거치지 않으므로 GET + URL에 SLD_BODY 직접 전달
-        String url = geoserverUrl + "/ows?service=WMS&version=1.1.0&request=GetLegendGraphic"
-                + "&format=image%2Fpng&width=20&height=20"
-                + "&LAYER=" + java.net.URLEncoder.encode(legendLayer, java.nio.charset.StandardCharsets.UTF_8)
-                + "&SLD_BODY=" + java.net.URLEncoder.encode(sld, java.nio.charset.StandardCharsets.UTF_8);
-        log.info("[Legend] layer='{}' urlLen={}", legendLayer, url.length());
-
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .header("Authorization", basicAuth())
-                .GET()
-                .build();
-        HttpResponse<byte[]> res = httpClient.send(req, HttpResponse.BodyHandlers.ofByteArray());
-        String contentType = res.headers().firstValue("Content-Type").orElse("");
-        log.info("[Legend] status={} contentType={} bodyLen={}", res.statusCode(), contentType, res.body().length);
-        if (res.statusCode() != 200 || contentType.contains("xml")) {
-            log.warn("[Legend] error: {}", new String(res.body(), 0, Math.min(300, res.body().length)));
-            throw new RuntimeException("범례 생성 실패");
-        }
-        return res.body();
-    }
-
-    public void setLayerStyle(String workspace, String layerName, String styleName) throws Exception {
-        String body = String.format(
-                "{\"layer\":{\"defaultStyle\":{\"name\":\"%s\",\"workspace\":\"%s\"}}}",
-                styleName, workspace);
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(geoserverUrl + "/rest/layers/" + workspace + ":" + layerName))
-                .header("Authorization", basicAuth())
-                .header("Content-Type", "application/json")
-                .PUT(HttpRequest.BodyPublishers.ofString(body))
-                .build();
-        HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-        if (res.statusCode() != 200) throw new RuntimeException("스타일 적용 실패: " + res.body());
-    }
-
-    public List<PublishResult> publishLayers(String workspace, String datastore, List<String> layers) {
-        List<PublishResult> results = new ArrayList<>();
-        for (String layer : layers) {
+        List<LayerWithStyle> out = new ArrayList<>();
+        for (CompletableFuture<LayerWithStyle> f : futures) {
             try {
-                String body = String.format("{\"featureType\":{\"name\":\"%s\"}}", layer);
-                HttpRequest req = baseRequest("/workspaces/" + workspace + "/datastores/" + datastore + "/featuretypes")
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(body))
-                        .build();
-                HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-                if (res.statusCode() == 201) {
+                out.add(f.join());
+            } catch (CompletionException e) {
+                // 연결 거부(401)는 화면에 428로 알려야 하므로 그대로 던진다
+                if (e.getCause() instanceof CustomException ce) throw ce;
+                throw e;
+            }
+        }
+        return out;
+    }
+
+    /** 레이어 하나의 기본 스타일 이름. 계정 거부(AUTH_REJECTED)만 던지고 나머지 실패는 빈 값(기존 동작). */
+    private String layerStyle(GeoServerConnection c, String wsEncoded, String layerName) {
+        try {
+            Resp res = http.call(c, "레이어 상세 조회", Req.get(
+                    rest(c, "/workspaces/" + wsEncoded + "/layers/" + seg("레이어", layerName)),
+                    JSON, GeoServerHttp.TIMEOUT_NORMAL, GeoServerHttp.MAX_TEXT_BYTES));
+            if (!res.is2xx()) return "";
+            JsonNode detail = objectMapper.readTree(res.body());
+            return detail.path("layer").path("defaultStyle").path("name").asText("");
+        } catch (CustomException e) {
+            if (e.getErrorCode() == GisErrorCode.GEOSERVER_AUTH_REJECTED) throw e;
+            return "";
+        } catch (IOException e) {
+            return "";
+        }
+    }
+
+    public List<String> getStyles(GeoServerConnection c) {
+        JsonNode root = getJson(c, "스타일 목록 조회", "/styles");
+        return names(root.path("styles").path("style"));
+    }
+
+    public String getStyleSld(GeoServerConnection c, String name) {
+        Resp res = http.call(c, "스타일 조회", Req.get(
+                rest(c, "/styles/" + seg("스타일", name) + ".sld"),
+                SLD_TYPE, GeoServerHttp.TIMEOUT_NORMAL, GeoServerHttp.MAX_TEXT_BYTES));
+        requireStatus(res, "스타일 조회");
+        return res.text();
+    }
+
+    // ── 스타일 변경 ─────────────────────────────────────────────
+
+    public void createStyle(GeoServerConnection c, String name, String sld) {
+        requireName("스타일", name);
+        requireText("SLD", sld);
+        Resp res = http.call(c, "스타일 생성", Req.send("POST",
+                rest(c, "/styles?name=" + UriUtils.encodeQueryParam(name, StandardCharsets.UTF_8)),
+                JSON, SLD_TYPE, sld, GeoServerHttp.TIMEOUT_NORMAL));
+        if (res.status() != 201) throw GisErrorCode.GEOSERVER_REQUEST_FAILED.exception("스타일 생성", res.status());
+    }
+
+    public void updateStyle(GeoServerConnection c, String name, String sld) {
+        requireText("SLD", sld);
+        Resp res = http.call(c, "스타일 수정", Req.send("PUT",
+                rest(c, "/styles/" + seg("스타일", name)),
+                JSON, SLD_TYPE, sld, GeoServerHttp.TIMEOUT_NORMAL));
+        if (res.status() != 200) throw GisErrorCode.GEOSERVER_REQUEST_FAILED.exception("스타일 수정", res.status());
+    }
+
+    public void deleteStyle(GeoServerConnection c, String name) {
+        Resp res = http.call(c, "스타일 삭제", Req.send("DELETE",
+                rest(c, "/styles/" + seg("스타일", name) + "?purge=true&recurse=true"),
+                JSON, null, null, GeoServerHttp.TIMEOUT_NORMAL));
+        requireStatus(res, "스타일 삭제");
+    }
+
+    public void setLayerStyle(GeoServerConnection c, String workspace, String layerName, String styleName) {
+        String ws = seg("작업공간", workspace);
+        String layer = seg("레이어", layerName);
+        requireName("스타일", styleName);
+        ObjectNode style = objectMapper.createObjectNode().put("name", styleName).put("workspace", workspace);
+        ObjectNode body = objectMapper.createObjectNode();
+        body.putObject("layer").set("defaultStyle", style);
+        Resp res = http.call(c, "스타일 적용", Req.send("PUT",
+                rest(c, "/layers/" + ws + ":" + layer),
+                JSON, "application/json", body.toString(), GeoServerHttp.TIMEOUT_NORMAL));
+        if (res.status() != 200) throw GisErrorCode.GEOSERVER_REQUEST_FAILED.exception("스타일 적용", res.status());
+    }
+
+    // ── 범례 ────────────────────────────────────────────────────
+
+    /** 연결별로 자동 고른 레이어에 SLD_BODY를 얹어 GetLegendGraphic을 부른다. 기억한 레이어가 실패하면 한 번만 다시 고른다. */
+    public byte[] getLegendGraphic(GeoServerConnection c, String sld) {
+        requireText("SLD", sld);
+        String layer = c.legendLayer();
+        boolean freshlyPicked = false;
+        if (layer == null) {
+            layer = pickLegendLayer(c);
+            freshlyPicked = true;
+        }
+        Resp res = legendRequest(c, layer, sld);
+        if (!legendOk(res) && !freshlyPicked) {
+            c.legendLayer(null);
+            String again = pickLegendLayer(c);
+            if (!again.equals(layer)) {
+                layer = again;
+                res = legendRequest(c, layer, sld);
+            }
+        }
+        if (!legendOk(res)) {
+            log.debug("[Legend] 실패 host={} HTTP {} : {}", c.host(), res.status(), GeoServerHttp.preview(res.body()));
+            throw GisErrorCode.GEOSERVER_REQUEST_FAILED.exception("범례 생성", res.status());
+        }
+        c.legendLayer(layer);
+        return res.body();
+    }
+
+    private boolean legendOk(Resp res) {
+        // 로그인 HTML 같은 비이미지 응답을 PNG로 내려보내지 않도록 PNG 매직 바이트(89 50 4E 47 0D 0A 1A 0A)까지 확인
+        byte[] b = res.body();
+        return res.status() == 200
+                && !res.contentType().toLowerCase(java.util.Locale.ROOT).contains("xml")
+                && b.length >= 8 && (b[0] & 0xff) == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G'
+                && b[4] == 0x0d && b[5] == 0x0a && b[6] == 0x1a && b[7] == 0x0a;
+    }
+
+    private Resp legendRequest(GeoServerConnection c, String layer, String sld) {
+        // 백엔드 → GeoServer 구간은 nginx를 거치지 않으므로 GET + URL에 SLD_BODY 직접 전달
+        String url = c.baseUrl() + "/ows?service=WMS&version=1.1.0&request=GetLegendGraphic"
+                + "&format=image%2Fpng&width=20&height=20"
+                + "&LAYER=" + java.net.URLEncoder.encode(layer, StandardCharsets.UTF_8)
+                + "&SLD_BODY=" + java.net.URLEncoder.encode(sld, StandardCharsets.UTF_8);
+        return http.call(c, "범례 생성", Req.get(url, "image/png,*/*", GeoServerHttp.TIMEOUT_LEGEND, GeoServerHttp.MAX_PNG_BYTES));
+    }
+
+    private String pickLegendLayer(GeoServerConnection c) {
+        JsonNode root = getJson(c, "레이어 목록 조회", "/layers");
+        List<String> names = names(root.path("layers").path("layer"));
+        if (names.isEmpty()) throw new CustomException(GisErrorCode.GEOSERVER_LEGEND_UNAVAILABLE);
+        return names.get(0);
+    }
+
+    // ── 발행 ────────────────────────────────────────────────────
+
+    public List<PublishResult> publishLayers(GeoServerConnection c, String workspace, String datastore, List<String> layers) {
+        String path = "/workspaces/" + seg("작업공간", workspace) + "/datastores/" + seg("저장소", datastore) + "/featuretypes";
+        if (layers == null || layers.isEmpty()) {
+            throw GisErrorCode.GEOSERVER_INPUT_INVALID.exception("발행할 레이어를 선택하세요.");
+        }
+        for (String layer : layers) requireName("레이어", layer);
+
+        List<PublishResult> results = new ArrayList<>();
+        String abortReason = null; // 연결 자체가 막히면 남은 레이어는 요청하지 않는다
+        for (String layer : layers) {
+            if (abortReason != null) {
+                results.add(new PublishResult(layer, false, abortReason));
+                continue;
+            }
+            try {
+                ObjectNode body = objectMapper.createObjectNode();
+                body.putObject("featureType").put("name", layer);
+                Resp res = http.call(c, "레이어 발행", Req.send("POST", rest(c, path),
+                        JSON, "application/json", body.toString(), GeoServerHttp.TIMEOUT_PUBLISH));
+                if (res.status() == 201) {
                     results.add(new PublishResult(layer, true, "발행 완료"));
                 } else {
-                    results.add(new PublishResult(layer, false, "HTTP " + res.statusCode() + ": " + res.body()));
+                    results.add(new PublishResult(layer, false,
+                            "HTTP " + res.status() + ": " + GeoServerHttp.preview(res.body())));
                 }
-            } catch (Exception e) {
+            } catch (CustomException e) {
                 results.add(new PublishResult(layer, false, e.getMessage()));
+                // http.call이 던지는 예외는 전부 연결 문제(401·3xx·전송 실패)라 남은 레이어는 요청하지 않는다
+                abortReason = e.getErrorCode() == GisErrorCode.GEOSERVER_AUTH_REJECTED
+                        ? "연결 거부(GeoServer가 계정을 거부해 연결을 해제했습니다)"
+                        : "중단됨(앞선 레이어에서 GeoServer 연결에 실패했습니다)";
             }
         }
         return results;
+    }
+
+    // ── 내부 도우미 ─────────────────────────────────────────────
+
+    private String rest(GeoServerConnection c, String pathAndQuery) {
+        return c.baseUrl() + "/rest" + pathAndQuery;
+    }
+
+    private JsonNode getJson(GeoServerConnection c, String op, String pathAndQuery) {
+        Resp res = http.call(c, op, Req.get(rest(c, pathAndQuery), JSON, GeoServerHttp.TIMEOUT_NORMAL, GeoServerHttp.MAX_TEXT_BYTES));
+        requireStatus(res, op);
+        try {
+            return objectMapper.readTree(res.body());
+        } catch (IOException e) {
+            log.debug("[GeoServer] {} JSON 해석 실패 host={}", op, c.host());
+            throw new CustomException(GisErrorCode.GEOSERVER_RESPONSE_INVALID);
+        }
+    }
+
+    private void requireStatus(Resp res, String op) {
+        if (!res.is2xx()) throw GisErrorCode.GEOSERVER_REQUEST_FAILED.exception(op, res.status());
+    }
+
+    /**
+     * 목록 응답 방어: 배열은 그대로, 객체·문자열 하나는 원소 하나, 빈 문자열("")·그 밖은 빈 목록.
+     * GeoServer는 빈 목록을 {"workspaces":""}로, 원소 하나를 배열 대신 단독 값으로 주는 버전이 있다.
+     */
+    static List<JsonNode> asList(JsonNode node) {
+        List<JsonNode> out = new ArrayList<>();
+        if (node == null || node.isMissingNode() || node.isNull()) return out;
+        if (node.isArray()) {
+            node.forEach(out::add);
+        } else if (node.isObject()) {
+            out.add(node);
+        } else if (node.isTextual() && !node.asText().isBlank()) {
+            out.add(node);
+        }
+        return out;
+    }
+
+    private static List<String> names(JsonNode node) {
+        List<String> out = new ArrayList<>();
+        for (JsonNode n : asList(node)) {
+            String name = n.isObject() ? n.path("name").asText("") : n.asText("");
+            if (!name.isBlank()) out.add(name);
+        }
+        return out;
+    }
+
+    /** 경로 변수 검사 + 경로 조각 인코딩. 값 자체는 오류 메시지에 넣지 않는다. */
+    private static String seg(String label, String value) {
+        requireName(label, value);
+        return UriUtils.encodePathSegment(value, StandardCharsets.UTF_8);
+    }
+
+    private static void requireName(String label, String value) {
+        if (value == null || value.isBlank() || value.equals(".") || value.equals("..") || value.length() > 500) {
+            throw GisErrorCode.GEOSERVER_INPUT_INVALID.exception(label + " 이름이 올바르지 않습니다.");
+        }
+        for (int i = 0; i < value.length(); i++) {
+            if (Character.isISOControl(value.charAt(i))) {
+                throw GisErrorCode.GEOSERVER_INPUT_INVALID.exception(label + " 이름에 제어 문자를 넣을 수 없습니다.");
+            }
+        }
+    }
+
+    private static void requireText(String label, String value) {
+        if (value == null || value.isBlank()) {
+            throw GisErrorCode.GEOSERVER_INPUT_INVALID.exception(label + " 내용이 비었습니다.");
+        }
     }
 }

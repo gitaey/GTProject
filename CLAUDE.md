@@ -60,14 +60,14 @@ npm run build:gis-demo      # 정적 예제 폴더 조립 → packages/gis-map/d
 
 ## 환경 변수 (이름만)
 
-- frontend `.env.local`: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_VWORLD_API_KEY`, `NEXT_PUBLIC_GEOSERVER_URL`,
-  서버 전용 `GEOSERVER_URL`, `GEOSERVER_ADMIN_USER`, `GEOSERVER_ADMIN_PASSWORD`, `GEOSERVER_LEGEND_LAYER`
-- backend: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `GEOSERVER_URL`, `GEOSERVER_ADMIN_USER`,
-  `GEOSERVER_ADMIN_PASSWORD`, `GEOSERVER_LEGEND_LAYER`, `KMA_API_KEY`, `LOSTARK_API_KEY`,
+- frontend `.env.local`: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_VWORLD_API_KEY`, `NEXT_PUBLIC_GEOSERVER_URL`(지도 화면 GeoServer 범례 이미지 주소 — GeoServer 관리 도구와 무관)
+- backend: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`,
+  `KMA_API_KEY`, `LOSTARK_API_KEY`,
   `GOOGLE_CREDENTIALS_JSON`, `GEOTIFF_UPLOAD_DIR`, `MYMAP_UPLOAD_DIR`, `TITILER_URL`, `TITILER_CONTAINER_NAME`
 - bot: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `GOOGLE_CREDENTIALS_JSON`, `DISCORD_BOT_TOKEN`, `LOSTARK_API_KEY`
 
 로컬 값은 gitignore된 `application-local.yml` / `.env.local`에 둔다.
+(GeoServer 관리 도구의 접속 주소·계정은 환경 변수가 아니라 `GeoServer > 접속 설정` 화면에서 사용자가 입력한다.)
 
 ---
 
@@ -91,3 +91,4 @@ npm run build:gis-demo      # 정적 예제 폴더 조립 → packages/gis-map/d
 | 2026-10-14 | 에이전트 모델 조정 — planner·qa·security-reviewer·region-code-manager는 opus, backend-dev·frontend-dev·map-dev·arch/perf/style-reviewer는 sonnet(토큰 절감). 바람지도 탭 작업을 `fullstack-pipeline`(planner→map-dev→qa 3회→메인 브라우저 확인)으로 수행 | `.claude/agents/*`, 바람길 도메인·지도 패키지 | 하네스 토큰 사용량이 커서 구현 계열을 sonnet으로 내림 |
 | 2026-10-22 | 토큰 절약 규칙 — 구현 에이전트: 변이 시험 핵심 30개 안팎·수정 루프는 바뀐 곳만·퍼즈는 1회·도구 호출 약 100회, qa: 바뀐 파일 범위 표본 확인, 파이프라인: QA는 단계 끝에 한 번·수정 루프 기본 1회·작은 변경은 직접·새 단계는 새 에이전트 | `.claude/agents/map-dev.md`, `qa.md`, `skills/fullstack-pipeline/SKILL.md` | 구현 에이전트가 전체 토큰의 약 70%(변이 시험·긴 도구 호출·이어 쓰기로 맥락 증가)를 써서 주간 한도에 걸림 |
 | 2026-11-03 | 공개 데모 `/demo`(로그인 없이 열림, noindex) 추가, `/proxy/**` 로그인 필수화, `npm run build`에 `prebuild`(정적 예제 조립) 추가 | `frontend/src/middleware.ts`, `app/demo`, `app/proxy`, `package.json` | 이식 데모 공개, 익명이 VWorld 키 한도를 쓰는 것 차단 |
+| 2026-11-06 | GeoServer 관리 도구를 범용으로 — 접속 설정 화면에서 주소·계정 입력, 서버 메모리 번호표(`X-GeoServer-Connection`), `/api/geoserver/**` SUPER_ADMIN·MAP_ADMIN 제한, 공개 SLD 엔드포인트·GeoServer 환경 변수 4종 삭제 | `backend/domain/geoserver`, `app/admin/geoserver`, `application.yml` | 아무 GeoServer에나 붙여 쓰는 도구, yml 비밀 기본값 제거 |

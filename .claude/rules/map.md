@@ -103,6 +103,7 @@ React는 `<GisMapProvider host={…}>`(바뀌면 `map.setHost`), UMD는 `GisMap.
 
 - 5개 도메인(`map`·`mymap`·`geoserver`·`geotiff`·`wind`)은 다른 도메인을, 서로도 import하지 않는다(감사 13번 실패). 공통은 `global/` 조각만:
   `global/response/ApiResponse`, `global/exception/{CustomException, BaseErrorCode}`, `global/gis/{GisErrorCode, GisUserContext}` + 구현 `SecurityContextGisUserContext`.
+- GeoServer 관리 도구는 연결 정보를 사용자가 입력하는 범용 도구다(서버 메모리 번호표). 접속 정보를 설정에서 읽지 않고, 외부 호출은 `GeoServerHttp`만 지난다(주소 검사·리다이렉트 금지·시간/크기 제한).
 - 사용자·역할은 문자열(`userId`/`roleCode`)로만 다룬다. `map`의 `LayerUserAccess`도 BK-1에서 `String userId`로 바뀌어 `User` FK가 없다
   (DB의 옛 FK 제약은 설계문서 B1 이관 SQL을 사용자가 실행해야 없어진다 — 실행 전에는 탈퇴 사용자 PUT이 500, 회원 삭제가 FK로 실패할 수 있다).
 - 지도 전용 에러는 `GisErrorCode.X`(`global/gis`), 현재 사용자·역할은 `GisUserContext`로만 읽는다. 지도 도메인에서 `ErrorCode.`·`SecurityContextHolder` 직접 사용 금지.
