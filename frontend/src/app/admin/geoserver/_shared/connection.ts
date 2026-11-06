@@ -62,6 +62,13 @@ export interface ConnectionInfo {
 /** 428 — 연결이 없거나 만료되었거나 GeoServer가 계정을 거부함 */
 export class GeoServerConnectionLostError extends Error {}
 
+/** 428이 아닌 API 실패 — 화면이 상태 코드(409 이름 중복·422 없는 레이어 등)로 갈래를 나눌 때 쓴다. Error로 잡는 기존 호출부는 그대로 동작 */
+export class GeoServerApiError extends Error {
+    constructor(message: string, readonly status: number) {
+        super(message)
+    }
+}
+
 export function readSession(): StoredConnection | null {
     try {
         const raw = sessionStorage.getItem(SESSION_KEY)
@@ -159,8 +166,8 @@ export async function gsFetch<T>(path: string, options?: RequestInit): Promise<T
         clearSession()
         throw new GeoServerConnectionLostError(json?.message || DEFAULT_LOST_MESSAGE)
     }
-    if (!json) throw new Error(statusMessage(res.status))
-    if (!json.success) throw new Error(json.message || statusMessage(res.status))
+    if (!json) throw new GeoServerApiError(statusMessage(res.status), res.status)
+    if (!json.success) throw new GeoServerApiError(json.message || statusMessage(res.status), res.status)
     return json.data as T
 }
 

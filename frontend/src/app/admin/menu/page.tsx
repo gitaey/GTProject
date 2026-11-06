@@ -70,6 +70,7 @@ const MENU_CATALOG: CatalogArea[] = [
                     { id: 'sidebar.geoserver-connect', label: '접속 설정' },
                     { id: 'sidebar.geoserver-publish', label: '레이어 배포' },
                     { id: 'sidebar.geoserver-styles', label: 'SLD 스타일 관리' },
+                    { id: 'sidebar.geoserver-layergroups', label: '레이어 그룹' },
                 ],
             },
             {

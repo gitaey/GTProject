@@ -18,6 +18,7 @@ const PAGE_TITLES: Record<string, string> = {
     '/admin/geoserver/connect': 'GeoServer 접속 설정',
     '/admin/geoserver/publish': 'GeoServer 발행',
     '/admin/geoserver/styles': 'GeoServer 스타일',
+    '/admin/geoserver/layergroups': 'GeoServer 레이어 그룹',
     '/admin/access-log': '접속 로그',
     '/map-admin/layer': '레이어 관리',
 }

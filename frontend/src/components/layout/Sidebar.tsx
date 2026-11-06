@@ -49,6 +49,7 @@ const menuItems: MenuItem[] = [
             { id: 'geoserver-connect', label: '접속 설정', href: '/admin/geoserver/connect' },
             { id: 'geoserver-publish', label: '레이어 발행', href: '/admin/geoserver/publish' },
             { id: 'geoserver-styles', label: '스타일 관리', href: '/admin/geoserver/styles' },
+            { id: 'geoserver-layergroups', label: '레이어 그룹', href: '/admin/geoserver/layergroups' },
         ],
     },
     {
