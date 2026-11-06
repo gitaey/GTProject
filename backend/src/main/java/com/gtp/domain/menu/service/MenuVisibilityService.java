@@ -32,7 +32,7 @@ public class MenuVisibilityService {
             "sidebar.map-menu", "sidebar.map-permission",
             "sidebar.blog-view", "sidebar.blog-admin", "sidebar.blog-category",
             "sidebar.bot-log", "sidebar.bot-command", "sidebar.bot-schedule", "sidebar.bot-room",
-            "sidebar.geoserver-connect", "sidebar.geoserver-publish", "sidebar.geoserver-styles",
+            "sidebar.geoserver-connect", "sidebar.geoserver-publish", "sidebar.geoserver-styles", "sidebar.geoserver-layergroups",
             "sidebar.system-user", "sidebar.system-access-log", "sidebar.system-menu", "sidebar.system-permission",
             "map.panel.layer", "map.panel.image", "map.panel.etc",
             "map.tool.zoom", "map.tool.draw", "map.tool.measure-distance",
@@ -40,7 +40,7 @@ public class MenuVisibilityService {
         ),
         "MAP_ADMIN", List.of(
             "sidebar.home", "sidebar.map-view", "sidebar.map-layer",
-            "sidebar.geoserver-connect", "sidebar.geoserver-publish", "sidebar.geoserver-styles",
+            "sidebar.geoserver-connect", "sidebar.geoserver-publish", "sidebar.geoserver-styles", "sidebar.geoserver-layergroups",
             "map.panel.layer", "map.panel.image", "map.panel.etc",
             "map.tool.zoom", "map.tool.draw", "map.tool.measure-distance",
             "map.tool.measure-area", "map.tool.radius-search", "map.tool.wind", "map.tool.print", "map.tool.area-analysis", "map.tool.parcel-info", "map.tool.clear"

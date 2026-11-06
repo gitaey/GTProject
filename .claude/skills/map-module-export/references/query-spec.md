@@ -127,7 +127,7 @@ GTProject 구현은 JWT principal 문자열을 읽는다(`SecurityContextGisUser
 | W3 | GET `/api/wind/frames/{id}` | 익명 | A | 선택: 바람지도 탭(패널) |
 | W5 | GET `/api/wind/fields/{id}` | 익명 | A | 선택: 기온·습도 오버레이 |
 | W4 | POST `/api/wind/refresh` | SUPER_ADMIN·MAP_ADMIN | - | 운영용(수동 갱신) |
-| S1 | `/api/geoserver/**` (15개: 연결 4 + 관리 11) | SUPER_ADMIN·MAP_ADMIN + 연결 번호표 헤더(없으면 428) | M | 관리(지도 화면과 무관, 8절) |
+| S1 | `/api/geoserver/**` (25개: 연결 4 + 관리 11 + 레이어 그룹 10) | SUPER_ADMIN·MAP_ADMIN + 연결 번호표 헤더(없으면 428) | M | 관리(지도 화면과 무관, 8절) |
 
 보안 메모(발견만, 고치지 않음 — 설계문서 "발견한 범위 밖 문제"와 같음): T4~T6은 로그인 없이 업로드(최대 2GB)·삭제가 된다.
 L7~L12, G2~G4는 로그인한 아무 사용자나 호출할 수 있다. **이식할 때는 관리 API에 관리자 권한을 거는 것을 권장**한다.
@@ -691,6 +691,7 @@ DELETE FROM tbl_wind_scalar WHERE cycle_date < #{d} OR (cycle_date = #{d} AND cy
 | GET/POST/PUT/DELETE `/styles…` | `{url}/rest/styles…` (`.sld`, `?purge=true&recurse=true`) |
 | PUT `/workspaces/{ws}/layers/{layer}/style` | `PUT {url}/rest/layers/{ws}:{layer}` |
 | POST `/legend` (SLD 본문 → PNG) | `GET {url}/ows?…request=GetLegendGraphic&LAYER=<연결별 자동 선택 레이어>&SLD_BODY=…` |
+| GET `/workspaces/{ws}/layer-names`, GET `/layergroups`·`/workspaces/{ws}/layergroups`(+`/{name}`), POST `/layergroups`, PUT·DELETE `/layergroups/{name}`·`/workspaces/{ws}/layergroups/{name}` (레이어 그룹 10개, `GeoServerLayerGroupService`) | `{url}/rest/…/layergroups`(만들기·수정은 XML, 읽기는 JSON), 수정 때 레이어마다 `layers/{ws}:{name}`·리소스 조회로 영역 재계산. 이름에 점(`.`)이 있으면 REST가 확장자로 잘라 읽을 수 있어 수정·삭제는 GeoServer를 부르지 않고 막는다 |
 
 ---
 

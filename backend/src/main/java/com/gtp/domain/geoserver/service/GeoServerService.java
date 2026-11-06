@@ -320,7 +320,7 @@ public class GeoServerService {
         return out;
     }
 
-    private static List<String> names(JsonNode node) {
+    static List<String> names(JsonNode node) {
         List<String> out = new ArrayList<>();
         for (JsonNode n : asList(node)) {
             String name = n.isObject() ? n.path("name").asText("") : n.asText("");
@@ -330,12 +330,12 @@ public class GeoServerService {
     }
 
     /** 경로 변수 검사 + 경로 조각 인코딩. 값 자체는 오류 메시지에 넣지 않는다. */
-    private static String seg(String label, String value) {
+    static String seg(String label, String value) {
         requireName(label, value);
         return UriUtils.encodePathSegment(value, StandardCharsets.UTF_8);
     }
 
-    private static void requireName(String label, String value) {
+    static void requireName(String label, String value) {
         if (value == null || value.isBlank() || value.equals(".") || value.equals("..") || value.length() > 500) {
             throw GisErrorCode.GEOSERVER_INPUT_INVALID.exception(label + " 이름이 올바르지 않습니다.");
         }
@@ -346,7 +346,7 @@ public class GeoServerService {
         }
     }
 
-    private static void requireText(String label, String value) {
+    static void requireText(String label, String value) {
         if (value == null || value.isBlank()) {
             throw GisErrorCode.GEOSERVER_INPUT_INVALID.exception(label + " 내용이 비었습니다.");
         }

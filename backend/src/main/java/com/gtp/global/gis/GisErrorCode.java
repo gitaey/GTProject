@@ -61,7 +61,7 @@ public enum GisErrorCode implements BaseErrorCode {
     SHARE_BULK_INVALID(HttpStatus.BAD_REQUEST, "일괄 공유 요청이 올바르지 않습니다(레이어 1~50개, 대상 1~100개, 방식 ADD/REMOVE)."),
     SHARE_CONFLICT(HttpStatus.CONFLICT, "다른 변경과 겹쳤습니다. 다시 시도하세요."),
 
-    // GeoServer 접속·관리 — {0}·{1}은 exception(...)으로 채운다. 메시지는 ERROR 로그에도 남으므로 비밀번호·번호표·응답 본문을 넣지 않는다
+    // GeoServer 접속·관리 — {0}·{1}은 exception(...)으로 채운다. 메시지는 ERROR 로그에도 남으므로 비밀번호·번호표를 넣지 않는다. 응답 본문은 넣지 않되, 레이어 그룹 REJECTED만 예외로 GeoServer 검증 문구(응답 앞 200자, 비밀값 없음)를 넣는다
     GEOSERVER_NOT_CONNECTED(HttpStatus.PRECONDITION_REQUIRED, "GeoServer 연결이 없거나 만료되었습니다(서버가 다시 시작되었을 수 있습니다). 접속 설정에서 다시 연결하세요."),
     GEOSERVER_AUTH_REJECTED(HttpStatus.PRECONDITION_REQUIRED, "GeoServer가 이 계정을 거부했습니다(비밀번호가 바뀌었을 수 있습니다). 접속 설정에서 다시 연결하세요."),
     GEOSERVER_ADDRESS_BLOCKED(HttpStatus.BAD_REQUEST, "이 주소로는 연결할 수 없습니다(링크로컬·클라우드 메타데이터 주소)."),
@@ -74,7 +74,15 @@ public enum GisErrorCode implements BaseErrorCode {
     GEOSERVER_LEGEND_UNAVAILABLE(HttpStatus.FAILED_DEPENDENCY, "범례 미리보기에 쓸 레이어가 서버에 없습니다."),
     GEOSERVER_INPUT_INVALID(HttpStatus.BAD_REQUEST, "{0}"),
     GEOSERVER_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "연결 시도가 너무 많습니다. 잠시 후 다시 시도하세요."),
-    GEOSERVER_CONNECTION_LIMIT(HttpStatus.TOO_MANY_REQUESTS, "보관 중인 GeoServer 연결이 너무 많습니다. 잠시 후 다시 시도하세요.");
+    GEOSERVER_CONNECTION_LIMIT(HttpStatus.TOO_MANY_REQUESTS, "보관 중인 GeoServer 연결이 너무 많습니다. 잠시 후 다시 시도하세요."),
+
+    // GeoServer 레이어 그룹 — {0}~{2}는 GeoServer 자원 이름·상태·검증 문구(비밀값 없음)
+    GEOSERVER_LAYERGROUP_EXISTS(HttpStatus.CONFLICT, "같은 이름의 레이어 그룹이 이미 있습니다: {0}"),
+    GEOSERVER_LAYERGROUP_CHANGED(HttpStatus.CONFLICT, "다른 곳에서 이 레이어 그룹이 바뀌었습니다. 다시 불러온 뒤 수정하세요: {0}"),
+    GEOSERVER_LAYERGROUP_LAYER_MISSING(HttpStatus.UNPROCESSABLE_ENTITY, "GeoServer에 없는 레이어가 있습니다(삭제되었거나 이름이 바뀌었을 수 있습니다): {0}"),
+    GEOSERVER_LAYERGROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "레이어 그룹을 찾을 수 없습니다(이미 삭제되었을 수 있습니다): {0}"),
+    GEOSERVER_LAYERGROUP_NOT_EDITABLE(HttpStatus.BAD_REQUEST, "이 레이어 그룹은 이 도구로 수정할 수 없습니다: {0}"),
+    GEOSERVER_LAYERGROUP_REJECTED(HttpStatus.FAILED_DEPENDENCY, "GeoServer가 레이어 그룹 {0}을(를) 거절했습니다 (HTTP {1}): {2}");
 
     private final HttpStatus status;
     private final String message;
