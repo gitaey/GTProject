@@ -413,13 +413,11 @@ export class PrintControllerImpl implements PrintController {
     print(opts?: PrintOptions): Promise<void> {
         return this.runExport(async () => {
             const page = await this.renderNow(opts)
+            // 이전 인쇄의 iframe이 아직 남아 있으면 먼저 지운다(done은 인쇄 창을 띄운 직후 풀리므로 iframe이 더 오래 산다)
+            this.printHandle?.dispose()
             const handle = printCanvas(this.opts.olMap.getViewport().ownerDocument, page.canvas, page.widthMm, page.heightMm)
             this.printHandle = handle
-            try {
-                await handle.done
-            } finally {
-                if (this.printHandle === handle) this.printHandle = null
-            }
+            await handle.done
         })
     }
 
