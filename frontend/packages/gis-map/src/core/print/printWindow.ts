@@ -1,10 +1,13 @@
 // 브라우저 인쇄 창: 숨은 iframe(같은 출처 srcdoc) 문서에 페이지 그림을 옮겨 그리고 그 창의 print()를 부른다.
 //   · 호스트 페이지의 CSS·@media print에 영향을 주지 않는다(@page 규칙은 iframe 문서 안에만 있다).
 //   · 캔버스가 오염(tainted)돼도 drawImage는 되므로 PNG·PDF가 막힌 화면에서도 인쇄는 된다 — 사용자는 인쇄 창에서 "PDF로 저장"을 고른다.
-//   · 인쇄 창이 닫히면(afterprint) 또는 안전 타이머가 지나면 iframe을 지우고 resolve한다. dispose()로 즉시 정리할 수 있다.
+//   · 인쇄 창이 닫히면(afterprint, 또는 멈춰 있던 print()가 돌아오면 — 취소 포함) 또는 안전 타이머가 지나면 iframe을 지우고 resolve한다. dispose()로 즉시 정리할 수 있다.
 
 /** 인쇄 창이 안 닫힌 것으로 보고 정리하기까지의 최대 시간(afterprint가 안 오는 브라우저 대비) */
 export const PRINT_SAFETY_MS = 120000
+
+/** print() 호출이 이 시간 이상 멈춰 있었으면 인쇄 창이 닫힌 뒤 돌아온 것으로 본다 */
+const MODAL_PRINT_MS = 400
 
 /** iframe 문서의 CSS: 용지 크기·여백 0, 캔버스 CSS 크기 = 용지 mm. 두 번째 빈 쪽이 안 생기게 넘치는 부분은 숨긴다 */
 export function printCss(widthMm: number, heightMm: number): string {
@@ -72,10 +75,16 @@ export function printCanvas(
             ctx.drawImage(source, 0, 0)
             sheet.appendChild(copy)
             idoc.body.appendChild(sheet)
+            // 취소 때 숨은 iframe의 afterprint가 안 오는 브라우저가 있어 부모 창의 afterprint도 듣는다
             win.addEventListener('afterprint', finish)
+            doc.defaultView?.addEventListener('afterprint', finish, { once: true })
             timer = setTimeout(finish, safetyMs)
             win.focus()
+            const startedAt = Date.now()
             win.print()
+            // print()가 인쇄 창이 닫힐 때까지 멈춰 있던 브라우저(데스크톱 Chrome·Firefox)는 돌아온 시점이 곧 닫힌 시점이다.
+            // 바로 돌아오는 브라우저(일부 모바일)는 창이 아직 열려 있으므로 afterprint·안전 타이머를 기다린다.
+            if (Date.now() - startedAt >= MODAL_PRINT_MS) finish()
         } catch (e) {
             cleanup()
             rejectDone(e)
