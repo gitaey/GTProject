@@ -2,7 +2,7 @@
 
 // CSV → Excel 변환 도구. 상태·함수(handleFileChange·handleConvert·handleReset)는 옛 EtcPanel.tsx에서 그대로 옮겼다(동작 변경 없음) — 겉모양(JSX)만 새 톤.
 
-import { useState, useRef } from 'react'
+import { useState, useRef, type DragEvent } from 'react'
 import * as XLSX from 'xlsx'
 import { Upload } from 'lucide-react'
 import { BTN_PRIMARY, BTN_SECONDARY, FIELD, FIELD_LABEL, NoticeBox } from './EtcParts'
@@ -14,6 +14,25 @@ export default function CsvToExcelTool() {
     // 구분자: 기본값 쉼표, 다중문자(||, \t 등) 지원
     const [delimiter, setDelimiter] = useState(',')
     const fileRef = useRef<HTMLInputElement>(null)
+    const [over, setOver] = useState(false)
+
+    // 끌어 놓은 파일을 입력칸에 넣어 주면 handleConvert가 그대로 fileRef에서 읽는다
+    function handleDrop(e: DragEvent<HTMLLabelElement>) {
+        e.preventDefault()
+        setOver(false)
+        if (status === 'processing') return
+        const file = e.dataTransfer.files?.[0]
+        if (!file || !fileRef.current) return
+        if (!/\.csv$/i.test(file.name)) {
+            setErrorMsg('CSV 파일(.csv)만 올릴 수 있습니다.')
+            setStatus('error')
+            return
+        }
+        fileRef.current.files = e.dataTransfer.files
+        setFileName(file.name)
+        setStatus('idle')
+        setErrorMsg('')
+    }
 
     function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0]
@@ -98,10 +117,13 @@ export default function CsvToExcelTool() {
                 />
                 <label
                     htmlFor="etc-csv-file"
-                    className="flex cursor-pointer flex-col items-center gap-1 rounded-[7px] border-[1.5px] border-dashed border-[#D1D5DC] px-2.5 py-3.5 text-center text-gray-400 transition-colors hover:border-[#F26722] hover:bg-[#FFF7ED] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#F26722]"
+                    onDragOver={(e) => { e.preventDefault(); if (status !== 'processing') setOver(true) }}
+                    onDragLeave={() => setOver(false)}
+                    onDrop={handleDrop}
+                    className={`flex cursor-pointer flex-col items-center gap-1 rounded-[7px] border-[1.5px] border-dashed px-2.5 py-3.5 text-center transition-colors hover:border-[#F26722] hover:bg-[#FFF7ED] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#F26722] ${over ? 'border-[#F26722] bg-[#FFF7ED] text-[#F26722]' : 'border-[#D1D5DC] text-gray-400'}`}
                 >
                     <Upload size={16} aria-hidden />
-                    <span className="max-w-full break-all text-[11.5px] font-semibold text-gray-700">{fileName ?? 'CSV 파일 선택'}</span>
+                    <span className="max-w-full break-all text-[11.5px] font-semibold text-gray-700">{fileName ?? 'CSV 파일을 끌어 놓거나 눌러서 선택'}</span>
                     <small className="text-[10.5px]">EUC-KR(한글) CSV</small>
                 </label>
             </div>
