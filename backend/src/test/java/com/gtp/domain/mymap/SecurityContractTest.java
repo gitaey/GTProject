@@ -111,13 +111,16 @@ class SecurityContractTest {
         assertThat(com.gtp.domain.mymap.controller.ParcelRefController.class.getAnnotation(RequestMapping.class).value())
                 .containsExactly("/api/mymap/ref");
         boolean found = false;
+        boolean foundPnuAddresses = false;
         for (Method m : com.gtp.domain.mymap.controller.ParcelRefController.class.getDeclaredMethods()) {
             for (String p : pathsOf(m)) {
                 assertThat(p).as(m.getName()).doesNotStartWith("/api");
                 if (m.getName().equals("buildings") && p.equals("/parcels/{pnu}/buildings") && verbOf(m).equals("GET")) found = true;
+                if (m.getName().equals("pnuAddresses") && p.equals("/pnu-addresses") && verbOf(m).equals("POST")) foundPnuAddresses = true;
             }
         }
         assertThat(found).as("GET /api/mymap/ref/parcels/{pnu}/buildings").isTrue();
+        assertThat(foundPnuAddresses).as("POST /api/mymap/ref/pnu-addresses (U26)").isTrue();
     }
 
     private static List<String> pathsOf(Method m) {

@@ -67,6 +67,8 @@ public class MyMapProperties {
         private String table = "ref.lsmd_cont_ldreg";
         private String pnuColumn = "pnu";
         private String jibunColumn = "jibun";
+        /** 법정동 이름 열(PNU → 주소 엑셀이 법정동 사전에 없는 PNU의 지번주소를 메울 때만 읽는다) */
+        private String bjdNameColumn = "bjd_name";
         private String sidoColumn = "sido";
         private String geomColumn = "geom";
         private int srid = 4326;

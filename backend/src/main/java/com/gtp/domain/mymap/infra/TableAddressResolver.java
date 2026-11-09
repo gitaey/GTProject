@@ -121,7 +121,7 @@ public class TableAddressResolver implements AddressResolver {
     }
 
     /** PNU 19자리 → 지번 찾기 키(법정동코드 10 + 산여부 + 본번 + 부번) */
-    private static JibunKey jibunKeyOf(String pnu) {
+    public static JibunKey jibunKeyOf(String pnu) {
         return new JibunKey(pnu.substring(0, 10), pnu.charAt(10) == '2' ? "1" : "0",
                 Integer.parseInt(pnu.substring(11, 15)), Integer.parseInt(pnu.substring(15, 19)));
     }

@@ -33,6 +33,7 @@ public class PostgisPnuParcelProvider implements PnuParcelProvider {
     private final String coverageSql;
     private final String pointSql;
     private final String pointAreaSql;
+    private final String legalDongNameSql;
 
     public PostgisPnuParcelProvider(JdbcOperations jdbc, MyMapProperties.Ref ref) {
         this.jdbc = jdbc;
@@ -53,6 +54,8 @@ public class PostgisPnuParcelProvider implements PnuParcelProvider {
                 + "(array_agg(ST_PointOnSurface(g) ORDER BY ST_Area(g) DESC))[1] AS p, ";
         this.pointSql = pointHead + "NULL::float8 AS a FROM (" + inner + ") s GROUP BY pnu) t";
         this.pointAreaSql = pointHead + "sum(ST_Area(g::geography)) AS a FROM (" + inner + ") s GROUP BY pnu) t";
+        // 법정동 이름만(모양은 읽지 않는다) — 같은 PNU 다중 폴리곤이어도 첫 값이면 되므로 GROUP BY로 한 줄
+        this.legalDongNameSql = "SELECT " + pnu + " AS pnu, min(" + ident(p.getBjdNameColumn()) + ") AS bjd_name" + where + " GROUP BY " + pnu;
         this.coverageSql = "SELECT sido, version, status FROM " + ident(ref.getLoadMetaTable()) + " WHERE dataset = 'parcel'";
     }
 
@@ -74,6 +77,31 @@ public class PostgisPnuParcelProvider implements PnuParcelProvider {
 
     String pointSql(boolean withArea) {
         return withArea ? pointAreaSql : pointSql;
+    }
+
+    String legalDongNameSql() {
+        return legalDongNameSql;
+    }
+
+    /** 법정동 이름 보조 조회. PNU 목록으로만(500개씩, 시도 파티션 키 포함), 이름이 빈 PNU는 결과에 넣지 않는다. */
+    @Override
+    public Map<String, String> legalDongNamesByPnus(Collection<String> pnus) {
+        TreeSet<String> distinct = new TreeSet<>();
+        for (String p : pnus) {
+            if (p != null && PNU.matcher(p).matches()) distinct.add(p);
+        }
+        Map<String, String> out = new HashMap<>();
+        List<String> all = new ArrayList<>(distinct);
+        for (int i = 0; i < all.size(); i += CHUNK) {
+            List<String> chunk = all.subList(i, Math.min(i + CHUNK, all.size()));
+            String[] sidos = chunk.stream().map(p -> p.substring(0, 2)).distinct().toArray(String[]::new);
+            String[] pnuArr = chunk.toArray(String[]::new);
+            jdbc.query(legalDongNameSql, ps -> bind(ps, sidos, pnuArr), rs -> {
+                String name = rs.getString("bjd_name");
+                if (name != null && !name.isBlank()) out.put(rs.getString("pnu"), name);
+            });
+        }
+        return out;
     }
 
     /** 필지 안쪽 대표점(ST_PointOnSurface)과 면적(ST_Area(geography), ㎡ 소수 1자리). PNU 목록으로만 조회한다(500개씩, 시도 파티션 키 포함). */

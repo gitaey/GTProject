@@ -102,6 +102,27 @@ public interface AddressRefReader {
     }
 
     /**
+     * 필지 한 곳의 도로명주소 한 줄(도로 키당 대표 건물 1건, PNU → 주소 엑셀용). zipCode·name·sggName은 없으면 "",
+     * relation = 이 주소의 건물 중 하나라도 이 필지가 대표지번이면 "MAIN", 관련지번으로만 걸렸으면 "RELATED".
+     */
+    record RoadAddressRow(StandardParts parts, String zipCode, String name, String sggName, boolean apartment, String relation) {
+
+        public RoadAddressRow {
+            zipCode = zipCode == null ? "" : zipCode.strip();
+            name = name == null ? "" : name.strip();
+            sggName = sggName == null ? "" : sggName.strip();
+            relation = "RELATED".equals(relation) ? "RELATED" : "MAIN";
+        }
+    }
+
+    /**
+     * 필지 한 곳의 도로명주소 결과: buildingCount = 건물 수(폐지 제외·건물당 1번), addressCount = 서로 다른 도로명주소 수(자르기 전),
+     * rows = 정해진 순서(대표지번 묶음 먼저 → 도로명 → 지하여부 → 건물본번 → 건물부번)로 잘린 목록.
+     */
+    record JibunAddresses(int buildingCount, int addressCount, List<RoadAddressRow> rows) {
+    }
+
+    /**
      * 지번 → 건물 조회(색인 ix_ti_spbd_buld_jibun)를 써도 되는가. 건물 표에 (법정동코드, 산여부, 지번본번, 지번부번) 색인이 없으면 이 조회가
      * 1,000만 행 전체 스캔이라 false여야 한다(그러면 지번 입력 행의 도로명주소 열은 비워 둔다).
      */
@@ -136,6 +157,15 @@ public interface AddressRefReader {
      */
     default BuildingPage buildingsByJibun(JibunKey key, int limit) {
         return BuildingPage.empty();
+    }
+
+    /**
+     * 필지(지번 키) 여러 곳의 도로명주소를 한 번에 찾는다(PNU → 주소 엑셀). 키마다 도로명주소(도로 키 = 도로명코드·지하여부·건물본번·건물부번)별
+     * 대표 건물 1건을 perKey개까지, 건물이 없는 키는 결과에서 빠진다. 관련지번 색인이 있으면({@link #relatedJibunLookupReady()}) 관련지번 건물도 합친다.
+     * {@link #jibunLookupReady()}가 true일 때만 부른다(아니면 건물 표 전체 스캔). perKey는 1 이상.
+     */
+    default Map<JibunKey, JibunAddresses> roadAddressesByJibun(Collection<JibunKey> keys, int perKey) {
+        return Map.of();
     }
 
     /** 주소 자료가 읽을 수 있는 상태면 그 기준월(예 "2026-09"), 아니면 null. 기준월이 바뀌면 법정동 사전을 다시 만든다. */

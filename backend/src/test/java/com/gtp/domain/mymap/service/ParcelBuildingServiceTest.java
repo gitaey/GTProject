@@ -243,7 +243,7 @@ class ParcelBuildingServiceTest {
     @Test
     void 컨트롤러_응답_봉투_필드_캐시_헤더_오류() throws Exception {
         reader.parcelBuilding(KEY, apt("X1", "1동"));
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(new ParcelRefController(service)).setControllerAdvice(new GlobalExceptionHandler()).build();
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(new ParcelRefController(service, org.mockito.Mockito.mock(com.gtp.domain.mymap.service.PnuAddressService.class))).setControllerAdvice(new GlobalExceptionHandler()).build();
         ObjectMapper om = new ObjectMapper();
 
         MvcResult ok = mvc.perform(get("/api/mymap/ref/parcels/" + PNU + "/buildings?limit=5")).andReturn();

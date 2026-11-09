@@ -41,6 +41,8 @@ public class JdbcAddressRefReader implements AddressRefReader {
     private final String jibunIndexSql;
     private final String buildingsByJibunSql;
     private final String buildingsByJibunRelatedSql;
+    private final String roadAddressesByJibunSql;
+    private final String roadAddressesByJibunRelatedSql;
 
     /** 색인이 없다고 확인한 결과는 이 시간이 지나면 다시 확인한다(운영자가 색인을 만든 뒤 재시작 없이 켜지게) */
     static final long NEGATIVE_RECHECK_NANOS = 5L * 60 * 1_000_000_000L;
@@ -114,6 +116,44 @@ public class JdbcAddressRefReader implements AddressRefReader {
                 + "SELECT DISTINCT ON (u.bd_mgt_sn) u.* FROM (" + mainSelect + " UNION ALL " + relatedSelect + ") u "
                 + "ORDER BY u.bd_mgt_sn, u.rel_ord) d "
                 + "ORDER BY d.rel_ord, d.rn, d.udgd_yn, d.buld_mnnm, d.buld_slno, d.buld_nm_dc, d.bd_mgt_sn LIMIT ?";
+
+        // U26: 필지 500곳의 도로명주소를 한 번에. 키 배열 → 대표지번 건물(+ 관련지번 건물) → 건물당 1줄 → 도로 키(=도로명주소)당 대표 건물 1줄
+        // → 필지마다 정렬·건수 → 상위 perKey개만 도로명코드 표를 붙인다. 모든 값은 바인딩(배열 4개 + perKey).
+        String hitCols = "b.bd_mgt_sn, b.road_cd, b.udgd_yn, b.buld_mnnm, b.buld_slno, b.emd_no, b.ctp_kor_nm, b.sig_kor_nm, "
+                + "b.emd_kor_nm, b.li_kor_nm, b.rn, b.apt_yn, b.buld_nm, b.sgg_buld_nm, b.zip_cd";
+        String mainHit = "SELECT k.n, " + hitCols + ", 0 AS rel_ord FROM k JOIN " + building + " b ON b.adm_cd = k.adm_cd "
+                + "AND b.mntn_yn = k.mntn_yn AND b.lnbr_mnnm = k.lnbr_mnnm AND b.lnbr_slno = k.lnbr_slno WHERE " + active;
+        String relatedHit = "SELECT k.n, " + hitCols + ", 1 AS rel_ord FROM k JOIN " + related + " m ON m.adm_cd = k.adm_cd "
+                + "AND m.mntn_yn = k.mntn_yn AND m.lnbr_mnnm = k.lnbr_mnnm AND m.lnbr_slno = k.lnbr_slno JOIN " + building
+                + " b ON b.road_cd = m.road_cd AND b.udgd_yn = m.udgd_yn AND b.buld_mnnm = m.buld_mnnm AND b.buld_slno = m.buld_slno "
+                + "WHERE coalesce(m.mv_rs_cd, '') <> '63' AND " + active;
+        String roadKey = "PARTITION BY n, road_cd, udgd_yn, buld_mnnm, buld_slno";
+        // 대표 건물: 시군구용 건물명이 있는 공동주택 → 이름이 있는 건물 → 대표지번 → 건물관리번호 (NULL이 앞서지 않게 coalesce)
+        String repOrder = "(coalesce(apt_yn, '') = '1' AND coalesce(sgg_buld_nm, '') <> '') DESC, "
+                + "(coalesce(buld_nm, '') <> '' OR coalesce(sgg_buld_nm, '') <> '') DESC, rel_ord, bd_mgt_sn";
+        String roadAddressTail = "), bld AS (SELECT DISTINCT ON (n, bd_mgt_sn) * FROM hit ORDER BY n, bd_mgt_sn, rel_ord), "
+                + "addr AS (SELECT bld.*, count(*) OVER (PARTITION BY n) AS bld_cnt, min(rel_ord) OVER (" + roadKey + ") AS addr_rel, "
+                + "row_number() OVER (" + roadKey + " ORDER BY " + repOrder + ") AS rk FROM bld), "
+                + "ranked AS (SELECT addr.*, count(*) OVER (PARTITION BY n) AS addr_cnt, "
+                + "row_number() OVER (PARTITION BY n ORDER BY addr_rel, rn, udgd_yn, buld_mnnm, buld_slno, road_cd) AS addr_ord "
+                + "FROM addr WHERE rk = 1) "
+                + "SELECT r.n, r.road_cd, r.udgd_yn, r.buld_mnnm, r.buld_slno, r.ctp_kor_nm, r.sig_kor_nm, r.emd_kor_nm, r.li_kor_nm, r.rn, "
+                + "r.apt_yn, r.buld_nm, r.sgg_buld_nm, r.zip_cd, r.bld_cnt, r.addr_cnt, r.addr_rel, s.emd_gb FROM ranked r "
+                + "LEFT JOIN " + road + " s ON s.sgg_cd = substr(r.road_cd, 1, 5) AND s.road_no = substr(r.road_cd, 6, 7) AND s.emd_no = r.emd_no "
+                + "WHERE r.addr_ord <= ? ORDER BY r.n, r.addr_ord";
+        String roadAddressHead = "WITH k AS (SELECT u.adm_cd, u.mntn_yn, u.lnbr_mnnm, u.lnbr_slno, u.n FROM "
+                + "unnest(?::varchar[], ?::varchar[], ?::int[], ?::int[]) WITH ORDINALITY AS u(adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno, n)), "
+                + "hit AS (";
+        this.roadAddressesByJibunSql = roadAddressHead + mainHit + roadAddressTail;
+        this.roadAddressesByJibunRelatedSql = roadAddressHead + mainHit + " UNION ALL " + relatedHit + roadAddressTail;
+    }
+
+    String roadAddressesByJibunSql() {
+        return roadAddressesByJibunSql;
+    }
+
+    String roadAddressesByJibunRelatedSql() {
+        return roadAddressesByJibunRelatedSql;
     }
 
     String buildingsByJibunSql() {
@@ -206,6 +246,60 @@ public class JdbcAddressRefReader implements AddressRefReader {
                     rs.getString("zip_cd"), rs.getString("emd_gb"), rs.getString("relation")));
         });
         return new BuildingPage(total[0], related, List.copyOf(rows));
+    }
+
+    /**
+     * 필지 여러 곳의 도로명주소(U26). 500곳씩 한 쿼리 — 지번 색인(4열 등호)을 타는 키 묶음 JOIN이다. 관련지번 색인이 있으면 관련지번 건물도 합친다.
+     * 기준월·색인 확인은 {@link #jibunLookupReady()}가 이미 했다고 보고 같은 기억을 재사용한다.
+     */
+    @Override
+    public Map<JibunKey, JibunAddresses> roadAddressesByJibun(Collection<JibunKey> keys, int perKey) {
+        if (perKey < 1) throw new IllegalArgumentException("perKey는 1 이상이어야 합니다: " + perKey);
+        List<JibunKey> all = new ArrayList<>(new java.util.LinkedHashSet<>(keys));
+        Map<JibunKey, JibunAddresses> out = new HashMap<>();
+        if (all.isEmpty()) return out;
+        IndexState known = indexStates.get(jibunIndexName);
+        String version = known != null ? known.version() : readyVersion();
+        boolean related = version != null && indexReady(relatedIndexName, version);
+        String sql = related ? roadAddressesByJibunRelatedSql : roadAddressesByJibunSql;
+        for (int i = 0; i < all.size(); i += CHUNK) {
+            List<JibunKey> chunk = all.subList(i, Math.min(i + CHUNK, all.size()));
+            Map<Integer, List<RoadAddressRow>> rowsByN = new HashMap<>();
+            Map<Integer, int[]> counts = new HashMap<>();
+            jdbc.query(sql, ps -> {
+                Connection con = ps.getConnection();
+                int n = chunk.size();
+                String[] adm = new String[n], mntn = new String[n];
+                Integer[] mains = new Integer[n], subs = new Integer[n];
+                for (int j = 0; j < n; j++) {
+                    JibunKey k = chunk.get(j);
+                    adm[j] = k.admCd();
+                    mntn[j] = k.mntn();
+                    mains[j] = k.main();
+                    subs[j] = k.sub();
+                }
+                ps.setArray(1, con.createArrayOf("varchar", adm));
+                ps.setArray(2, con.createArrayOf("varchar", mntn));
+                ps.setArray(3, con.createArrayOf("int4", mains));
+                ps.setArray(4, con.createArrayOf("int4", subs));
+                ps.setInt(5, perKey);
+            }, rs -> {
+                int n = rs.getInt("n");
+                counts.put(n, new int[]{rs.getInt("bld_cnt"), rs.getInt("addr_cnt")});
+                boolean apartment = "1".equals(rs.getString("apt_yn"));
+                String sgg = trim(rs.getString("sgg_buld_nm"));
+                StandardParts parts = new StandardParts(trim(rs.getString("ctp_kor_nm")), trim(rs.getString("sig_kor_nm")),
+                        trim(rs.getString("emd_kor_nm")), trim(rs.getString("li_kor_nm")), trim(rs.getString("rn")), trim(rs.getString("udgd_yn")),
+                        rs.getInt("buld_mnnm"), rs.getInt("buld_slno"), apartment, sgg, trim(rs.getString("emd_gb")));
+                rowsByN.computeIfAbsent(n, k -> new ArrayList<>()).add(new RoadAddressRow(parts, rs.getString("zip_cd"),
+                        rs.getString("buld_nm"), sgg, apartment, rs.getInt("addr_rel") == 0 ? "MAIN" : "RELATED"));
+            });
+            for (Map.Entry<Integer, int[]> e : counts.entrySet()) {
+                out.put(chunk.get(e.getKey() - 1), new JibunAddresses(e.getValue()[0], e.getValue()[1],
+                        List.copyOf(rowsByN.getOrDefault(e.getKey(), List.of()))));
+            }
+        }
+        return out;
     }
 
     @Override

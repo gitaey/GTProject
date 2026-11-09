@@ -52,6 +52,10 @@ public enum GisErrorCode implements BaseErrorCode {
     PARCEL_QUERY_INVALID(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다(PNU 19자리 숫자, limit 1~1000)."),
     PARCEL_BUILDINGS_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "건물 자료(지번 색인)가 아직 준비되지 않았습니다."),
 
+    // PNU 묶음 → 지번·도로명주소(기타 패널의 엑셀 도구, U26)
+    PNU_ADDRESS_INVALID(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다(PNU 19자리 숫자 1~500개)."),
+    PNU_ADDRESS_BUSY(HttpStatus.TOO_MANY_REQUESTS, "주소 찾기 요청이 많습니다. 잠시 후 다시 시도하세요."),
+
     // 공유(공유 상대 검색·공유 저장) — 전역 ErrorCode를 쓰지 않는다
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."),
     SHARE_QUERY_INVALID(HttpStatus.BAD_REQUEST, "검색어는 2~50자로 입력하세요."),

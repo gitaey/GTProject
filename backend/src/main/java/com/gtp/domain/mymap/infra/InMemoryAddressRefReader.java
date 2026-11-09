@@ -95,6 +95,77 @@ public class InMemoryAddressRefReader implements AddressRefReader {
         return new BuildingPage(all.size(), related, List.copyOf(all.subList(0, Math.min(limit, all.size()))));
     }
 
+    public int roadAddressesByJibunCalls = 0;
+    public int lastPerKey = -1;
+    /** 시험용: 마지막 roadAddressesByJibun 호출에 넘어온 키 수(중복 제거 뒤) */
+    public int lastKeyCount = -1;
+    /** 시험용: 켜 두면 roadAddressesByJibun이 이 예외를 던진다(세마포어 반납 확인) */
+    public volatile RuntimeException failRoadAddresses;
+    /** 시험용: 켜 두면 roadAddressesByJibun이 들어와 있는 동안 멈춘다(동시 처리 수 확인) */
+    public volatile java.util.concurrent.CountDownLatch holdRoadAddresses;
+    public volatile java.util.concurrent.CountDownLatch enteredRoadAddresses;
+
+    private record Addr(BuildingRow rep, int rel) {
+    }
+
+    /**
+     * 실제 SQL(U26)과 같은 의미의 메모리 구현: 필지 정보 카드와 같은 자료({@link #parcelBuilding})에서 — 관련지번 색인이 없으면 RELATED 줄은 뺀다 —
+     * 건물당 1줄(대표지번 우선) → 도로 키(도로명코드·지하여부·건물본번·건물부번)별 대표 건물(시군구용 건물명 있는 공동주택 → 이름 있는 건물 → 대표지번 → 건물관리번호)
+     * → 대표지번 묶음 먼저·도로명·지하여부·본번·부번 순으로 perKey개.
+     */
+    @Override
+    public Map<JibunKey, JibunAddresses> roadAddressesByJibun(Collection<JibunKey> keys, int perKey) {
+        if (perKey < 1) throw new IllegalArgumentException("perKey는 1 이상이어야 합니다: " + perKey);
+        roadAddressesByJibunCalls++;
+        lastPerKey = perKey;
+        java.util.concurrent.CountDownLatch entered = enteredRoadAddresses;
+        if (entered != null) entered.countDown();
+        java.util.concurrent.CountDownLatch hold = holdRoadAddresses;
+        if (hold != null) {
+            try {
+                hold.await(10, java.util.concurrent.TimeUnit.SECONDS);   // 시험이 멈추지 않게 상한을 둔다
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        if (failRoadAddresses != null) throw failRoadAddresses;
+        boolean related = relatedJibunLookupReady();
+        Set<JibunKey> distinct = new LinkedHashSet<>(keys);
+        lastKeyCount = distinct.size();
+        Map<JibunKey, JibunAddresses> out = new HashMap<>();
+        for (JibunKey key : distinct) {
+            Map<String, BuildingRow> byId = new LinkedHashMap<>();
+            for (BuildingRow r : parcelBuildings.getOrDefault(key, List.of())) {
+                if (!related && !"MAIN".equals(r.relation())) continue;
+                byId.merge(r.id(), r, (a, b) -> "MAIN".equals(a.relation()) ? a : b);
+            }
+            if (byId.isEmpty()) continue;
+            Map<String, List<BuildingRow>> byRoad = new LinkedHashMap<>();
+            for (BuildingRow r : byId.values()) {
+                byRoad.computeIfAbsent(r.roadCd() + "|" + r.udgd() + "|" + r.main() + "|" + r.sub(), k -> new ArrayList<>()).add(r);
+            }
+            List<Addr> addrs = new ArrayList<>();
+            for (List<BuildingRow> g : byRoad.values()) {
+                BuildingRow rep = g.stream().min(Comparator
+                        .comparing((BuildingRow r) -> r.apartment() && !r.sggName().isEmpty() ? 0 : 1)
+                        .thenComparing(r -> !r.name().isEmpty() || !r.sggName().isEmpty() ? 0 : 1)
+                        .thenComparing(r -> "MAIN".equals(r.relation()) ? 0 : 1)
+                        .thenComparing(BuildingRow::id)).get();
+                addrs.add(new Addr(rep, g.stream().anyMatch(r -> "MAIN".equals(r.relation())) ? 0 : 1));
+            }
+            addrs.sort(Comparator.comparing(Addr::rel)
+                    .thenComparing(a -> a.rep().roadName()).thenComparing(a -> a.rep().udgd())
+                    .thenComparing(a -> a.rep().main()).thenComparing(a -> a.rep().sub()).thenComparing(a -> a.rep().roadCd()));
+            List<RoadAddressRow> rows = new ArrayList<>();
+            for (Addr a : addrs.subList(0, Math.min(perKey, addrs.size()))) {
+                BuildingRow r = a.rep();
+                rows.add(new RoadAddressRow(r.standardParts(), r.zipCode(), r.name(), r.sggName(), r.apartment(), a.rel() == 0 ? "MAIN" : "RELATED"));
+            }
+            out.put(key, new JibunAddresses(byId.size(), addrs.size(), List.copyOf(rows)));
+        }
+        return out;
+    }
+
     public int findRoadCodesCalls = 0;
     public int findBuildingsCalls = 0;
     public int legalDongsCalls = 0;

@@ -41,6 +41,15 @@ class GisErrorCodeTest {
     }
 
     @Test
+    void PNU_주소_찾기_코드의_상태와_메시지() {
+        assertThat(GisErrorCode.PNU_ADDRESS_INVALID.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(GisErrorCode.PNU_ADDRESS_BUSY.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(GisErrorCode.PNU_ADDRESS_INVALID.getMessage()).isEqualTo("요청 값이 올바르지 않습니다(PNU 19자리 숫자 1~500개).");
+        assertThat(GisErrorCode.PNU_ADDRESS_BUSY.getMessage()).isEqualTo("주소 찾기 요청이 많습니다. 잠시 후 다시 시도하세요.");
+        assertThat(new CustomException(GisErrorCode.PNU_ADDRESS_BUSY).getMessage()).doesNotContain("{");
+    }
+
+    @Test
     void 메시지의_자리표시를_값으로_채운다() {
         CustomException e = GisErrorCode.MYMAP_LAYER_LIMIT.exception(20);
         assertThat(e.getMessage()).isEqualTo("나만의지도는 한 사람당 최대 20개까지 만들 수 있습니다.");

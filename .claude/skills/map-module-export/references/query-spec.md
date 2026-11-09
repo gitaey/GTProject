@@ -50,6 +50,8 @@
 | `INVALID_COORDINATE_COLUMN` | 400 | 선택한 위도/경도 컬럼에서 좌표를 읽을 수 없습니다. | excel confirm (헤더에 컬럼 없음) |
 | `PARCEL_QUERY_INVALID` | 400 | 요청 값이 올바르지 않습니다(PNU 19자리 숫자, limit 1~1000). | U25 |
 | `PARCEL_BUILDINGS_UNAVAILABLE` | 503 | 건물 자료(지번 색인)가 아직 준비되지 않았습니다. | U25 (지번 색인 없음·적재 교체 중) |
+| `PNU_ADDRESS_INVALID` | 400 | 요청 값이 올바르지 않습니다(PNU 19자리 숫자 1~500개). | U26 (본문 없음·깨진 JSON·JSON 아닌 형식·`pnus` 없음/빈 배열/500 초과/형식 틀린 값) |
+| `PNU_ADDRESS_BUSY` | 429 | 주소 찾기 요청이 많습니다. 잠시 후 다시 시도하세요. | U26 (서버 전체 동시 처리 3건 초과) |
 
 ### 1.3 JSON 직렬화
 
@@ -101,6 +103,7 @@ GTProject 구현은 JWT principal 문자열을 읽는다(`SecurityContextGisUser
 | U23 | POST `/api/mymap/upload/excel/convert` | 로그인 | A | 선택: 주소 변환(엑셀로만 받기) |
 | U24 | GET `/api/mymap/{id}/export` | 로그인 | A | 선택: 내보내기(엑셀·GeoJSON) |
 | U25 | GET `/api/mymap/ref/parcels/{pnu}/buildings` | 로그인 | A | 선택: 필지 정보 카드의 건물 목록(건물DB 읽기, 지번 색인 필수) |
+| U26 | POST `/api/mymap/ref/pnu-addresses` | 로그인 | A | 선택: PNU 묶음(≤500) → 지번·도로명주소(기타 패널 엑셀 도구, 건물DB 읽기, 도로명주소는 지번 색인이 있을 때만) |
 | U8 | GET `/api/mymap/{id}/share` | 로그인 | A | 선택: 공유 |
 | U9 | PUT `/api/mymap/{id}/share` | 로그인 | A | 선택: 공유 |
 | U10 | PATCH `/api/mymap/{id}` | 소유자만 | A | 선택: 스타일·이름·표시 수정 |
@@ -149,6 +152,7 @@ L7~L12, G2~G4는 로그인한 아무 사용자나 호출할 수 있다. **이식
 | 선택: 나만의지도 업로드 | U5~U7 | 같음 + 업로드 폴더 | GeoTools·POI 의존성 필요(`egov-jdk11-checklist.md` 4·5절) |
 | 선택: 나만의지도 공유 | U8, U9 | 공유 2개 테이블 | |
 | 선택: 필지 정보 카드(건물 칸) | U25 | 건물DB `ref.ti_spbd_buld`·`ref.ti_sprd_stret`·`ref.load_meta` (+ 선택 `ref.ti_scco_mvmn`) | `restSources()`의 `parcelBuildings`(= `restParcelBuildings`). 없으면 카드의 건물 칸이 없다. 필지 속성은 호스트 프록시 `/vworld/data`(`proxySources()`의 `parcel.infoAt`) |
+| 선택: PNU → 주소 찾기(기타 패널 엑셀 도구) | U26 | 건물DB `ref.ti_spbd_buld`·`ref.ti_sprd_stret`·`ref.load_meta` (+ 선택 `ref.ti_scco_mvmn`) + 선택 지적도 `ref.lsmd_cont_ldreg`(법정동 이름 보조) | 지도 패키지가 아니라 GTProject 연결부(`app/map/_gtp/etc`)가 부른다 — 이식 대상 아님. 백엔드만 가져갈 때 `AddressRefReader.roadAddressesByJibun` + `PnuParcelProvider.legalDongNamesByPnus`(기본 빈 결과) 구현 |
 | 선택: 항공영상 | T1~T3 (보기), T4~T6 (업로드) | `geo_tiff_files` | GDAL + titiler 인프라 필요 |
 | 선택: 바람길 | W1~W3·W5 + 스케줄러 | `tbl_wind_frame`, `tbl_wind_scalar` | 기상청 API 키(`KMA_API_KEY`) 필요 |
 | 선택: VWorld 검색·필지·지역명·WFS·범례 | 호스트 프록시 5종(9절) | 없음 | `proxySources()`. 백엔드 API가 아니라 **호스트가 제공하는 프록시** |
@@ -577,6 +581,60 @@ ORDER BY d.rel_ord, d.rn, d.udgd_yn, d.buld_mnnm, d.buld_slno, d.buld_nm_dc, d.b
 ```
 
 서비스 규칙(MyBatis로 옮겨도 자바에서 그대로): ① 도로 키 `(road_cd, udgd_yn, buld_mnnm, buld_slno)`별 묶음 → 묶음 정렬 `MAIN 먼저 → 도로명 → 지하여부 → 본번 → 부번`, 묶음 안 건물은 `buld_nm_dc` 자연 정렬("2동" < "10동", 빈 값은 맨 뒤) → `bd_mgt_sn` ② `roadAddress` = 표준 도로명주소 조립(U7a와 같은 `StandardAddressFormatter.road`, 묶음의 대표 건물 = 시군구용 건물명이 있는 공동주택이 있으면 그것, 없으면 첫 건물) ③ `name` = 공동주택이면 `sgg_buld_nm`(없으면 `buld_nm`), 아니면 `buld_nm`(없으면 `sgg_buld_nm`) 중 첫 비지 않은 값 ④ `underground` = 대표 건물 `udgd_yn='1'`(공중·수상은 `roadAddress` 글자에만 반영) ⑤ `relation` = 묶음에 대표지번 건물이 하나라도 있으면 MAIN. 지번 주소는 만들지 않는다(법정동 사전 첫 구성이 수 초~수십 초라 — 화면은 VWorld의 지번 주소를 쓴다). 한계: 건물DB는 건물마다 대표지번이 하나뿐이고, 관련지번은 도로 키(건물번호) 단위라 같은 건물번호 묶음의 다른 동도 함께 나올 수 있다.
+
+### U26. POST `/api/mymap/ref/pnu-addresses` — PNU 묶음 → 지번·도로명주소 (구현: `mymap/controller/ParcelRefController` + `mymap/service/PnuAddressService` + `JdbcAddressRefReader.roadAddressesByJibun` + `PostgisPnuParcelProvider.legalDongNamesByPnus`)
+
+기타 패널의 "PNU → 주소 찾기" 엑셀 도구가 부른다. 엑셀은 브라우저가 읽고 PNU만 500개씩 순서대로 보낸다(서버는 파일을 받지 않는다).
+
+- 권한: 로그인(`/api/mymap/**` 규칙 안 — SecurityConfig 변경 없음). 역할 제한 없음(U25와 같다). 응답 헤더 `Cache-Control: no-store`(200일 때만).
+- 요청 `Content-Type: application/json`: `{ "pnus": ["3611011000100010000", …] }` — 1~500개, 각 값 `^\d{10}[12]\d{8}$`. 하이픈·공백 정리는 브라우저 몫이고 서버는 검사만 한다(하나라도 틀리면 전체 400). 중복은 서버가 하나로 합친다.
+- 응답 `ApiResponse<{ referenceVersion("2026-09"|"unknown"|null), roadAvailable(false=지번 색인이 없어 도로명주소를 찾지 않음 — 모든 item의 건수 0·roadAddresses []), relatedIncluded(관련지번 색인까지 찾았나), maxRoadAddresses(20), items:[{ pnu(요청 값 그대로), jibunAddress|null, buildingCount(폐지 제외·건물당 1번, 자르기 전), roadAddressCount(서로 다른 도로명주소 수, 자르기 전), roadAddresses:[{ roadAddress, zipCode|null, buildingName|null, relation:"MAIN"|"RELATED" }] }] }>`. `items`는 요청에서 중복을 뺀 처음 나온 순서이고 요청한 PNU가 모두 한 번씩 들어 있다(못 찾아도 빠지지 않음). `roadAddresses`는 최대 20개, 순서 `MAIN 묶음 먼저 → 도로명 → 지하여부 → 건물본번 → 건물부번`(U25 카드와 같다), 첫 원소가 대표 도로명주소.
+- 오류(봉투 `{ success:false, message, data:null }`, 코드 문자열은 응답에 없고 HTTP 상태로 가른다): 400 `PNU_ADDRESS_INVALID` · 429 `PNU_ADDRESS_BUSY`(동시 처리 3건 초과 — 브라우저가 1·2·4초 뒤 다시 시도) · 503 `MYMAP_REF_UNAVAILABLE`(`load_meta` 적재 기록 없음·교체 중·읽기 실패, 또는 주소 해석기 미지원) · 비로그인 403 빈 본문 · DB 오류 500. 지번 색인이 없을 때는 503이 아니라 `roadAvailable:false`로 지번주소만 준다.
+- 지번주소: 법정동 사전(U7a·U24와 같은 기준월 단위 캐시 — 첫 호출에 수 초~수십 초)으로 `시도 시군구 법정동 [리] [산 ]본번[-부번]`. 사전은 "건물이 하나라도 있는 법정동"만 담으므로, 사전에 없는 법정동코드의 PNU만 지적도(`ref.lsmd_cont_ldreg`)의 `bjd_name`(공백이 둘일 수 있어 한 칸으로 정리)으로 메운다. 그 조회가 DB 오류여도 그 PNU만 `jibunAddress null`이고 나머지는 정상이다.
+- **필수 색인** `ix_ti_spbd_buld_jibun`(없으면 `roadAvailable:false`), 선택 `ix_ti_scco_mvmn_jibun`(있으면 관련지번 건물도 합침, `relatedIncluded`) — U25와 같은 확인·기억 규칙. 새 색인·스키마 변경 없음, 읽기 전용 SELECT.
+
+```sql
+-- U26a 대표지번만 (키 500개를 한 번에). ?는 adm_cd[], mntn_yn[], lnbr_mnnm[], lnbr_slno[], perKey(20) 순
+WITH k AS (
+  SELECT u.adm_cd, u.mntn_yn, u.lnbr_mnnm, u.lnbr_slno, u.n
+  FROM unnest(?::varchar[], ?::varchar[], ?::int[], ?::int[]) WITH ORDINALITY AS u(adm_cd, mntn_yn, lnbr_mnnm, lnbr_slno, n)
+), hit AS (
+  SELECT k.n, b.bd_mgt_sn, b.road_cd, b.udgd_yn, b.buld_mnnm, b.buld_slno, b.emd_no, b.ctp_kor_nm, b.sig_kor_nm, b.emd_kor_nm, b.li_kor_nm,
+         b.rn, b.apt_yn, b.buld_nm, b.sgg_buld_nm, b.zip_cd, 0 AS rel_ord
+  FROM k JOIN ref.ti_spbd_buld b                                   -- 4열 등호 → ix_ti_spbd_buld_jibun
+    ON b.adm_cd = k.adm_cd AND b.mntn_yn = k.mntn_yn AND b.lnbr_mnnm = k.lnbr_mnnm AND b.lnbr_slno = k.lnbr_slno
+  WHERE coalesce(b.mv_rs_cd, '') NOT IN ('63', '72')
+  -- U26b(ix_ti_scco_mvmn_jibun 이 있을 때만) 여기에 UNION ALL:
+  --   SELECT k.n, <같은 열>, 1 AS rel_ord FROM k
+  --   JOIN ref.ti_scco_mvmn m ON m.adm_cd = k.adm_cd AND m.mntn_yn = k.mntn_yn AND m.lnbr_mnnm = k.lnbr_mnnm AND m.lnbr_slno = k.lnbr_slno
+  --   JOIN ref.ti_spbd_buld b ON b.road_cd = m.road_cd AND b.udgd_yn = m.udgd_yn AND b.buld_mnnm = m.buld_mnnm AND b.buld_slno = m.buld_slno
+  --   WHERE coalesce(m.mv_rs_cd, '') <> '63' AND coalesce(b.mv_rs_cd, '') NOT IN ('63', '72')
+), bld AS (            -- 건물당 1줄(대표지번 우선)
+  SELECT DISTINCT ON (n, bd_mgt_sn) * FROM hit ORDER BY n, bd_mgt_sn, rel_ord
+), addr AS (           -- 도로 키(=도로명주소)당 대표 건물 1줄: 시군구용 건물명 있는 공동주택 → 이름 있는 건물 → 대표지번 → 건물관리번호
+  SELECT bld.*, count(*) OVER (PARTITION BY n) AS bld_cnt,
+         min(rel_ord) OVER (PARTITION BY n, road_cd, udgd_yn, buld_mnnm, buld_slno) AS addr_rel,
+         row_number() OVER (PARTITION BY n, road_cd, udgd_yn, buld_mnnm, buld_slno
+                            ORDER BY (coalesce(apt_yn, '') = '1' AND coalesce(sgg_buld_nm, '') <> '') DESC,
+                                     (coalesce(buld_nm, '') <> '' OR coalesce(sgg_buld_nm, '') <> '') DESC, rel_ord, bd_mgt_sn) AS rk
+  FROM bld
+), ranked AS (
+  SELECT addr.*, count(*) OVER (PARTITION BY n) AS addr_cnt,
+         row_number() OVER (PARTITION BY n ORDER BY addr_rel, rn, udgd_yn, buld_mnnm, buld_slno, road_cd) AS addr_ord
+  FROM addr WHERE rk = 1
+)
+SELECT r.n, r.road_cd, r.udgd_yn, r.buld_mnnm, r.buld_slno, r.ctp_kor_nm, r.sig_kor_nm, r.emd_kor_nm, r.li_kor_nm, r.rn,
+       r.apt_yn, r.buld_nm, r.sgg_buld_nm, r.zip_cd, r.bld_cnt, r.addr_cnt, r.addr_rel, s.emd_gb
+FROM ranked r
+LEFT JOIN ref.ti_sprd_stret s ON s.sgg_cd = substr(r.road_cd, 1, 5) AND s.road_no = substr(r.road_cd, 6, 7) AND s.emd_no = r.emd_no
+WHERE r.addr_ord <= ? ORDER BY r.n, r.addr_ord;
+
+-- U26c 법정동 사전에 없는 법정동코드의 PNU만 (시도 파티션 키 + PNU 배열, 500개씩). 열 이름은 설정 mymap.ref.parcel.bjd-name-column
+SELECT pnu AS pnu, min(bjd_name) AS bjd_name FROM ref.lsmd_cont_ldreg
+WHERE sido = ANY(?::char(2)[]) AND pnu = ANY(?::varchar[]) GROUP BY pnu;
+```
+
+서비스 규칙: ① 결과의 `n`(1부터)을 요청 키 순서에 되짚어 PNU에 붙인다(건물이 없는 키는 결과에 없다 → 건수 0·`[]`) ② `roadAddress` = `StandardAddressFormatter.road`(U25와 같다), `buildingName` = U25의 대표 이름 규칙(공동주택이면 `sgg_buld_nm` 우선) ③ `relation` = 그 도로명주소의 건물 중 하나라도 이 필지가 대표지번이면 MAIN ④ 동시 처리는 서버 전체 3칸(세마포어, 비어 있지 않으면 429, `finally`에서 반납) ⑤ PNU 값은 로그에 남기지 않는다. 한계: 정렬의 도로명 비교는 DB 정렬 순서(collation)를 따라 U25의 자바 문자열 비교와 다를 수 있다(20개를 넘는 필지의 자르는 경계에서만 드러남). 지적도 존재 확인(말소·분할 PNU 구분)은 하지 않는다 — 건물이 없으면 "건물 없음"으로만 나온다.
 
 ### U19 이후(아직 없음) · U11·U12
 

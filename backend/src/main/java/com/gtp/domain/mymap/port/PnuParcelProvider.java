@@ -23,6 +23,14 @@ public interface PnuParcelProvider {
         throw new UnsupportedOperationException("이 필지 공급자는 대표점·면적 조회를 지원하지 않습니다");
     }
 
+    /**
+     * PNU → 필지 데이터에 적힌 법정동 이름(예 "세종특별자치시 금남면 …" — 공백이 둘일 수 있어 호출한 쪽이 정리한다). 법정동 사전에 없는 PNU의
+     * 지번주소를 메우는 보조 조회(PNU → 주소 엑셀)다. 찾지 못했거나 이름이 빈 PNU는 결과에 없다. 지원하지 않는 구현은 빈 결과.
+     */
+    default Map<String, String> legalDongNamesByPnus(Collection<String> pnus) {
+        return Map.of();
+    }
+
     /** 적재된 시도·기준월·교체 중 여부. 자료가 없거나 읽지 못하면 {@link Coverage#unavailable()} */
     Coverage coverage();
 }

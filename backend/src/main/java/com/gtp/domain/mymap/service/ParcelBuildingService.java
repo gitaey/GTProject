@@ -132,9 +132,14 @@ public class ParcelBuildingService {
 
     /** 대표 이름: 공동주택이면 시군구용 건물명(없으면 건축물대장 건물명), 아니면 건축물대장 건물명(없으면 시군구용 건물명) */
     static String displayName(BuildingRow r) {
-        String first = r.apartment() ? r.sggName() : r.name();
+        return displayName(r.apartment(), r.name(), r.sggName());
+    }
+
+    /** 위 규칙의 재료 버전(PNU → 주소 엑셀도 같은 규칙을 쓴다). name·sggName은 null이 아닌 값 */
+    static String displayName(boolean apartment, String name, String sggName) {
+        String first = apartment ? sggName : name;
         if (!first.isEmpty()) return first;
-        return r.apartment() ? r.name() : r.sggName();
+        return apartment ? name : sggName;
     }
 
     private static int naturalCompareEmptyLast(String a, String b) {
