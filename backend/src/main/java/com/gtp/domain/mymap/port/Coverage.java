@@ -37,6 +37,14 @@ public record Coverage(Map<String, String> versionBySido, Set<String> swappingSi
         return versionFor(versionBySido.keySet());
     }
 
+    /**
+     * 전국 기준(expected)이 전부 적재돼 있고 지역 제한(restricted)이 없을 때만 true.
+     * 한도 응답(MyMapQuotaService)과 적재 상태 응답(RefStatusService)이 같은 판정을 쓴다.
+     */
+    public boolean isNationwide(Collection<String> expected, Collection<String> restricted) {
+        return restricted.isEmpty() && !expected.isEmpty() && versionBySido.keySet().containsAll(expected);
+    }
+
     /** 주어진 시도 가운데 적재된 것들의 가장 이른 기준월. 없으면 null */
     public String versionFor(Collection<String> sidos) {
         String min = null;

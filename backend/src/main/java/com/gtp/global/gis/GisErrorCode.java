@@ -56,6 +56,11 @@ public enum GisErrorCode implements BaseErrorCode {
     PNU_ADDRESS_INVALID(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다(PNU 19자리 숫자 1~500개)."),
     PNU_ADDRESS_BUSY(HttpStatus.TOO_MANY_REQUESTS, "주소 찾기 요청이 많습니다. 잠시 후 다시 시도하세요."),
 
+    // 지도 시작 화면 저장(계정 저장 — GET·PUT·DELETE /api/mymap/start-view)
+    START_VIEW_STORE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "시작 화면 저장소가 아직 준비되지 않았습니다(관리자: DB 표 생성 필요)."),
+    START_VIEW_INVALID(HttpStatus.BAD_REQUEST, "시작 화면 형식이 올바르지 않습니다."),
+    START_VIEW_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "시작 화면 값이 너무 큽니다(최대 8KB)."),
+
     // 공유(공유 상대 검색·공유 저장) — 전역 ErrorCode를 쓰지 않는다
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."),
     SHARE_QUERY_INVALID(HttpStatus.BAD_REQUEST, "검색어는 2~50자로 입력하세요."),

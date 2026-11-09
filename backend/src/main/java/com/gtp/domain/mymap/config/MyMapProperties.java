@@ -59,6 +59,18 @@ public class MyMapProperties {
         /** 시도 파티션 교체 중이면 이 시간까지 기다렸다가 매칭한다 */
         private int swapWaitSeconds = 120;
         private long swapPollMillis = 2000;
+        /** 참조 자료 적재 상태(GET /api/mymap/ref/status)의 "오래됨" 판정 기준 일수 */
+        private StaleDays staleDays = new StaleDays();
+    }
+
+    /** 원본 기준일(없으면 기준월의 말일)에서 오늘(KST)까지 이 일수를 넘으면 "오래됨". 둘 다 월 1회 갱신 자료라 여유를 둔 값 */
+    @Getter
+    @Setter
+    public static class StaleDays {
+        /** 도로명주소 건물DB 3종(건물·도로명코드·관련지번) */
+        private int address = 100;
+        /** 연속지적도 */
+        private int parcel = 400;
     }
 
     @Getter

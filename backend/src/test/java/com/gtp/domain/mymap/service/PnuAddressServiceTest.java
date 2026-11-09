@@ -413,7 +413,8 @@ class PnuAddressServiceTest {
     @Test
     void 컨트롤러_응답_봉투_필드_캐시_헤더와_오류_상태() throws Exception {
         reader.parcelBuilding(KEY, row("X1", "반곡로", "0", 51, 0, "건축물대장명", "예시아파트", true, "30145", "MAIN"));
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(new ParcelRefController(org.mockito.Mockito.mock(ParcelBuildingService.class), service))
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(new ParcelRefController(org.mockito.Mockito.mock(ParcelBuildingService.class), service,
+                org.mockito.Mockito.mock(RefStatusService.class)))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
         ObjectMapper om = new ObjectMapper();
         String url = "/api/mymap/ref/pnu-addresses";
@@ -474,7 +475,8 @@ class PnuAddressServiceTest {
         reader.setReadyVersion("2026-09");
 
         PnuAddressService one = new PnuAddressService(reader, new TableAddressResolver(reader, 5), parcels, 0);
-        MockMvc busyMvc = MockMvcBuilders.standaloneSetup(new ParcelRefController(org.mockito.Mockito.mock(ParcelBuildingService.class), one))
+        MockMvc busyMvc = MockMvcBuilders.standaloneSetup(new ParcelRefController(org.mockito.Mockito.mock(ParcelBuildingService.class), one,
+                org.mockito.Mockito.mock(RefStatusService.class)))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
         MvcResult busy = busyMvc.perform(post(url).contentType(MediaType.APPLICATION_JSON).content("{\"pnus\":[\"" + PNU + "\"]}")).andReturn();
         assertThat(busy.getResponse().getStatus()).isEqualTo(429);

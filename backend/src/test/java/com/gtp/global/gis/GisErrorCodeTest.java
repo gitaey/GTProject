@@ -50,6 +50,17 @@ class GisErrorCodeTest {
     }
 
     @Test
+    void 시작_화면_코드의_상태와_메시지() {
+        assertThat(GisErrorCode.START_VIEW_STORE_UNAVAILABLE.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(GisErrorCode.START_VIEW_INVALID.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(GisErrorCode.START_VIEW_TOO_LARGE.getStatus()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);   // 413
+        assertThat(GisErrorCode.START_VIEW_STORE_UNAVAILABLE.getMessage()).isEqualTo("시작 화면 저장소가 아직 준비되지 않았습니다(관리자: DB 표 생성 필요).");
+        assertThat(GisErrorCode.START_VIEW_INVALID.getMessage()).isEqualTo("시작 화면 형식이 올바르지 않습니다.");
+        assertThat(GisErrorCode.START_VIEW_TOO_LARGE.getMessage()).isEqualTo("시작 화면 값이 너무 큽니다(최대 8KB).");
+        assertThat(new CustomException(GisErrorCode.START_VIEW_TOO_LARGE).getMessage()).doesNotContain("{");
+    }
+
+    @Test
     void 메시지의_자리표시를_값으로_채운다() {
         CustomException e = GisErrorCode.MYMAP_LAYER_LIMIT.exception(20);
         assertThat(e.getMessage()).isEqualTo("나만의지도는 한 사람당 최대 20개까지 만들 수 있습니다.");

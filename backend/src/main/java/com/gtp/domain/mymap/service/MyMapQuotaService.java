@@ -39,7 +39,7 @@ public class MyMapQuotaService {
         List<MyMapQuotaResponse.LoadedSido> loaded = sidos.stream()
                 .map(s -> MyMapQuotaResponse.LoadedSido.builder().sido(s).version(coverage.versionBySido().get(s)).build()).toList();
         List<String> expected = props.getRef().getExpectedSidoCodes();
-        boolean nationwide = restricted.isEmpty() && !expected.isEmpty() && coverage.versionBySido().keySet().containsAll(expected);
+        boolean nationwide = coverage.isNationwide(expected, restricted);
         return MyMapQuotaResponse.builder()
                 .ownedLayers((int) userMapRepository.countByOwnerId(userId))
                 .maxLayers(lim.getMaxLayersPerUser())

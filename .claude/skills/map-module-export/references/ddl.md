@@ -38,6 +38,7 @@
 | `tbl_user_map_feature` | `mymap/entity/UserMapFeature.java` | 나만의지도 피처(GeoJSON TEXT) | **수십만 행 이상 가능** |
 | `tbl_user_map_permission_access` | `mymap/entity/UserMapPermissionAccess.java` | 나만의지도 역할 공유 | 작음 |
 | `tbl_user_map_user_access` | `mymap/entity/UserMapUserAccess.java` | 나만의지도 사용자 공유 | 작음 |
+| `tbl_map_start_view` | **엔티티 없음**(JdbcTemplate `mymap/infra/StartViewStore`) | 사용자별 지도 시작 화면 1행(계정 저장) — SQL 파일 `backend/scripts/mymap/ddl-start-view.sql`을 사용자가 실행 | 사용자 수 (행당 수백 바이트, 상한 8KB) |
 | `geo_tiff_files` | `geotiff/entity/GeoTiffFile.java` | 업로드한 GeoTIFF 메타 | 작음 |
 | `tbl_wind_scalar` | `wind/entity/WindScalarEntity.java` | 기온·습도 스칼라(사이클·예보시간·변수당 1행) | 18행 내외(9프레임×2변수), 행당 수십 KB~수백 KB |
 | `tbl_wind_frame` | `wind/entity/WindFrameEntity.java` | 바람장 프레임(완전한 최신 사이클 × `wind.forecast-hours`(기본 9)) | 6행 내외, **행당 수 MB TEXT** |
@@ -230,6 +231,24 @@ CREATE TABLE tbl_user_map_user_access (
     CONSTRAINT uk_umap_user_access UNIQUE (user_id, user_map_id)
 );
 ```
+
+지도 시작 화면(계정 저장) — **JPA 엔티티가 없다**. Hibernate `ddl-auto`가 만들지 않으므로 아래 SQL(원본: `backend/scripts/mymap/ddl-start-view.sql`, 되돌리기 `ddl-start-view-rollback.sql`)을 사용자가 직접 실행한다.
+표가 없으면 U28~U30이 503 `START_VIEW_STORE_UNAVAILABLE`로 답할 뿐 앱의 다른 기능은 정상이다. 이식할 때(MyBatis)는 같은 DDL을 쓰고 쿼리는 `query-spec.md` U28~U30.
+
+```sql
+CREATE TABLE IF NOT EXISTS tbl_map_start_view (
+    user_id        varchar(50)  NOT NULL,                 -- JWT principal 문자열(FK 없음 — 도메인 독립, tbl_layer_user_access와 같은 길이)
+    view_json      text         NOT NULL,                 -- 시작 화면 JSON(서버는 형식·크기만 검사, 내용 해석 안 함)
+    schema_version smallint     NOT NULL,                 -- view_json.version (지금 1)
+    updated_at     timestamp    NOT NULL DEFAULT now(),   -- 앱이 한국 시각(Asia/Seoul)을 직접 넣는다. 기본값은 손으로 넣을 때만
+    CONSTRAINT pk_map_start_view PRIMARY KEY (user_id),
+    CONSTRAINT ck_map_start_view_size CHECK (octet_length(view_json) <= 8192)
+);
+COMMENT ON TABLE  tbl_map_start_view IS '지도 시작 화면(사용자별 1행) — 위치·줌·배경지도·화면 분할';
+```
+
+- 인덱스는 PK(user_id)만(조회·저장·삭제 모두 user_id 한 행). `jsonb`가 아니라 `text` — 서버가 내용을 해석하지 않고 이식 대상 DB(Oracle 등)와 맞춘다.
+- 회원 탈퇴 때 행이 남는다(FK 없음, 행 하나 수백 바이트). 정리가 필요하면 주기 SQL로.
 
 근거(코드 확인): `UserMap.java:15-71`, `UserMapFeature.java:12-31`, `UserMapPermissionAccess.java:11-28`, `UserMapUserAccess.java:11-28`.
 `column_schema`는 엔티티에만 있고 값을 넣는 코드가 없다(코드 확인: `UserMapUploadService`/`UserMapProcessor`에서 사용 0건).

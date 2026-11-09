@@ -123,6 +123,46 @@ class SecurityContractTest {
         assertThat(foundPnuAddresses).as("POST /api/mymap/ref/pnu-addresses (U26)").isTrue();
     }
 
+    @Test
+    void 참조_상태와_시작_화면_엔드포인트는_api_mymap_아래에_계약대로_있고_앞선_규칙에_가려지지_않는다() throws Exception {
+        // U27 GET /api/mymap/ref/status
+        boolean status = false;
+        for (Method m : com.gtp.domain.mymap.controller.ParcelRefController.class.getDeclaredMethods()) {
+            if (m.getName().equals("status") && pathsOf(m).contains("/status") && verbOf(m).equals("GET")) status = true;
+        }
+        assertThat(status).as("GET /api/mymap/ref/status (U27)").isTrue();
+
+        // U28~U30 /api/mymap/start-view — 클래스 매핑이 /api/mymap/start-view이고 메서드는 경로 없이 GET·PUT·DELETE 하나씩
+        Class<?> c = com.gtp.domain.mymap.controller.StartViewController.class;
+        assertThat(c.getAnnotation(RequestMapping.class).value()).containsExactly("/api/mymap/start-view");
+        Map<String, String> verbToMethod = new java.util.HashMap<>();
+        for (Method m : c.getDeclaredMethods()) {
+            String verb = verbOf(m);
+            if (verb.isEmpty()) continue;
+            assertThat(pathsOf(m)).as(m.getName()).isEmpty();                    // 메서드에 따로 경로를 붙여 밖으로 나가지 않는다
+            assertThat(verbToMethod.put(verb, m.getName())).as(verb + " 중복").isNull();
+        }
+        assertThat(verbToMethod).containsOnly(Map.entry("GET", "get"), Map.entry("PUT", "put"), Map.entry("DELETE", "delete"));
+
+        // SecurityConfig: /api/mymap/** authenticated 규칙이 anyRequest().permitAll()보다 앞이고, 그보다 앞에 /api/mymap/start-view를
+        // 먼저 가로채는 넓은 규칙(/api/**·/**)이나 permitAll이 없다 — 이 컨트롤러 때문에 SecurityConfig를 바꿀 필요가 없다는 전제
+        List<String> lines = Files.readAllLines(SECURITY);
+        int mymap = -1, any = -1;
+        for (int i = 0; i < lines.size(); i++) {
+            String l = lines.get(i);
+            if (l.contains("\"/api/mymap/**\"") && l.contains(".authenticated()") && !l.contains("HttpMethod")) mymap = i;
+            if (l.contains("anyRequest().permitAll()")) any = i;
+        }
+        assertThat(mymap).as("/api/mymap/** authenticated 규칙").isGreaterThanOrEqualTo(0);
+        assertThat(mymap).isLessThan(any);
+        for (int i = 0; i < mymap; i++) {
+            String l = lines.get(i);
+            if (!l.contains("requestMatchers")) continue;
+            assertThat(l).as("앞선 규칙이 /api/mymap/start-view를 가로채지 않는다: " + l)
+                    .doesNotContain("\"/api/**\"").doesNotContain("\"/**\"").doesNotContain("\"/api/mymap/start-view");
+        }
+    }
+
     private static List<String> pathsOf(Method m) {
         if (m.isAnnotationPresent(GetMapping.class)) return List.of(m.getAnnotation(GetMapping.class).value());
         if (m.isAnnotationPresent(PostMapping.class)) return List.of(m.getAnnotation(PostMapping.class).value());

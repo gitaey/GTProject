@@ -52,6 +52,9 @@
 | `PARCEL_BUILDINGS_UNAVAILABLE` | 503 | 건물 자료(지번 색인)가 아직 준비되지 않았습니다. | U25 (지번 색인 없음·적재 교체 중) |
 | `PNU_ADDRESS_INVALID` | 400 | 요청 값이 올바르지 않습니다(PNU 19자리 숫자 1~500개). | U26 (본문 없음·깨진 JSON·JSON 아닌 형식·`pnus` 없음/빈 배열/500 초과/형식 틀린 값) |
 | `PNU_ADDRESS_BUSY` | 429 | 주소 찾기 요청이 많습니다. 잠시 후 다시 시도하세요. | U26 (서버 전체 동시 처리 3건 초과) |
+| `START_VIEW_STORE_UNAVAILABLE` | 503 | 시작 화면 저장소가 아직 준비되지 않았습니다(관리자: DB 표 생성 필요). | U28~U30 (표 `tbl_map_start_view` 없음 — PostgreSQL SQLState `42P01`) |
+| `START_VIEW_INVALID` | 400 | 시작 화면 형식이 올바르지 않습니다. | U29 (깨진 JSON·최상위가 객체 아님·`version`이 정수 1이 아님·`panes`가 객체 1~4개가 아님·같은 키 중복·끝에 군더더기) |
+| `START_VIEW_TOO_LARGE` | 413 | 시작 화면 값이 너무 큽니다(최대 8KB). | U29 (본문 8,192바이트 초과 — 정규화한 결과가 넘어도 같음) |
 
 ### 1.3 JSON 직렬화
 
@@ -104,6 +107,10 @@ GTProject 구현은 JWT principal 문자열을 읽는다(`SecurityContextGisUser
 | U24 | GET `/api/mymap/{id}/export` | 로그인 | A | 선택: 내보내기(엑셀·GeoJSON) |
 | U25 | GET `/api/mymap/ref/parcels/{pnu}/buildings` | 로그인 | A | 선택: 필지 정보 카드의 건물 목록(건물DB 읽기, 지번 색인 필수) |
 | U26 | POST `/api/mymap/ref/pnu-addresses` | 로그인 | A | 선택: PNU 묶음(≤500) → 지번·도로명주소(기타 패널 엑셀 도구, 건물DB 읽기, 도로명주소는 지번 색인이 있을 때만) |
+| U27 | GET `/api/mymap/ref/status` | 로그인 | A | 선택: 설정 패널의 "데이터 기준 정보"(건물DB 3종·연속지적도 적재 기준월, `ref.load_meta` SELECT 1회) |
+| U28 | GET `/api/mymap/start-view` | 로그인(본인 것만) | A | 선택: 내 시작 화면 조회(없으면 200 + `view:null`) |
+| U29 | PUT `/api/mymap/start-view` | 로그인(본인 것만) | A | 선택: 내 시작 화면 저장(덮어쓰기) |
+| U30 | DELETE `/api/mymap/start-view` | 로그인(본인 것만) | A | 선택: 내 시작 화면 삭제(멱등) |
 | U8 | GET `/api/mymap/{id}/share` | 로그인 | A | 선택: 공유 |
 | U9 | PUT `/api/mymap/{id}/share` | 로그인 | A | 선택: 공유 |
 | U10 | PATCH `/api/mymap/{id}` | 소유자만 | A | 선택: 스타일·이름·표시 수정 |
@@ -153,6 +160,8 @@ L7~L12, G2~G4는 로그인한 아무 사용자나 호출할 수 있다. **이식
 | 선택: 나만의지도 공유 | U8, U9 | 공유 2개 테이블 | |
 | 선택: 필지 정보 카드(건물 칸) | U25 | 건물DB `ref.ti_spbd_buld`·`ref.ti_sprd_stret`·`ref.load_meta` (+ 선택 `ref.ti_scco_mvmn`) | `restSources()`의 `parcelBuildings`(= `restParcelBuildings`). 없으면 카드의 건물 칸이 없다. 필지 속성은 호스트 프록시 `/vworld/data`(`proxySources()`의 `parcel.infoAt`) |
 | 선택: PNU → 주소 찾기(기타 패널 엑셀 도구) | U26 | 건물DB `ref.ti_spbd_buld`·`ref.ti_sprd_stret`·`ref.load_meta` (+ 선택 `ref.ti_scco_mvmn`) + 선택 지적도 `ref.lsmd_cont_ldreg`(법정동 이름 보조) | 지도 패키지가 아니라 GTProject 연결부(`app/map/_gtp/etc`)가 부른다 — 이식 대상 아님. 백엔드만 가져갈 때 `AddressRefReader.roadAddressesByJibun` + `PnuParcelProvider.legalDongNamesByPnus`(기본 빈 결과) 구현 |
+| 선택: 설정 패널 "데이터 기준 정보" | U27 | `ref.load_meta`(SELECT만) | `restSources()`의 `dataInfo`(= `restDataInfo`, 바람 예보 기준은 기존 `/api/wind/frames`). 없으면(404) 그 묶음 항목만 빠진다. 적재 기록 표가 없는 호스트는 `RefLoadMetaReader`만 구현 |
+| 선택: 설정 패널 "시작 화면"(계정 저장) | U28~U30 | `tbl_map_start_view`(SQL 파일로 만듦, 엔티티 없음) | `restSources()`의 `startView`(= `restStartView`). 404면 카드 숨김, 503이면 "저장소 준비 중". 백엔드가 없는 호스트는 브라우저 저장(`browserStartViewSource`)으로 대체 |
 | 선택: 항공영상 | T1~T3 (보기), T4~T6 (업로드) | `geo_tiff_files` | GDAL + titiler 인프라 필요 |
 | 선택: 바람길 | W1~W3·W5 + 스케줄러 | `tbl_wind_frame`, `tbl_wind_scalar` | 기상청 API 키(`KMA_API_KEY`) 필요 |
 | 선택: VWorld 검색·필지·지역명·WFS·범례 | 호스트 프록시 5종(9절) | 없음 | `proxySources()`. 백엔드 API가 아니라 **호스트가 제공하는 프록시** |
@@ -635,6 +644,45 @@ WHERE sido = ANY(?::char(2)[]) AND pnu = ANY(?::varchar[]) GROUP BY pnu;
 ```
 
 서비스 규칙: ① 결과의 `n`(1부터)을 요청 키 순서에 되짚어 PNU에 붙인다(건물이 없는 키는 결과에 없다 → 건수 0·`[]`) ② `roadAddress` = `StandardAddressFormatter.road`(U25와 같다), `buildingName` = U25의 대표 이름 규칙(공동주택이면 `sgg_buld_nm` 우선) ③ `relation` = 그 도로명주소의 건물 중 하나라도 이 필지가 대표지번이면 MAIN ④ 동시 처리는 서버 전체 3칸(세마포어, 비어 있지 않으면 429, `finally`에서 반납) ⑤ PNU 값은 로그에 남기지 않는다. 한계: 정렬의 도로명 비교는 DB 정렬 순서(collation)를 따라 U25의 자바 문자열 비교와 다를 수 있다(20개를 넘는 필지의 자르는 경계에서만 드러남). 지적도 존재 확인(말소·분할 PNU 구분)은 하지 않는다 — 건물이 없으면 "건물 없음"으로만 나온다.
+
+### U27. GET `/api/mymap/ref/status` — 참조 자료 적재 상태 (구현: `ParcelRefController` + `mymap/service/RefStatusService` + `JdbcRefLoadMetaReader`)
+
+- 권한: 로그인(`/api/mymap/**` 규칙 안 — SecurityConfig 변경 없음), 역할 제한 없음. 요청 본문·파라미터 없음. 응답 헤더 `Cache-Control: private, max-age=60`. 읽기 전용 SELECT 1회.
+- 응답 `data`: `{ checkedAt, datasets[4] }`. `checkedAt`·`loadedAt`은 ISO-8601 + `+09:00`(서버가 한국 시각으로 붙임), `baseDate`는 `YYYY-MM-DD`. 항목은 항상 4개, 순서 `building`(도로명주소 건물DB) · `road-code`(도로명코드) · `related-jibun`(관련지번) · `parcel`(연속지적도).
+  항목 필드: `id, label, source, updateCycle("매월"), status, version, latestVersion, baseDate, loadedAt, rowCount, stale, staleAfterDays, coverage`(parcel만 `{loadedSidoCount, expectedSidoCount, nationwide}`, UNAVAILABLE이면 null).
+- `status`: `READY` · `SWAPPING`(교체 중) · `PARTIAL`(parcel만 — 기대 시도 일부만 적재) · `MISSING`(기록 없음, 값은 전부 null) · `UNAVAILABLE`(기록을 읽지 못함, **HTTP는 200**). 기록의 `status`가 READY·SWAPPING 외 값이면 그 줄은 없는 것으로 본다.
+- 쿼리(적재 기록 표 이름은 설정 `mymap.ref.load-meta-table`, 데이터셋 값은 표 이름에서 스키마를 뺀 것 — `ti_spbd_buld`·`ti_sprd_stret`·`ti_scco_mvmn`, 지적도는 `parcel`):
+
+```sql
+SELECT dataset, sido, version, status, row_count, base_date, loaded_at
+FROM ref.load_meta
+WHERE dataset IN (?, ?, ?, 'parcel')
+```
+
+- 규칙: ① 주소 3종은 데이터셋당 1줄(sido `'00'`), 여러 줄이면 기준월이 가장 늦은 줄 ② parcel은 시도별 1줄 — `version`=가장 이른 기준월, `latestVersion`=가장 늦은 기준월, `baseDate`=가장 이른 값, `loadedAt`=가장 늦은 값, `rowCount`=합계, 한 시도라도 SWAPPING이면 SWAPPING ③ PARTIAL = 기대 시도(`mymap.ref.expected-sido-codes`, 지역 제한 `allowed-sido-codes`가 있으면 그 교집합) 중 적재된 수가 모자람, `nationwide`는 U14와 같은 판정(제한 없음 + 기대 시도 전부 적재) ④ 오래됨(`stale`) = 오늘(KST) − 기준일(`base_date`, 없으면 기준월의 말일)이 `staleAfterDays`를 **넘음**(딱 그 일수는 아님) — 주소 3종 100일·지적도 400일(설정 `mymap.ref.stale-days.address|parcel`), 판단할 날짜가 없으면 false ⑤ 표가 없거나 DB 오류면 예외 대신 4개 모두 UNAVAILABLE(응답에 표 이름·접속 정보 없음). 바람 예보 기준은 이 API가 아니라 기존 `GET /api/wind/frames`를 프런트가 쓴다.
+- `load_meta.loaded_at`은 시간대 없는 `timestamp` — 서버 한국 시각으로 읽는다. 이식 시 적재 기록 표가 없는 호스트는 `RefLoadMetaReader`만 새로 구현한다(빈 목록이면 전부 MISSING).
+
+### U28~U30. `/api/mymap/start-view` — 내 지도 시작 화면(계정 저장) (구현: `StartViewController` + `mymap/service/StartViewService` + `mymap/infra/StartViewStore`, JPA 엔티티 없음)
+
+- 권한: 로그인(`/api/mymap/**` 규칙 안 — SecurityConfig 변경 없음). **본인 것만**: 경로·본문에 사용자 id가 없고 서버가 `GisUserContext.currentUserId()`로만 행을 고른다. 세 응답 모두 `Cache-Control: no-store`. 같은 깊이의 `PATCH·DELETE /api/mymap/{id}`보다 글자 그대로인 경로가 먼저 선택된다(MyBatis·다른 프레임워크로 옮길 때 매핑 우선순위 확인).
+- U28 응답 `data`: `{ view, updatedAt }` — 저장한 JSON 그대로(없으면 둘 다 null, 200). `updatedAt`은 ISO-8601 + `+09:00`.
+- U29 요청 본문 = 시작 화면 JSON(`version`·`savedAt`·`split`·`panes[]`). 서버 검사는 **형식·크기만**(내용 해석 없음 — 모르는 키는 그대로 저장): ① 본문 ≤ 8,192 **바이트**(초과 413, 정규화한 문자열도 같은 기준) ② JSON으로 읽히고 최상위가 객체이며 끝에 군더더기·중복 키가 없음 ③ `version`이 정수 `1` ④ `panes`가 객체 1~4개 — 위반은 400. 통과하면 Jackson으로 다시 쓴(공백 제거) 문자열을 저장. 본문은 `@RequestBody` 변환기 없이 바이트를 직접 읽는다(깨진 본문이 500이 되지 않게, 8,193바이트까지만 읽음). 응답 `data`는 U28과 같은 모양(저장한 값 + 새 `updatedAt`).
+- U30: 저장값이 없어도 200(`data:null`, 멱등).
+- 표 없음(SQLState `42P01`) → 503 `START_VIEW_STORE_UNAVAILABLE`. 그 밖 DB 오류는 500.
+- 쿼리 3개(`tbl_map_start_view`, DDL은 `ddl.md` §4 끝 · `backend/scripts/mymap/ddl-start-view.sql`):
+
+```sql
+-- U28 조회
+SELECT view_json, updated_at FROM tbl_map_start_view WHERE user_id = ?
+-- U29 저장 (PostgreSQL 전용 문법). 시각은 DB now()가 아니라 앱이 넣는 한국 시각(Asia/Seoul)
+INSERT INTO tbl_map_start_view (user_id, view_json, schema_version, updated_at) VALUES (?, ?, ?, ?)
+ON CONFLICT (user_id) DO UPDATE SET view_json = EXCLUDED.view_json, schema_version = EXCLUDED.schema_version,
+                                    updated_at = EXCLUDED.updated_at
+-- U30 삭제
+DELETE FROM tbl_map_start_view WHERE user_id = ?
+```
+
+- **저장 쿼리 이식 대안**(`ON CONFLICT`은 PostgreSQL 전용): Oracle/Tibero는 `MERGE INTO tbl_map_start_view t USING (SELECT ? AS user_id, ? AS view_json, ? AS schema_version, ? AS updated_at FROM dual) s ON (t.user_id = s.user_id) WHEN MATCHED THEN UPDATE SET t.view_json = s.view_json, t.schema_version = s.schema_version, t.updated_at = s.updated_at WHEN NOT MATCHED THEN INSERT (user_id, view_json, schema_version, updated_at) VALUES (s.user_id, s.view_json, s.schema_version, s.updated_at)`. MyBatis(DB 무관)는 `UPDATE tbl_map_start_view SET view_json=?, schema_version=?, updated_at=? WHERE user_id=?`를 먼저 실행하고 갱신 건수가 0이면 `INSERT`(같은 사용자가 동시에 처음 저장하면 한쪽이 PK 위반 — 재시도 1회로 충분). `view_json`은 `text`(Oracle은 `CLOB`) — 크기 제한 8,192바이트는 서버 검사가 1차, DDL의 CHECK가 2차 방어(Oracle CLOB은 CHECK에서 `LENGTHB` 불가 → 서비스 검사만 믿거나 `varchar2(4000)`로 줄이고 상한을 4000으로 낮춘다).
 
 ### U19 이후(아직 없음) · U11·U12
 

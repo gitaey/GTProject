@@ -3,8 +3,10 @@ package com.gtp.domain.mymap.controller;
 import com.gtp.domain.mymap.dto.ParcelBuildingsResponse;
 import com.gtp.domain.mymap.dto.PnuAddressRequest;
 import com.gtp.domain.mymap.dto.PnuAddressResponse;
+import com.gtp.domain.mymap.dto.RefStatusResponse;
 import com.gtp.domain.mymap.service.ParcelBuildingService;
 import com.gtp.domain.mymap.service.PnuAddressService;
+import com.gtp.domain.mymap.service.RefStatusService;
 import com.gtp.global.gis.GisErrorCode;
 import com.gtp.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,19 @@ public class ParcelRefController {
 
     private final ParcelBuildingService parcelBuildingService;
     private final PnuAddressService pnuAddressService;
+    private final RefStatusService refStatusService;
+
+    /**
+     * U27. 참조 자료(건물DB 3종·연속지적도) 적재 상태 — 설정 패널의 "데이터 기준 정보". 읽기 전용(SELECT 1회).
+     * 로그인만 확인하고 역할은 보지 않는다. 적재 기록을 읽지 못해도 200 + 항목 UNAVAILABLE. 60초 private 캐시.
+     */
+    @GetMapping("/status")
+    public ResponseEntity<ApiResponse<RefStatusResponse>> status() {
+        RefStatusResponse body = refStatusService.status();
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(Duration.ofSeconds(60)).cachePrivate())
+                .body(ApiResponse.ok(body));
+    }
 
     /** U25. 필지(PNU)에 걸린 건물. limit은 1~1000(기본 200) — 숫자가 아니면 400이라 문자열로 받아 서비스가 검사한다. */
     @GetMapping("/parcels/{pnu}/buildings")
