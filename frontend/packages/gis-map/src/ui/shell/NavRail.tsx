@@ -3,7 +3,6 @@
 // 좌측 아이콘 네비게이션 컴포넌트 (FE-5b-1: 옛 nav/NavLeft)
 // 각 아이콘 클릭 시 오른쪽 패널 내용이 전환됨. FE-5c: 버튼 목록 = MapShell의 panels(호스트가 정한다)
 // 모바일(768px 미만)에서는 숨김, 태블릿부터 표시 — gis-map-ui.css .gm-nav-rail
-import { Settings } from 'lucide-react'
 import { useGisHost } from '../../react'
 import { cx } from '../cx'
 import type { MapPanelDef } from './types'
@@ -15,15 +14,20 @@ export interface NavRailProps {
     activePanel: string | null
     /** 같은 패널을 다시 누르면 닫힘(토글) — 상태는 지도 화면(MapShell)이 가진다 */
     togglePanel: (panelId: string) => void
+    /** 아래쪽 '설정' 버튼이 여는 패널(셸이 만든다). 없으면(settings=false) 구분선·버튼도 없다 */
+    settingsPanel?: MapPanelDef | null
 }
 
-export default function NavRail({ panels, activePanel, togglePanel }: NavRailProps) {
+export default function NavRail({ panels, activePanel, togglePanel, settingsPanel }: NavRailProps) {
     // 메뉴 권한은 호스트 주입값(GisMapHost.isFeatureAllowed / permissionsReady)
     const { isFeatureAllowed: isAllowed, permissionsReady: loaded } = useGisHost()
 
     const visibleItems = loaded
         ? panels.filter(item => item.featureId == null || isAllowed(item.featureId))
         : panels
+
+    const showSettings = !!settingsPanel && (!loaded || settingsPanel.featureId == null || isAllowed(settingsPanel.featureId))
+    const SettingsIcon = settingsPanel?.icon
 
     return (
         // 모바일(768px 미만)에서 숨김
@@ -42,13 +46,19 @@ export default function NavRail({ panels, activePanel, togglePanel }: NavRailPro
                 )
             })}
 
-            <div className="gm-nav-rail__footer">
-                <div className="gm-nav-rail__divider" />
-                <button className="gm-nav-rail__item">
-                    <Settings size={20} />
-                    <span>설정</span>
-                </button>
-            </div>
+            {showSettings && settingsPanel && SettingsIcon && (
+                <div className="gm-nav-rail__footer">
+                    <div className="gm-nav-rail__divider" />
+                    <button
+                        onClick={() => togglePanel(settingsPanel.id)}
+                        aria-pressed={activePanel === settingsPanel.id}
+                        className={cx('gm-nav-rail__item', activePanel === settingsPanel.id && 'gm-is-active')}
+                    >
+                        <SettingsIcon size={20} />
+                        <span>{settingsPanel.label}</span>
+                    </button>
+                </div>
+            )}
         </div>
     )
 }

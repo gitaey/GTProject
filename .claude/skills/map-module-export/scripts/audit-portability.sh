@@ -356,13 +356,13 @@ report_mixed 6 "$(join_out \
     "$(g '=[[:space:]]*create[[:space:]]*(<.*>)?[[:space:]]*\(' "${PKG_FILES[@]}")" \
     "$bad6")" "$warn6"
 
-echo "[7/15] 브라우저 전역 쓰기 (window/self/globalThis에 대입·Object.assign·defineProperty·Reflect.set, 'window as', globalThis, localStorage/sessionStorage는 react/usePersistentExpanded.ts만)"
+echo "[7/15] 브라우저 전역 쓰기 (window/self/globalThis에 대입·Object.assign·defineProperty·Reflect.set, 'window as', globalThis, localStorage/sessionStorage는 react/usePersistentExpanded.ts·adapters/memory/browserStorage.ts만)"
 # 허용 목록: src/standalone.ts, src/standalone-attach.ts — UMD 진입점은 전역 GisMap을 내보내는 것이 목적이라 7-a~7-c에서 뺀다.
 #   지금은 두 파일 모두 전역 쓰기 0이다(전역 대입은 Vite UMD 래퍼가 한다). AMD 페이지에서도 전역을 만들어야 할 때(QA FE-6c Q3)처럼
 #   진입점이 직접 전역을 다뤄야 하는 경우를 위한 자리다. 코어·어댑터·react·ui에서는 어떤 전역 쓰기도 안 된다.
 # 못 잡는 것: 전역 객체를 다른 이름에 담아 쓰기(const w = window; w.x = 1), Function('return this')(), eval.
 #   `self`는 창·Worker의 전역 이름이라 `self.x =`를 잡는다 — `const self = this` 같은 지역 변수는 오탐이 나므로 이름을 바꾼다.
-mapfile -t NON_STORAGE_FILES < <(for f in "${PKG_FILES[@]}"; do [ "${f#"$PKG"/}" = "react/usePersistentExpanded.ts" ] || echo "$f"; done)
+mapfile -t NON_STORAGE_FILES < <(for f in "${PKG_FILES[@]}"; do case "${f#"$PKG"/}" in react/usePersistentExpanded.ts|adapters/memory/browserStorage.ts) ;; *) echo "$f" ;; esac; done)
 mapfile -t NON_ENTRY_FILES < <(for f in "${PKG_FILES[@]}"; do case "${f#"$PKG"/}" in standalone.ts|standalone-attach.ts) ;; *) echo "$f" ;; esac; done)
 GLOBAL_OBJ='(window|self|globalThis)'
 report 7 "$(join_out \

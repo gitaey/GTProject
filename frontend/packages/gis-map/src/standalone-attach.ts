@@ -11,7 +11,7 @@ import type { GisMap, GisMapAttachOptions, OlCompatReport } from './core'
 import { createWindPlugin } from './core/wind'
 import { restSources } from './adapters/rest'
 import { proxySources } from './adapters/proxy'
-import { memorySources, demoSources } from './adapters/memory'
+import { memorySources, demoSources, browserStartViewSource } from './adapters/memory'
 
 /** 패키지 버전(core GIS_MAP_VERSION) */
 export const version = GIS_MAP_VERSION
@@ -48,9 +48,10 @@ export const plugins = Object.freeze({ wind: createWindPlugin })
 
 /**
  * 데이터 소스 어댑터: sources: [GisMap.adapters.rest(), GisMap.adapters.proxy()].
+ * startView(key) = 브라우저 저장소에 시작 화면을 저장하는 소스: sources: [..., { startView: GisMap.adapters.startView('my-key') }] — rest()의 계정 저장 대신 쓴다(둘을 섞지 않는다).
  * memory(data) = 이미 가진 데이터(GeoJSON·목록)로 서버 없이 소스를 만든다. demo(opts) = 합성 샘플 데이터 + 배경지도 설정 한 벌({ sources, config, view, notice }) — 정적 예제 gis-demo가 쓴다.
  */
-export const adapters = Object.freeze({ rest: restSources, proxy: proxySources, memory: memorySources, demo: demoSources })
+export const adapters = Object.freeze({ rest: restSources, proxy: proxySources, memory: memorySources, demo: demoSources, startView: browserStartViewSource })
 
 /** 호환 검사 오류 클래스(instanceof 확인용) */
 export { GisOlCompatError }
@@ -63,3 +64,6 @@ export { jimokName } from './core'
 
 /** 지도 여러 개의 이동·확대 연동: var link = GisMap.linkViews([gisA, gisB]); link.destroy() (분할 화면 UI는 React 위젯이라 UMD에는 없다) */
 export { linkViews } from './core'
+
+/** 시작 화면(저장·복원): GisMap.captureStartView([map], { count: 1, sync: false, activeIndex: 0 }) → 저장할 JSON, GisMap.applyViewState(map, view.panes[0]), GisMap.parseStartView(json) → 검사한 값 또는 null. 붙이기(attach)는 열 때 자동 적용하지 않는다 */
+export { buildStartView as captureStartView, applyViewState, parseStartView } from './core'

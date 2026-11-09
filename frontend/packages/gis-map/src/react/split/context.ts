@@ -2,7 +2,7 @@
 
 // 화면 분할용 Context 모음. 공개 타입(GisMapSetupInfo·GisMapSplitState 등)과 내부 Context(react/index.ts에서 export하지 않음)를 함께 둔다.
 import { createContext } from 'react'
-import type { GisMap, GisMapConfig, PartialGisMapHost } from '../../core'
+import type { GisMap, GisMapConfig, GisMapStartView, PartialGisMapHost } from '../../core'
 import type { GisMapContextValue } from '../context'
 
 /** GisMapProvider setup의 두 번째 인자 */
@@ -35,6 +35,11 @@ export interface GisMapSplitState {
     /** 없는 번호·아직 안 만든 지도면 무시. 이전 활성 지도의 도구를 끈다 */
     setActive(index: number): void
     setSync(on: boolean): void
+    /**
+     * 저장한 시작 화면을 지금 적용한다: 분할 수·화면 연동·지도마다 시점·배경지도를 맞추고 활성 지도를 정한다(없는 지도는 만들어지는 대로).
+     * 열 때의 자동 복원(restoreStartView)과 설정 패널의 [시작 화면으로]가 같은 길을 쓴다. 붙이기 모드면 1번 지도만 적용
+     */
+    applyStartView(view: GisMapStartView): void
 }
 
 export const GisMapSplitContext = createContext<GisMapSplitState | null>(null)

@@ -20,13 +20,13 @@ export default function BasemapSwitcher() {
 
     return (
         <div className="gm-basemap"
-            style={{ background: '#f1f5f9', border: '1px solid #e2e8f0' }}>
+            style={{ background: 'var(--gm-surface-sunken)', border: '1px solid var(--gm-border)' }}>
             {BASEMAP_OPTIONS.map(opt => (
                 <button key={opt.value} onClick={() => setBasemapMode(opt.value)}
                     className="gm-basemap__btn"
                     style={{
                         background: basemapMode === opt.value ? 'var(--gm-primary)' : 'transparent',
-                        color: basemapMode === opt.value ? '#fff' : '#64748b',
+                        color: basemapMode === opt.value ? 'var(--gm-on-primary)' : 'var(--gm-text-muted)',
                         fontWeight: basemapMode === opt.value ? 600 : 400,
                     }}>
                     {opt.label}

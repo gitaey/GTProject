@@ -8,6 +8,8 @@ import type OlMap from 'ol/Map'
 import type { Coordinate } from 'ol/coordinate'
 import type { Pixel } from 'ol/pixel'
 import type { MapResources } from '../tracker'
+import { applyAppearanceAttr } from '../types/appearance'
+import type { AppearanceSource } from '../types/appearance'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 
@@ -43,6 +45,7 @@ export class MyMapPopup {
     private readonly bodyEl: HTMLDivElement
     private readonly closeBtn: HTMLButtonElement
     private readonly overlay: Overlay
+    private offAppearance: (() => void) | null = null
     private enabled = true
     private open = false
     private destroyed = false
@@ -61,7 +64,7 @@ export class MyMapPopup {
         this.show(content, e.coordinate)
     }
 
-    constructor(olMap: OlMap, resources: MapResources, hooks: MyMapPopupHooks) {
+    constructor(olMap: OlMap, resources: MapResources, hooks: MyMapPopupHooks, appearance?: AppearanceSource) {
         this.olMap = olMap
         this.resources = resources
         this.hooks = hooks
@@ -72,6 +75,11 @@ export class MyMapPopup {
         this.root.className = 'gm-mymap-popup'
         this.root.setAttribute('role', 'dialog')
         this.root.setAttribute('aria-label', '나만의지도 속성')
+        // 밝기 속성: 지금 값을 달고 바뀌면 따라간다(팝업은 지연 생성되고 오래 산다). 구독 해제는 destroy
+        if (appearance) {
+            applyAppearanceAttr(this.root, appearance.get())
+            this.offAppearance = appearance.subscribe(value => applyAppearanceAttr(this.root, value))
+        }
         const header = doc.createElement('div')
         header.className = 'gm-mymap-popup__header'
         this.titleEl = doc.createElement('span')
@@ -139,6 +147,8 @@ export class MyMapPopup {
         if (this.destroyed) return
         this.destroyed = true
         this.open = false
+        this.offAppearance?.()
+        this.offAppearance = null
         this.olMap.un('singleclick', this.onMapClick)
         this.closeBtn.removeEventListener('click', this.onClose)
         this.resources.removeOverlay(this.overlay)

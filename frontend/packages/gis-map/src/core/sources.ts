@@ -12,6 +12,7 @@ import type {
 import type { AddressSearchItem, VWorldLegendItem } from './types/search'
 import type { AreaAnalysisColumn } from './areaAnalysis/types'
 import type { WindField, WindFrameMeta, WindScalarField } from './types/wind'
+import type { StartViewSource } from './startView/types'
 
 export interface LayerUserSelectionSource {
     /** 선택 가능한 전체 범위(권한 트리) */
@@ -281,6 +282,40 @@ export interface GisMapSources {
     areaQuery?: AreaQuerySource
     /** 공유 상대 검색·그룹 목록(자원 공통). 없으면 공유 화면이 아이디·코드 직접 입력 */
     shareDirectory?: ShareDirectorySource
+    /** 시작 화면 저장소(계정 저장 restStartView·브라우저 저장 browserStartViewSource). 없으면 설정 패널의 시작 화면 카드가 없다 */
+    startView?: StartViewSource
+    /** 데이터 기준 정보(건물DB 기준월·지적도 적재·바람 예보 발표). 없고 호스트가 정적 항목도 안 주면 설정 패널의 카드가 없다 */
+    dataInfo?: DataInfoSource
+}
+
+/** 데이터 기준 정보 한 항목 */
+export interface GisDataInfoItem {
+    id: string
+    label: string
+    source: string | null
+    /** 기준 버전(예 '2026-09', '11-09 09시'). 모르면 null */
+    version: string | null
+    /** 가장 늦은 기준(여러 지역이 섞일 때). 없으면 version과 같다 */
+    latestVersion?: string | null
+    /** 기준일(YYYY-MM-DD) */
+    baseDate: string | null
+    /** 적재 일시(ISO-8601) */
+    loadedAt: string | null
+    updateCycle: string | null
+    status: 'ready' | 'updating' | 'partial' | 'missing' | 'unavailable'
+    /** 오래됨 판정(서버·어댑터가 정한다) */
+    stale: boolean
+    staleNote?: string | null
+    coverage?: { loaded: number; expected: number; nationwide: boolean } | null
+    note?: string | null
+}
+
+export interface DataInfoSource {
+    /**
+     * 항목 목록. 일부 묶음이 실패해도 나머지는 돌려준다(실패한 묶음은 status 'unavailable' 항목이거나 생략).
+     * 상태가 보이는 GisHttpError로 reject: 401·403 로그인 만료. 404를 받은 묶음은 어댑터가 항목을 생략한다
+     */
+    list(signal?: AbortSignal): Promise<GisDataInfoItem[]>
 }
 
 /** 소스 팩토리가 받는 문맥. host()는 호출 시점의 호스트를 돌려주므로 주소·헤더를 소스에 따로 넘기지 않는다 */

@@ -43,7 +43,7 @@ export default function MobileLayerButton() {
                                             <span className="gm-mobile-layers__name">{layer.name}</span>
                                             <button onClick={() => toggleLayer(layer.id)}
                                                 className="gm-mobile-layers__toggle"
-                                                style={{ background: visible ? 'var(--gm-primary)' : '#D1D5DB' }}>
+                                                style={{ background: visible ? 'var(--gm-primary)' : 'var(--gm-border-strong)' }}>
                                                 <span className="gm-mobile-layers__knob"
                                                     style={{ left: visible ? '22px' : '2px' }} />
                                             </button>

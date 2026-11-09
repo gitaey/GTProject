@@ -35,6 +35,7 @@ import type { CategoryCounts } from '../lib/mymapStyleConfig'
 import { CatalogBase } from './catalog'
 import type { Catalog, CatalogState } from './catalog'
 import { MyMapPopup } from './MyMapPopup'
+import type { AppearanceSource } from '../types/appearance'
 import type { MyMapPopupContent } from './MyMapPopup'
 import {
     CLUSTER_OFF_RATIO, MyMapClusterView, emptyKindCounts, geomKindOf, isClusterable, resolveLoadChunkMs, resolveMyMapCluster, viewCountExceeds,
@@ -156,6 +157,8 @@ export interface VectorOverlayControllerOptions {
     config?: GisMapMyMapConfig
     /** 목록에서 삭제했을 때(이 지도에서 숨긴 뒤) 엔진이 이벤트로 알리는 데 쓴다 */
     onRemoved?: (id: number) => void
+    /** 클릭 팝업에 밝기 속성(data-gm-theme)을 달기 위한 통로(엔진이 넘김) */
+    appearance?: AppearanceSource
 }
 
 /** 옛 styleFor 그대로: 채우기는 색 + 알파 '33', 선 2px, 점은 반지름 5 + 흰 테두리 */
@@ -787,7 +790,7 @@ export class VectorOverlayControllerImpl implements VectorOverlayController {
                 const t = this.opts.tools
                 return !!t && t.store.getState().activeTool !== 'none'
             },
-        })
+        }, this.opts.appearance)
         this.popup.setEnabled(this.popupEnabled)
     }
 

@@ -5,6 +5,8 @@
 import type OlMap from 'ol/Map'
 import type { TextInputRequest } from '../config'
 import type { MapResources } from '../tracker'
+import { applyAppearanceAttr } from '../types/appearance'
+import type { AppearanceSource } from '../types/appearance'
 import { appendToMapTarget, mapDocument, positionOrigin, removeElement } from './mapDom'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
@@ -24,10 +26,12 @@ interface OpenInput {
 
 export class TextInputOverlay {
     private readonly olMap: OlMap
+    private readonly appearance: AppearanceSource | undefined
     private current: OpenInput | null = null
 
-    constructor(olMap: OlMap, resources: MapResources) {
+    constructor(olMap: OlMap, resources: MapResources, appearance?: AppearanceSource) {
         this.olMap = olMap
+        this.appearance = appearance
         const onTarget = (): void => this.close()
         olMap.on('change:target', onTarget)
         resources.onDispose(() => {
@@ -49,6 +53,8 @@ export class TextInputOverlay {
 
         const outer = doc.createElement('div')
         outer.className = 'gm-text-input'
+        // 입력창은 열 때마다 새로 만들고 짧게 산다 → 열 때의 밝기 값만 읽는다
+        if (this.appearance) applyAppearanceAttr(outer, this.appearance.get())
         const body = doc.createElement('div')
         body.className = 'gm-text-input__body'
         const box = doc.createElement('div')

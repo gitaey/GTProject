@@ -9,6 +9,8 @@ import type { LayerCrossOriginResolver } from './layers/resolveLayerUrl'
 import type { PrintLayoutConfig } from './print/types'
 import type { GisMapAreaAnalysisConfig } from './areaAnalysis/types'
 import type { GisMapMyMapConfig } from './overlays/myMapCluster'
+import type { GisMapAppearance } from './types/appearance'
+import type { GisMapStartViewConfig } from './startView/types'
 
 export interface GisMapViewConfig {
     /** [lon, lat] EPSG:4326 */
@@ -100,6 +102,10 @@ export interface GisMapConfig {
     myMap?: GisMapMyMapConfig
     /** 엔진이 추가하는 레이어 zIndex. 붙이기 모드에서 호스트 레이어와 겹치지 않게 조정 */
     zIndex?: Partial<GisMapZIndex>
+    /** 화면 밝기 모드. 기본 'light'. 엔진이 직접 그리는 DOM(텍스트 도형 입력창·나만의지도 팝업)에만 걸린다 — 위젯은 MapShell/MapRoot의 theme */
+    appearance?: GisMapAppearance
+    /** 시작 화면(sources.startView가 있을 때): 열 때 저장값 적용·기다리는 시간. 붙이기 모드는 자동 적용 안 함 */
+    startView?: GisMapStartViewConfig
 }
 
 /** 붙이기 모드 옵션. 뷰는 호스트 지도의 것을 그대로 쓰므로 받지 않는다 */

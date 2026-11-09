@@ -54,7 +54,7 @@ function SettingGroupNode({
                     className="gm-layer-settings__check gm-layer-settings__check--fixed"
                 />
                 <span className="gm-layer-settings__group-name"
-                    style={{ fontSize: depth === 0 ? '12px' : '11.5px', fontWeight: depth === 0 ? 600 : 500, color: depth === 0 ? '#0f172a' : '#334155' }}>
+                    style={{ fontSize: depth === 0 ? '12px' : '11.5px', fontWeight: depth === 0 ? 600 : 500, color: depth === 0 ? 'var(--gm-text)' : 'var(--gm-text-2)' }}>
                     {group.name}
                 </span>
             </div>
@@ -72,7 +72,7 @@ function SettingGroupNode({
                                 className="gm-layer-settings__check gm-layer-settings__check--fixed"
                             />
                             <span className="gm-layer-settings__name"
-                                style={{ color: selectedIds.has(layer.id) ? '#0f172a' : '#94a3b8' }}>
+                                style={{ color: selectedIds.has(layer.id) ? 'var(--gm-text)' : 'var(--gm-text-faint)' }}>
                                 {layer.name}
                             </span>
                         </div>
@@ -207,7 +207,7 @@ export default function LayerSettingsPanel({ onClose }: { onClose: () => void })
                                     className="gm-layer-settings__check"
                                 />
                                 <span className="gm-layer-settings__name"
-                                    style={{ color: selectedIds.has(layer.id) ? '#0f172a' : '#94a3b8' }}>
+                                    style={{ color: selectedIds.has(layer.id) ? 'var(--gm-text)' : 'var(--gm-text-faint)' }}>
                                     {layer.name}
                                 </span>
                             </div>

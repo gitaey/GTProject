@@ -51,13 +51,13 @@ export default function LayerTreeItem({ node, depth = 0 }: Props) {
         const someVisible = layers.some(l => getLayerVisible(visibleMap, l))
 
         return (
-            <div className="gm-layer-tree__group" style={depth === 0 ? { borderBottom: '1px solid #e2e8f0' } : {}}>
+            <div className="gm-layer-tree__group" style={depth === 0 ? { borderBottom: '1px solid var(--gm-border)' } : {}}>
                 <div
                     className="gm-layer-tree__group-row"
                     style={{
                         padding: `7px 10px 7px ${GROUP_INDENT[di]}px`,
-                        background: depth === 0 ? '#f8fafc' : '#fff',
-                        borderBottom: expanded ? '0.5px solid #e2e8f0' : 'none',
+                        background: depth === 0 ? 'var(--gm-surface-muted)' : 'var(--gm-surface)',
+                        borderBottom: expanded ? '0.5px solid var(--gm-border)' : 'none',
                     }}
                     onClick={() => toggleExpanded(node.id)}
                 >
@@ -77,7 +77,7 @@ export default function LayerTreeItem({ node, depth = 0 }: Props) {
                     <span className="gm-layer-tree__group-name" style={{
                         fontSize: depth === 0 ? '12px' : depth === 1 ? '11.5px' : '11px',
                         fontWeight: depth === 0 ? 600 : depth === 1 ? 500 : 400,
-                        color: depth === 0 ? '#0f172a' : depth === 1 ? '#334155' : '#64748b',
+                        color: depth === 0 ? 'var(--gm-text)' : depth === 1 ? 'var(--gm-text-2)' : 'var(--gm-text-muted)',
                     }}>
                         {node.name}
                     </span>
@@ -92,7 +92,7 @@ export default function LayerTreeItem({ node, depth = 0 }: Props) {
                             <LayerTreeItem key={child.id} node={child} depth={depth + 1} />
                         ))}
                         {node.layers.length > 0 && (
-                            <div className="gm-layer-tree__layers" style={node.children.length > 0 ? { borderTop: '0.5px solid #e2e8f0' } : {}}>
+                            <div className="gm-layer-tree__layers" style={node.children.length > 0 ? { borderTop: '0.5px solid var(--gm-border)' } : {}}>
                                 {node.layers.map(layer => (
                                     <LayerTreeItem key={layer.id} node={layer} depth={depth + 1} />
                                 ))}
@@ -125,7 +125,7 @@ export default function LayerTreeItem({ node, depth = 0 }: Props) {
                     className="gm-layer-tree__layer-check"
                 />
                 <span className="gm-layer-tree__layer-name" style={{
-                    color: visible ? '#0f172a' : '#94a3b8',
+                    color: visible ? 'var(--gm-text)' : 'var(--gm-text-faint)',
                     fontWeight: visible ? 500 : 400,
                 }}>
                     {node.name}

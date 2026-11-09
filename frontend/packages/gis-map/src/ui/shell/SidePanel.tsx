@@ -25,6 +25,15 @@ export default function SidePanel({ panel, map, split = false }: SidePanelProps)
 
     if (!panel) return null
 
+    // 화면 전체에 걸린 패널(설정): 대상 지도 탭 없이, 지도가 바뀌어도 다시 마운트하지 않는다
+    if (panel.scope === 'shell') {
+        return (
+            <div className="gm-side-panel">
+                <Fragment key={panel.id}>{panel.render(map)}</Fragment>
+            </div>
+        )
+    }
+
     if (!split) {
         return (
             <div className="gm-side-panel">

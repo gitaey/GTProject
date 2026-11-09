@@ -140,8 +140,8 @@ export default function SearchBar() {
                                     onMouseEnter={() => setFocusedIndex(index)}
                                     className="gm-search__item"
                                     style={{
-                                        borderBottom: '1px solid #f1f5f9',
-                                        background: index === focusedIndex ? '#fff7ed' : 'transparent',
+                                        borderBottom: '1px solid var(--gm-border-subtle)',
+                                        background: index === focusedIndex ? 'var(--gm-primary-soft)' : 'transparent',
                                     }}>
                                     <div className="gm-search__item-icon">
                                         {item.category?.includes('주소') || item.address.road

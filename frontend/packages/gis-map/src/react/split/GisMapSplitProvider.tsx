@@ -9,8 +9,8 @@
 // 상태는 전부 이 Provider의 state/ref다(모듈 전역 없음).
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { copyMapState, linkViews } from '../../core'
-import type { GisMap, GisMapConfig } from '../../core'
+import { applyViewState, copyMapState, linkViews } from '../../core'
+import type { GisMap, GisMapConfig, GisMapStartView, GisMapViewState, StartViewState } from '../../core'
 import { GisMapProvider } from '../GisMapProvider'
 import { GisMapContext } from '../context'
 import type { GisMapContextValue } from '../context'
@@ -32,6 +32,11 @@ export interface GisMapSplitProviderProps {
      * 지도가 만들어질 때 한 번만 읽는다. 줄였다가 다시 늘리면 닫힌 지도의 상태는 버려지고 새로 만든다
      */
     initialPaneState?: GisMapSplitInitialState
+    /**
+     * 1번 지도가 열 때 저장한 시작 화면을 적용했고 그 화면이 분할이면(count 2 이상) 분할도 되살린다. 기본 true.
+     * 사용자가 그 전에 분할 수를 직접 바꿨거나, 값이 늦게 와서 적용되지 않았으면(late) 하지 않는다 — 이미 보고 있는 화면을 바꾸지 않는다
+     */
+    restoreStartView?: boolean
     children: ReactNode
 }
 
@@ -48,12 +53,12 @@ function isCount(n: number): n is GisMapSplitCount {
     return n === 1 || n === 2 || n === 3 || n === 4
 }
 
-/** 보조 지도는 레이어 트리를 직접 받지 않는다(1번이 받은 것을 setTree로 나눠 쓴다 → 트리 요청 늘지 않음) */
+/** 보조 지도는 레이어 트리를 직접 받지 않고(1번이 받은 것을 setTree로 나눠 쓴다 → 트리 요청 늘지 않음) 시작 화면도 조회·적용하지 않는다(분할 복원은 이 Provider가 한다) */
 function spawnConfig(config: Omit<GisMapConfig, 'target' | 'host'> | undefined): Omit<GisMapConfig, 'target' | 'host'> {
-    return { ...config, layers: { ...config?.layers, autoLoad: false } }
+    return { ...config, layers: { ...config?.layers, autoLoad: false }, startView: { ...config?.startView, autoApply: false } }
 }
 
-export function GisMapSplitProvider({ defaultCount, onCountChange, defaultSync, initialPaneState, children }: GisMapSplitProviderProps) {
+export function GisMapSplitProvider({ defaultCount, onCountChange, defaultSync, initialPaneState, restoreStartView, children }: GisMapSplitProviderProps) {
     const outer = useContext(GisMapContext)
     const factory = useContext(GisMapFactoryContext)
     const available = outer !== null && factory !== null && factory.canSpawn
@@ -108,8 +113,17 @@ export function GisMapSplitProvider({ defaultCount, onCountChange, defaultSync, 
     /** 처음 상태를 이미 받은(또는 받을 필요 없는) 지도. WeakSet이라 destroy된 엔진은 저절로 사라진다 */
     const [initedPanes] = useState(() => new WeakSet<GisMap>())
 
+    /** 시작 화면 복원: 아직 안 만들어진 보조 지도(번호 → 상태)와, 지도가 다 만들어진 뒤 정할 분할 수·활성 지도 */
+    const pendingPanesRef = useRef(new Map<number, GisMapViewState>())
+    const pendingRestoreRef = useRef<{ count: GisMapSplitCount; active: number } | null>(null)
+    /** 사용자가 분할 수를 직접 바꿨다 → 자동 복원을 하지 않는다 */
+    const touchedRef = useRef(false)
+
     const setCount = useCallback((next: GisMapSplitCount) => {
         if (!latest.current.available || !isCount(next)) return
+        touchedRef.current = true
+        pendingPanesRef.current.clear()
+        pendingRestoreRef.current = null
         setRawCount(next)
         setRawActive(a => (a < next ? a : 0)) // 줄일 때 활성이 사라지면 1번이 활성
     }, [])
@@ -123,6 +137,40 @@ export function GisMapSplitProvider({ defaultCount, onCountChange, defaultSync, 
     }, [])
 
     const setSync = useCallback((on: boolean) => setSyncState(!!on), [])
+
+    // 복원이 끝나면(분할 수가 맞고 지도가 다 있고 보류한 상태가 없을 때) 활성 지도를 정한다
+    const flushRestore = useCallback(() => {
+        const want = pendingRestoreRef.current
+        if (!want || pendingPanesRef.current.size > 0) return
+        const cur = latest.current
+        if (cur.count !== want.count) return
+        for (let i = 0; i < want.count; i++) if (!cur.maps[i]) return
+        pendingRestoreRef.current = null
+        setRawActive(want.active < want.count ? want.active : 0)
+    }, [])
+
+    const applyStartView = useCallback((view: GisMapStartView) => {
+        const cur = latest.current
+        const first = cur.maps[0]
+        if (first) applyViewState(first, view.panes[0])
+        if (!cur.available) return
+        const pending = pendingPanesRef.current
+        pending.clear()
+        const count = view.split.count
+        for (let i = 1; i < count; i++) {
+            const m = i < cur.count ? cur.maps[i] : null
+            if (m) {
+                initedPanes.add(m) // 이미 있는 지도는 지금 맞춘다(처음 상태 복사가 덮어쓰지 않게)
+                applyViewState(m, view.panes[i])
+            } else {
+                pending.set(i, view.panes[i])
+            }
+        }
+        pendingRestoreRef.current = { count, active: view.split.activeIndex }
+        setRawCount(count)
+        setSyncState(view.split.sync)
+        flushRestore()
+    }, [initedPanes, flushRestore])
 
     const prevCount = useRef(count)
     useEffect(() => {
@@ -169,20 +217,62 @@ export function GisMapSplitProvider({ defaultCount, onCountChange, defaultSync, 
         }
         if (fresh.length === 0) return
         for (const m of fresh) initedPanes.add(m)
+        // 시작 화면 복원이 맡긴 지도는 저장한 상태를 적용하고(복사 안 함), 나머지만 아래에서 복사한다
+        const toCopy: GisMap[] = []
+        for (let i = 1; i < maps.length; i++) {
+            const m = maps[i]
+            if (!m || !fresh.includes(m)) continue
+            const saved = pendingPanesRef.current.get(i)
+            if (!saved) {
+                toCopy.push(m)
+                continue
+            }
+            pendingPanesRef.current.delete(i)
+            try {
+                applyViewState(m, saved)
+            } catch (err) {
+                console.error('[gis-map] 저장한 시작 화면을 지도 ' + (i + 1) + '에 적용하지 못했다', err)
+            }
+        }
+        flushRestore()
         const mode = initialPaneStateRef.current ?? 'view-basemap'
-        if (mode === 'default') return
+        if (mode === 'default' || toCopy.length === 0) return
         // 원본 = 활성 지도(같은 차례에 새로 생긴 지도는 원본이 될 수 없다 → 0번)
         const active = maps[latest.current.activeIndex]
         const source = active && !fresh.includes(active) ? active : maps[0]
         if (!source) return
-        for (const m of fresh) {
+        for (const m of toCopy) {
             try {
                 copyMapState(source, m, { layers: mode === 'clone-layers' })
             } catch (err) {
                 console.error('[gis-map] 새 지도의 처음 상태를 복사하지 못했다', err)
             }
         }
-    }, [maps, initedPanes])
+    }, [maps, initedPanes, flushRestore])
+
+    // 분할 수가 바뀐 렌더 뒤에도 복원 마무리(지도가 이미 다 있었던 경우)
+    useEffect(() => {
+        flushRestore()
+    }, [maps, count, flushRestore])
+
+    // ── 열 때 저장한 시작 화면의 분할 복원 ─────────────────────────────
+    // 1번 지도가 시작 화면을 적용했고(applied — 늦게 온 값은 적용 안 함) 분할이면 한 번만 되살린다. 사용자가 이미 분할 수를 바꿨으면 하지 않는다.
+    // 자식 effect가 먼저 돌아 셸 안에서 적용하면 위 "처음 상태" 복사가 덮어쓰므로 복원은 이 Provider 안에서 한다
+    const [restored] = useState(() => new WeakSet<GisMap>())
+    const applyStartViewRef = useRef(applyStartView)
+    applyStartViewRef.current = applyStartView
+    const outerMap = outer?.map ?? null
+    useEffect(() => {
+        if (!outerMap || !available || restoreStartView === false) return
+        const check = (s: StartViewState): void => {
+            if (!s.applied || restored.has(outerMap)) return
+            restored.add(outerMap)
+            if (touchedRef.current || !s.value || s.value.view.split.count < 2) return
+            applyStartViewRef.current(s.value.view)
+        }
+        check(outerMap.startView.store.getState())
+        return outerMap.startView.store.subscribe(s => check(s))
+    }, [outerMap, available, restoreStartView, restored])
 
     // ── 오버레이 삭제 전파 ───────────────────────────────────────────
     // 한 지도의 목록에서 GeoTIFF·나만의지도를 삭제하면(서버에서도 지워짐) 다른 지도에 켜 둔 같은 레이어도 내린다
@@ -220,8 +310,8 @@ export function GisMapSplitProvider({ defaultCount, onCountChange, defaultSync, 
 
     // ── 공개 상태 ────────────────────────────────────────────────────
     const state = useMemo<GisMapSplitState>(
-        () => ({ available, count, panes: maps, activeIndex, sync, setCount, setActive, setSync }),
-        [available, count, maps, activeIndex, sync, setCount, setActive, setSync],
+        () => ({ available, count, panes: maps, activeIndex, sync, setCount, setActive, setSync, applyStartView }),
+        [available, count, maps, activeIndex, sync, setCount, setActive, setSync, applyStartView],
     )
 
     // 활성 지도. 0번이면 바깥 값을 그대로(같은 참조) 내려 보낸다

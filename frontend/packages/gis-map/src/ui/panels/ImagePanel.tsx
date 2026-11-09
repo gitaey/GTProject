@@ -70,15 +70,15 @@ export default function ImagePanel() {
           onClick={() => !uploading && fileInputRef.current?.click()}
           className="gm-image-panel__drop"
           style={{
-            border: `1.5px dashed ${dragging ? 'var(--gm-primary)' : '#d1d5db'}`,
+            border: `1.5px dashed ${dragging ? 'var(--gm-primary)' : 'var(--gm-border-strong)'}`,
             cursor: uploading ? 'default' : 'pointer',
-            background: dragging ? 'rgba(var(--gm-primary-rgb), 0.05)' : '#f9fafb',
+            background: dragging ? 'rgba(var(--gm-primary-rgb), 0.05)' : 'var(--gm-surface-muted)',
           }}
         >
           {uploading ? (
             <Loader2 size={18} className="gm-loader gm-image-panel__drop-loader" />
           ) : (
-            <Upload size={16} color="#9ca3af" />
+            <Upload size={16} style={{ color: 'var(--gm-text-faint)' }} />
           )}
           <span className="gm-image-panel__drop-text">
             {uploading ? '업로드 중...' : '.tif / .tiff 파일을 드래그하거나 클릭'}
@@ -126,7 +126,7 @@ export default function ImagePanel() {
               {/* 파일명 + 크기 + 상태 */}
               <div className="gm-panel__item-body">
                 <div className="gm-panel__item-name" style={{
-                  color: isFailed ? '#ef4444' : active ? '#111827' : '#374151',
+                  color: isFailed ? 'var(--gm-danger)' : active ? 'var(--gm-text)' : 'var(--gm-text-2)',
                   fontWeight: active ? 500 : 400,
                 }}>
                   {item.originalName}
@@ -153,9 +153,7 @@ export default function ImagePanel() {
                 <button
                   onClick={() => handleReprocessBounds(item.id)}
                   title="좌표 재추출"
-                  className="gm-panel__item-btn"
-                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--gm-primary)')}
-                  onMouseLeave={e => (e.currentTarget.style.color = '#9ca3af')}
+                  className="gm-panel__item-btn gm-panel__item-btn--hover-primary"
                 >
                   <RefreshCw size={12} />
                 </button>
@@ -166,8 +164,6 @@ export default function ImagePanel() {
                 onClick={() => handleDelete(item.id)}
                 title="삭제"
                 className="gm-panel__item-btn gm-panel__item-btn--delete"
-                onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#d1d5db')}
               >
                 <Trash2 size={13} />
               </button>

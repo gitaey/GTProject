@@ -13,6 +13,20 @@ export type { LinkViewsOptions, ViewLink } from './split/linkViews'
 export { copyMapState } from './split/paneState'
 export type { CopyMapStateOptions } from './split/paneState'
 
+// 시작 화면(저장소 sources.startView · map.startView) — 순수 함수(화면 상태 읽기·적용·저장 JSON 만들기·검사)도 공개
+export { captureViewState, applyViewState, buildStartView, parseStartView, START_VIEW_VERSION } from './startView/viewState'
+export type { BuildStartViewSplit } from './startView/viewState'
+export { startViewErrorKind, DEFAULT_START_VIEW_WAIT_MS } from './startView/StartViewController'
+export type { StartViewController } from './startView/StartViewController'
+export { EMPTY_START_VIEW_STATE } from './startView/types'
+export type {
+    GisMapViewState, GisMapStartView, StoredStartView, StartViewSource, GisMapStartViewConfig, StartViewStatus, StartViewOp,
+    StartViewErrorKind, StartViewState,
+} from './startView/types'
+// 화면 밝기 모드
+export { normalizeAppearance } from './types/appearance'
+export type { GisMapAppearance } from './types/appearance'
+
 // 도구(도구 관리자·그리기·커서 안내)
 export { DEFAULT_DRAW_STYLE } from './tools/DrawController'
 export type { DrawController, DrawState } from './tools/DrawController'
@@ -124,6 +138,7 @@ export type {
     ShareUser, ShareGroup, ShareDirectorySource, ShareEntryState, ShareSnapshot, ShareChange, BulkShareMode, BulkShareResult,
     ShareTargetSource, AreaQuerySource, AreaQueryLayerInfo, AreaQueryPage,
     ParcelInfo, ParcelBuilding, ParcelAddressGroup, ParcelBuildingsResult, ParcelBuildingSource,
+    DataInfoSource, GisDataInfoItem,
 } from './sources'
 
 // 상태 저장소 / 이벤트

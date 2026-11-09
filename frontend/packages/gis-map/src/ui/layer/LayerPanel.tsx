@@ -28,7 +28,7 @@ export default function LayerPanel() {
                 <div className="gm-layer-panel__actions">
                     <button onClick={loadTree}
                         className="gm-layer-panel__icon-btn"
-                        onMouseEnter={e => (e.currentTarget.style.background = '#e2e8f0')}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--gm-border)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                         title="새로고침">
                         <RefreshCw size={14} />
@@ -36,8 +36,8 @@ export default function LayerPanel() {
                     {showSettings && (
                     <button onClick={() => setSettingsOpen(true)}
                         className="gm-layer-panel__icon-btn"
-                        style={{ color: settingsOpen ? 'var(--gm-primary)' : '#64748b' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = '#e2e8f0')}
+                        style={{ color: settingsOpen ? 'var(--gm-primary)' : 'var(--gm-text-muted)' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--gm-border)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                         title="레이어 설정">
                         <Settings size={14} />

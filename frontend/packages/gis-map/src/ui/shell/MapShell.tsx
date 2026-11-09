@@ -5,9 +5,11 @@
 // 지도 기능은 전부 엔진(GisMapProvider)이 맡고 위젯은 가장 가까운 엔진을 직접 읽는다. 셸에는 배치와 "열린 패널"(화면 상태)만 있다.
 // 열린 패널은 셸의 로컬 state(엔진·패키지 전역은 모른다): 처음 값 = defaultPanel, 바뀌면 onPanelChange로 알린다
 // → 페이지를 떠났다 돌아와도 이어지게 하려면 호스트(앱)가 기억했다가 다음 마운트 때 defaultPanel로 다시 넘긴다.
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Settings } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { GisMapSplitProvider, GisMapView, useGisMap, useGisMapSplit } from '../../react'
+import type { GisMapAppearance, StartViewState } from '../../core'
+import { GisMapSplitProvider, GisMapView, useGisMap, useGisMapSplit, useStoreValue } from '../../react'
 import type { GisMapSplitCount, GisMapSplitInitialState } from '../../react'
 import { cx } from '../cx'
 import { defaultPanels } from '../panels/defaultPanels'
@@ -18,11 +20,13 @@ import RegionBadge from '../overlay/RegionBadge'
 import WindLegend from '../overlay/WindLegend'
 import MapSplitSelect from '../split/MapSplitSelect'
 import SplitStage from '../split/SplitStage'
+import SettingsPanel from '../settings/SettingsPanel'
 import MapHeader from './MapHeader'
 import MapRoot from './MapRoot'
 import NavRail from './NavRail'
 import SidePanel from './SidePanel'
-import type { MapPanelDef, MapShellBrand, MapUserMenuItem } from './types'
+import { SETTINGS_PANEL_ID } from './types'
+import type { MapPanelDef, MapShellBrand, MapShellSettingsOptions, MapUserMenuItem } from './types'
 
 /** 화면 분할 옵션(MapShell split). 전부 선택 */
 export interface MapShellSplitOptions {
@@ -94,13 +98,27 @@ export interface MapShellProps {
      * 지도를 하나 더 만들 때마다 setup이 불리므로 호스트 setup은 info.pane으로 번호를 구분한다
      */
     split?: boolean | MapShellSplitOptions
+    /**
+     * 설정 패널(네비 아래 '설정' 버튼): 화면 테마·시작 화면·데이터 기준 정보 카드. 기본 true. false면 버튼도 없다.
+     * 객체면 카드 켜고 끄기·정적 데이터 항목·권한 기능 ID(MapShellSettingsOptions). 모양을 바꾸려면 렌더마다 새 객체를 만들지 말고 모듈 상수로 둔다
+     */
+    settings?: boolean | MapShellSettingsOptions
+    /** 화면 밝기 모드(제어). 주면 이 값을 따르고 바꾸면 onThemeChange만 부른다. 안 주면 defaultTheme(기본 'light')에서 시작해 셸이 기억한다 */
+    theme?: GisMapAppearance
+    defaultTheme?: GisMapAppearance
+    onThemeChange?: (value: GisMapAppearance) => void
     /** 지도 위에 더 올릴 호스트 위젯(지도 영역 안, 기본 위젯들 뒤) */
     children?: ReactNode
 }
 
-function initialPanelId(panels: readonly MapPanelDef[], defaultPanel: string | null | undefined): string | null {
+/** settings={true}일 때 쓰는 빈 옵션(얼린 상수 — 렌더마다 새 객체를 만들지 않는다) */
+const EMPTY_SETTINGS: Readonly<MapShellSettingsOptions> = Object.freeze({})
+
+const selectHolding = (s: StartViewState): boolean => s.holding
+
+function initialPanelId(panels: readonly MapPanelDef[], defaultPanel: string | null | undefined, settingsPanel: MapPanelDef | null): string | null {
     if (defaultPanel === null) return null
-    if (defaultPanel !== undefined && panels.some(p => p.id === defaultPanel)) return defaultPanel
+    if (defaultPanel !== undefined && (panels.some(p => p.id === defaultPanel) || (settingsPanel !== null && defaultPanel === settingsPanel.id))) return defaultPanel
     return panels.length > 0 ? panels[0].id : null
 }
 
@@ -127,9 +145,33 @@ function MapShellView({
     className, brand, panels = defaultPanels, defaultPanel, onPanelChange,
     showHeader = true, showSearch = true, showBasemapSwitcher = true, showUser = true, headerRight, userMenuItems,
     showNavRail = true, showToolbar = true, showPrint = true, showAreaAnalysis = true, showParcelInfo = true, showRegionBadge = true, showMobileLayerButton = true, showWindLegend = true,
-    showStatusBar = true, statusBarProjection, split, children,
+    showStatusBar = true, statusBarProjection, split, settings = true, theme: themeProp, defaultTheme, onThemeChange, children,
 }: MapShellProps) {
     const map = useGisMap()
+
+    // 화면 테마: 제어(theme prop) 또는 셸이 기억(defaultTheme). 서버 렌더 첫 화면은 라이트
+    const [themeState, setThemeState] = useState<GisMapAppearance>(defaultTheme ?? 'light')
+    const theme = themeProp ?? themeState
+    const onThemeChangeRef = useRef(onThemeChange)
+    onThemeChangeRef.current = onThemeChange
+    const controlled = themeProp !== undefined
+    const setTheme = useCallback((value: GisMapAppearance) => {
+        if (!controlled) setThemeState(value)
+        onThemeChangeRef.current?.(value)
+    }, [controlled])
+
+    // 설정 패널 정의(셸 안에서 만든다 — panels 목록에는 없다). 옵션·테마가 바뀔 때만 새로
+    const settingsOptions = settings === false ? null : settings === true ? EMPTY_SETTINGS : settings
+    const settingsPanel = useMemo<MapPanelDef | null>(() => {
+        if (!settingsOptions) return null
+        return {
+            id: SETTINGS_PANEL_ID, label: settingsOptions.label ?? '설정', icon: Settings, featureId: settingsOptions.featureId, scope: 'shell',
+            render: () => <SettingsPanel options={settingsOptions} theme={theme} onThemeChange={setTheme} />,
+        }
+    }, [settingsOptions, theme, setTheme])
+
+    // 저장한 시작 화면을 기다리며 지도 그림을 미루는 동안 지도 칸에 옅은 바탕(짧게 끝나면 안 보인다)
+    const startHolding = useStoreValue(map?.startView.store, selectHolding, false)
 
     // 화면 분할: split을 켰고 분할 Provider가 쓸 수 있을 때만(붙이기 모드·Provider 없음이면 분할 없는 셸과 같다). 칸이 2개 이상일 때만 격자
     const splitOptions = typeof split === 'object' ? split : undefined
@@ -138,7 +180,7 @@ function MapShellView({
     const splitActive = splitUi && splitState.count > 1
 
     // 열린 패널: 같은 패널 아이콘을 다시 누르면 닫힘(옛 panelStore.togglePanel)
-    const [activePanel, setActivePanel] = useState<string | null>(() => initialPanelId(panels, defaultPanel))
+    const [activePanel, setActivePanel] = useState<string | null>(() => initialPanelId(panels, defaultPanel, settingsPanel))
     const togglePanel = useCallback((panelId: string) => {
         setActivePanel(cur => (cur === panelId ? null : panelId))
     }, [])
@@ -154,10 +196,10 @@ function MapShellView({
     }, [activePanel])
 
     // 마운트 뒤 호스트가 panels에서 열린 패널을 빼면 패널을 그리지 않는다(처음 값의 방어는 initialPanelId)
-    const panel = activePanel === null ? null : panels.find(p => p.id === activePanel) ?? null
+    const panel = activePanel === null ? null : panels.find(p => p.id === activePanel) ?? (settingsPanel !== null && activePanel === settingsPanel.id ? settingsPanel : null)
 
     return (
-        <MapRoot className={cx('gm-map-view', className)}>
+        <MapRoot className={cx('gm-map-view', className)} theme={theme}>
             {showHeader && (
                 <MapHeader brand={brand} showSearch={showSearch} right={headerRight}
                     showBasemapSwitcher={showBasemapSwitcher} showUser={showUser} userMenuItems={userMenuItems}
@@ -165,7 +207,7 @@ function MapShellView({
             )}
 
             <div className="gm-map-view__body">
-                {showNavRail && <NavRail panels={panels} activePanel={activePanel} togglePanel={togglePanel} />}
+                {showNavRail && <NavRail panels={panels} activePanel={activePanel} togglePanel={togglePanel} settingsPanel={settingsPanel} />}
                 <SidePanel panel={panel} map={map} split={splitActive} />
 
                 {/* 커서 안내·텍스트 입력창은 엔진(코어 DOM)이 지도 요소 안에, 측정 툴팁은 ol.Overlay로 그린다 */}
@@ -175,6 +217,7 @@ function MapShellView({
                         ? <SplitStage showRegionBadge={showRegionBadge} showWindLegend={showWindLegend}
                             compactPaneWidth={splitOptions?.compactPaneWidth} minPaneWidth={splitOptions?.minPaneWidth} />
                         : <GisMapView className="gm-map-view__map" />}
+                    {startHolding && <div className="gm-map-pending" role="status" aria-label="지도를 준비하는 중" />}
                     {showRegionBadge && !splitActive && <RegionBadge />}
 
                     {/* 도구 모음·모바일 레이어 버튼은 무대에 하나 — 대상은 활성 지도. 활성 지도가 바뀌면 key로 새로 마운트해

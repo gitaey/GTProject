@@ -46,6 +46,10 @@ import { AreaAnalysisControllerImpl } from './areaAnalysis/AreaAnalysisControlle
 import type { AreaAnalysisController } from './areaAnalysis/types'
 import { ParcelInfoControllerImpl } from './parcelInfo/ParcelInfoController'
 import type { ParcelInfoController } from './parcelInfo/types'
+import { normalizeAppearance } from './types/appearance'
+import type { AppearanceSource, GisMapAppearance } from './types/appearance'
+import { DEFAULT_START_VIEW_WAIT_MS, StartViewControllerImpl } from './startView/StartViewController'
+import type { StartViewController } from './startView/StartViewController'
 
 /** zoom 기본 16, 600ms */
 export interface FlyToRequest {
@@ -65,6 +69,8 @@ export interface GisMapEvents {
     overlayremoved: GisOverlayRemoved
     clear: undefined
     hostchange: GisMapHost
+    /** setAppearance로 밝기 모드가 바뀌었다(같은 값이면 알리지 않음) */
+    appearancechange: GisMapAppearance
     destroy: undefined
 }
 
@@ -97,7 +103,13 @@ export interface GisMap {
     readonly areaAnalysis: AreaAnalysisController
     /** 필지 정보 카드('parcel-info' 도구가 켜진 동안 지도 클릭 → 필지 속성·경계·면적 + 그 필지의 건물 목록). 리스너·강조는 도구를 켤 때만 붙인다 */
     readonly parcelInfo: ParcelInfoController
+    /** 시작 화면(저장소 sources.startView가 있고 엔진이 지도를 만든 경우에만 동작 — 아니면 store.status가 'unsupported') */
+    readonly startView: StartViewController
+    /** 화면 밝기 모드(config.appearance, 기본 'light') */
+    readonly appearance: GisMapAppearance
 
+    /** 밝기 모드를 바꾼다. 엔진이 직접 그리는 DOM에 적용하고 appearancechange를 알린다(위젯은 MapShell/MapRoot의 theme) */
+    setAppearance(value: GisMapAppearance): void
     /** owned=false면 아무것도 안 함(경고) */
     mount(target: HTMLElement | string): void
     unmount(): void
@@ -143,6 +155,7 @@ class GisMapEngine implements GisMap {
     readonly print: PrintController
     readonly areaAnalysis: AreaAnalysisController
     readonly parcelInfo: ParcelInfoController
+    readonly startView: StartViewController
 
     /** FE-3·FE-4 컨트롤러가 쓸 설정값 */
     protected readonly zIndex: Readonly<GisMapZIndex>
@@ -163,7 +176,15 @@ class GisMapEngine implements GisMap {
     private readonly printController: PrintControllerImpl
     private readonly areaController: AreaAnalysisControllerImpl
     private readonly parcelInfoController: ParcelInfoControllerImpl
+    private readonly startViewController: StartViewControllerImpl
+    private appearanceValue: GisMapAppearance
+    /** 시작 화면을 기다리는 동안 미뤄 둔 mount 대상 */
+    private pendingTarget: HTMLElement | string | null = null
     private destroyed = false
+
+    get appearance(): GisMapAppearance {
+        return this.appearanceValue
+    }
 
     constructor(olMap: OlMap, owned: boolean, options: GisMapAttachOptions) {
         this.id = newEngineId()
@@ -179,6 +200,12 @@ class GisMapEngine implements GisMap {
         this.resources = new MapResources(olMap)
         this.events = createEmitter<GisMapEvents>()
         olMap.set(ENGINE_KEY, this.id, true)
+        // 밝기 값은 코어 DOM(입력창·나만의지도 팝업)을 만드는 컨트롤러보다 먼저 정해 둔다
+        this.appearanceValue = normalizeAppearance(options.appearance)
+        const appearanceSource: AppearanceSource = {
+            get: () => this.appearanceValue,
+            subscribe: fn => this.events.on('appearancechange', fn),
+        }
 
         // 도구: 관리자 → 그리기(레이어 1개를 지금 붙임, interaction은 도구를 켤 때만) → 커서 안내
         this.toolManager = new ToolManagerImpl()
@@ -190,6 +217,7 @@ class GisMapEngine implements GisMap {
             zIndex: this.zIndex.tools,
             initialStyle: { ...DEFAULT_DRAW_STYLE, color: this.theme.primary },
             textInput: options.ui?.textInput,
+            appearance: appearanceSource,
         })
         this.draw = this.drawController
         // 측정: 거리 → 면적 → 반경 순으로 레이어를 붙인다(옛 훅 호출 순서). interaction은 도구를 켤 때만
@@ -226,7 +254,7 @@ class GisMapEngine implements GisMap {
         this.raster = this.rasterController
         this.vectorController = new VectorOverlayControllerImpl({
             olMap, resources: this.resources, source: this.sources.myMap, zIndex: this.zIndex.vector,
-            defaultColor: this.theme.primary, tools: this.toolManager, config: options.myMap,
+            defaultColor: this.theme.primary, tools: this.toolManager, config: options.myMap, appearance: appearanceSource,
             onRemoved: id => this.events.emit('overlayremoved', { kind: 'vector', id }),
         })
         this.vector = this.vectorController
@@ -252,12 +280,46 @@ class GisMapEngine implements GisMap {
             parcelSource: this.sources.parcel, buildingSource: this.sources.parcelBuildings,
         })
         this.parcelInfo = this.parcelInfoController
+
+        // 시작 화면: 엔진이 만든 지도만(붙이기는 호스트 뷰를 건드리지 않는다). 마지막에 시작해야 레이어 컨트롤러가 이미 있다
+        const startViewOptions = options.startView
+        this.startViewController = new StartViewControllerImpl({
+            getMap: () => this,
+            hostStore: this.hostStore,
+            source: this.sources.startView,
+            owned,
+            autoApply: owned && startViewOptions?.autoApply !== false,
+            waitMs: Math.max(0, startViewOptions?.waitMs ?? DEFAULT_START_VIEW_WAIT_MS),
+            onReleaseMount: () => this.releaseMount(),
+        })
+        this.startView = this.startViewController
+        this.startViewController.begin()
+    }
+
+    /** 시작 화면 대기가 끝났을 때(값 도착·실패·waitMs 경과) 미뤄 둔 mount를 실행한다 */
+    private releaseMount(): void {
+        const target = this.pendingTarget
+        this.pendingTarget = null
+        if (target !== null && !this.destroyed) this.olMap.setTarget(target)
+    }
+
+    setAppearance(value: GisMapAppearance): void {
+        if (this.destroyed) return
+        const next = normalizeAppearance(value)
+        if (next === this.appearanceValue) return
+        this.appearanceValue = next
+        this.events.emit('appearancechange', next)
     }
 
     mount(target: HTMLElement | string): void {
         if (this.destroyed) return
         if (!this.owned) {
             console.warn('[gis-map] 붙이기 모드에서는 mount()를 쓰지 않는다. 호스트 지도의 target을 그대로 쓴다')
+            return
+        }
+        // 저장된 시작 화면을 기다리는 중이면 그림을 미룬다(타일 요청도 없음) — 값이 오거나 waitMs가 지나면 releaseMount
+        if (this.startViewController.isHolding()) {
+            this.pendingTarget = target
             return
         }
         this.olMap.setTarget(target)
@@ -269,6 +331,7 @@ class GisMapEngine implements GisMap {
             console.warn('[gis-map] 붙이기 모드에서는 unmount()를 쓰지 않는다')
             return
         }
+        this.pendingTarget = null
         this.olMap.setTarget(undefined)
     }
 
@@ -361,6 +424,7 @@ class GisMapEngine implements GisMap {
         this.printController.destroy()
         this.areaController.destroy()
         this.parcelInfoController.destroy()
+        this.startViewController.destroy()
         this.regionWatcher.destroy()
         this.parcelHighlighter.destroy()
         this.vectorController.destroy()

@@ -30,6 +30,7 @@ import type { DrawStyle, MapTool } from '../types/draw'
 import type { GeoJsonObject } from '../types/geojson'
 import { bindRightClickFinish } from './rightClickFinish'
 import { TextInputOverlay } from './textInputOverlay'
+import type { AppearanceSource } from '../types/appearance'
 import type { ToolHandler, ToolManagerImpl } from './ToolManager'
 
 export interface DrawState {
@@ -117,6 +118,8 @@ export interface DrawControllerOptions {
     initialStyle: DrawStyle
     /** config.ui.textInput(호스트 입력 UI). 없으면 코어 DOM 입력창 */
     textInput?: (req: TextInputRequest) => void
+    /** 코어 DOM 입력창에 밝기 속성을 달기 위한 통로(엔진이 넘김) */
+    appearance?: AppearanceSource
 }
 
 export class DrawControllerImpl implements DrawController, ToolHandler {
@@ -173,7 +176,7 @@ export class DrawControllerImpl implements DrawController, ToolHandler {
         this.resources.onDispose(() => selected.un('change:length', onLength))
 
         this.customTextInput = opts.textInput ?? null
-        this.textOverlay = this.customTextInput ? null : new TextInputOverlay(this.olMap, this.resources)
+        this.textOverlay = this.customTextInput ? null : new TextInputOverlay(this.olMap, this.resources, opts.appearance)
 
         this.resources.onDispose(() => {
             this.destroyed = true

@@ -150,7 +150,7 @@ export default function DrawPanel() {
                                         style={{
                                             backgroundColor: c,
                                             outline: drawStyle.color === c ? '2px solid var(--gm-primary)' : '2px solid transparent',
-                                            border: c === '#ffffff' ? '1px solid #e2e8f0' : 'none',
+                                            border: c === '#ffffff' ? '1px solid var(--gm-border)' : 'none',
                                         }} />
                                 ))}
                                 <label className="gm-draw-panel__custom-color"

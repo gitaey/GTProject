@@ -186,6 +186,238 @@
 }
 
 
+/* ── 의미 토큰(화면 밝기 모드용) ──
+   위젯 색을 팔레트 변수(--gm-color-*)가 아니라 이 의미 토큰으로 쓴다. 라이트 값 = 지금 화면의 색(그래서 라이트는 바뀌지 않는다).
+   다크는 같은 토큰의 다른 값 — 팔레트를 뒤집지 않는 이유: "주황 위 흰 글자"까지 검게 변하기 때문이다. 주 색 --gm-primary는 두 모드가 같다.
+   선택자 규칙(attach 빌드 때문에): 다크는 속성 선택자만 쓴다. attach 빌드(vite.config.ts attachCorePlugin)는 `.gm-root[...]`·`[...] .gm-root` 꼴을 실패시킨다.
+   다크 블록은 라이트 블록 뒤(같은 명시도 → 뒤가 이김). 'system' 블록은 'dark' 블록과 값이 같다 — 둘은 함께 고친다.
+   엔진이 직접 그리는 DOM(텍스트 입력창·나만의지도 팝업)은 attach에서 .gm-root 밖일 수 있어 var(--gm-surface, #fff)처럼 라이트 대체값을 함께 쓴다. */
+.gm-root {
+    --gm-surface: #fff;
+    --gm-surface-muted: #f9fafb;
+    --gm-surface-sunken: #f3f4f6;
+    --gm-border: #e5e7eb;
+    --gm-border-subtle: #f3f4f6;
+    --gm-border-strong: #d1d5dc;
+    --gm-text: #111827;
+    --gm-text-2: #374151;
+    --gm-text-muted: #6b7280;
+    --gm-text-faint: #9ca3af;
+    --gm-on-primary: #fff;
+    --gm-primary-soft: #fff7ed;
+    --gm-primary-line: #f9c9a8;
+    --gm-danger: #ef4444;
+    --gm-danger-soft: #fef2f2;
+    --gm-warn: #b45309;
+    --gm-warn-soft: #fffbeb;
+    --gm-success: #15803d;
+    --gm-success-soft: #dcfce7;
+    --gm-info: #2563eb;
+    --gm-info-soft: #eff6ff;
+    --gm-backdrop: rgba(17, 24, 39, .45);
+    --gm-shadow-color: rgba(0, 0, 0, .1);
+    --gm-paper: #fff;
+    /* 추가 토큰(위젯 CSS의 나머지 색 — 라이트 값 = 지금 색, 다크는 같은 역할의 위 토큰과 같은 규칙) */
+    --gm-surface-strong: #e5e7eb;
+    --gm-surface-glass: rgba(255, 255, 255, .9);
+    --gm-surface-glass-strong: rgba(255, 255, 255, .95);
+    --gm-shimmer: rgba(255, 255, 255, .7);
+    --gm-backdrop-flat: rgba(0, 0, 0, .4);
+    --gm-tooltip-bg: #1e2939;
+    --gm-text-strong: #1e2939;
+    --gm-text-3: #4a5565;
+    --gm-text-disabled: #d1d5db;
+    --gm-accent: var(--gm-color-orange-500);
+    --gm-accent-light: var(--gm-color-orange-400);
+    --gm-primary-softer: #fffaf5;
+    --gm-primary-soft-strong: #ffedd5;
+    --gm-primary-line-soft: #fed7aa;
+    --gm-orange-text: #c2410c;
+    --gm-orange-deep: #9a3412;
+    --gm-danger-light: var(--gm-color-red-400);
+    --gm-danger-text: #b91c1c;
+    --gm-danger-deep: #991b1b;
+    --gm-danger-deeper: #7f1d1d;
+    --gm-danger-soft-strong: #fee2e2;
+    --gm-danger-line: #fecaca;
+    --gm-danger-line-strong: #fca5a5;
+    --gm-danger-solid: #ef4444;
+    --gm-danger-solid-vivid: var(--gm-color-red-500);
+    --gm-danger-solid-vivid-hover: var(--gm-color-red-600);
+    --gm-warn-deep: #92400e;
+    --gm-warn-deeper: #78350f;
+    --gm-warn-soft-strong: #fef3c7;
+    --gm-warn-line: #fcd34d;
+    --gm-warn-line-soft: #fde68a;
+    --gm-success-deep: #166534;
+    --gm-success-bright: #16a34a;
+    --gm-success-softer: #f0fdf4;
+    --gm-success-line: #bbf7d0;
+    --gm-indigo-soft: #e0e7ff;
+    --gm-indigo-text: #3730a3;
+    --gm-primary-disabled: #f9b98f;
+    --gm-shadow-06: rgba(0, 0, 0, .06);
+    --gm-shadow-08: rgba(0, 0, 0, .08);
+    --gm-shadow-12: rgba(0, 0, 0, .12);
+    --gm-shadow-15: rgba(0, 0, 0, .15);
+    --gm-shadow-18: rgba(0, 0, 0, .18);
+    --gm-shadow-20: rgba(0, 0, 0, .2);
+    --gm-shadow-25: rgba(0, 0, 0, .25);
+}
+
+[data-gm-theme="dark"] {
+    --gm-surface: #1a2232;
+    --gm-surface-muted: #151c2a;
+    --gm-surface-sunken: #232d40;
+    --gm-border: #2e3a4f;
+    --gm-border-subtle: #222b3b;
+    --gm-border-strong: #3d4a61;
+    --gm-text: #f1f5f9;
+    --gm-text-2: #e2e8f0;
+    --gm-text-muted: #94a3b8;
+    --gm-text-faint: #7f8ca3;
+    --gm-on-primary: #fff;
+    --gm-primary-soft: rgba(var(--gm-primary-rgb, 242, 103, 34), .14);
+    --gm-primary-line: rgba(var(--gm-primary-rgb, 242, 103, 34), .45);
+    --gm-danger: #f87171;
+    --gm-danger-soft: rgba(239, 68, 68, .14);
+    --gm-warn: #fbbf24;
+    --gm-warn-soft: rgba(245, 158, 11, .14);
+    --gm-success: #4ade80;
+    --gm-success-soft: rgba(34, 197, 94, .14);
+    --gm-info: #60a5fa;
+    --gm-info-soft: rgba(59, 130, 246, .16);
+    --gm-backdrop: rgba(0, 0, 0, .6);
+    --gm-shadow-color: rgba(0, 0, 0, .2);
+    --gm-paper: #f8fafc;
+    --gm-surface-strong: #2e3a4f;
+    --gm-surface-glass: rgba(26, 34, 50, .9);
+    --gm-surface-glass-strong: rgba(26, 34, 50, .95);
+    --gm-shimmer: rgba(255, 255, 255, .08);
+    --gm-backdrop-flat: rgba(0, 0, 0, .6);
+    --gm-tooltip-bg: #334155;
+    --gm-text-strong: #f1f5f9;
+    --gm-text-3: #cbd5e1;
+    --gm-text-disabled: #475569;
+    --gm-accent: var(--gm-color-orange-500);
+    --gm-accent-light: var(--gm-color-orange-400);
+    --gm-primary-softer: rgba(var(--gm-primary-rgb, 242, 103, 34), .07);
+    --gm-primary-soft-strong: rgba(var(--gm-primary-rgb, 242, 103, 34), .24);
+    --gm-primary-line-soft: rgba(var(--gm-primary-rgb, 242, 103, 34), .32);
+    --gm-orange-text: #fb923c;
+    --gm-orange-deep: #fdba74;
+    --gm-danger-light: #f87171;
+    --gm-danger-text: #fca5a5;
+    --gm-danger-deep: #fca5a5;
+    --gm-danger-deeper: #fecaca;
+    --gm-danger-soft-strong: rgba(239, 68, 68, .22);
+    --gm-danger-line: rgba(239, 68, 68, .4);
+    --gm-danger-line-strong: rgba(239, 68, 68, .55);
+    --gm-danger-solid: #ef4444;
+    --gm-danger-solid-vivid: var(--gm-color-red-500);
+    --gm-danger-solid-vivid-hover: var(--gm-color-red-600);
+    --gm-warn-deep: #fcd34d;
+    --gm-warn-deeper: #fde68a;
+    --gm-warn-soft-strong: rgba(245, 158, 11, .22);
+    --gm-warn-line: rgba(245, 158, 11, .45);
+    --gm-warn-line-soft: rgba(245, 158, 11, .32);
+    --gm-success-deep: #86efac;
+    --gm-success-bright: #4ade80;
+    --gm-success-softer: rgba(34, 197, 94, .08);
+    --gm-success-line: rgba(34, 197, 94, .4);
+    --gm-indigo-soft: rgba(99, 102, 241, .2);
+    --gm-indigo-text: #a5b4fc;
+    --gm-primary-disabled: #a24f2a;
+    --gm-shadow-06: rgba(0, 0, 0, .12);
+    --gm-shadow-08: rgba(0, 0, 0, .16);
+    --gm-shadow-12: rgba(0, 0, 0, .24);
+    --gm-shadow-15: rgba(0, 0, 0, .3);
+    --gm-shadow-18: rgba(0, 0, 0, .36);
+    --gm-shadow-20: rgba(0, 0, 0, .4);
+    --gm-shadow-25: rgba(0, 0, 0, .5);
+    --gm-shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, .2), 0 1px 2px -1px rgba(0, 0, 0, .2);
+    /* 다크에서만: 글자색을 지정하지 않은 자식이 호스트 페이지의 어두운 글자색을 물려받아 안 보이는 것을 막는다(라이트는 호스트 값 그대로 — 무변화) */
+    color: var(--gm-text);
+    color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+    [data-gm-theme="system"] {
+        --gm-surface: #1a2232;
+        --gm-surface-muted: #151c2a;
+        --gm-surface-sunken: #232d40;
+        --gm-border: #2e3a4f;
+        --gm-border-subtle: #222b3b;
+        --gm-border-strong: #3d4a61;
+        --gm-text: #f1f5f9;
+        --gm-text-2: #e2e8f0;
+        --gm-text-muted: #94a3b8;
+        --gm-text-faint: #7f8ca3;
+        --gm-on-primary: #fff;
+        --gm-primary-soft: rgba(var(--gm-primary-rgb, 242, 103, 34), .14);
+        --gm-primary-line: rgba(var(--gm-primary-rgb, 242, 103, 34), .45);
+        --gm-danger: #f87171;
+        --gm-danger-soft: rgba(239, 68, 68, .14);
+        --gm-warn: #fbbf24;
+        --gm-warn-soft: rgba(245, 158, 11, .14);
+        --gm-success: #4ade80;
+        --gm-success-soft: rgba(34, 197, 94, .14);
+        --gm-info: #60a5fa;
+        --gm-info-soft: rgba(59, 130, 246, .16);
+        --gm-backdrop: rgba(0, 0, 0, .6);
+        --gm-shadow-color: rgba(0, 0, 0, .2);
+        --gm-paper: #f8fafc;
+        --gm-surface-strong: #2e3a4f;
+        --gm-surface-glass: rgba(26, 34, 50, .9);
+        --gm-surface-glass-strong: rgba(26, 34, 50, .95);
+        --gm-shimmer: rgba(255, 255, 255, .08);
+        --gm-backdrop-flat: rgba(0, 0, 0, .6);
+        --gm-tooltip-bg: #334155;
+        --gm-text-strong: #f1f5f9;
+        --gm-text-3: #cbd5e1;
+        --gm-text-disabled: #475569;
+        --gm-accent: var(--gm-color-orange-500);
+        --gm-accent-light: var(--gm-color-orange-400);
+        --gm-primary-softer: rgba(var(--gm-primary-rgb, 242, 103, 34), .07);
+        --gm-primary-soft-strong: rgba(var(--gm-primary-rgb, 242, 103, 34), .24);
+        --gm-primary-line-soft: rgba(var(--gm-primary-rgb, 242, 103, 34), .32);
+        --gm-orange-text: #fb923c;
+        --gm-orange-deep: #fdba74;
+        --gm-danger-light: #f87171;
+        --gm-danger-text: #fca5a5;
+        --gm-danger-deep: #fca5a5;
+        --gm-danger-deeper: #fecaca;
+        --gm-danger-soft-strong: rgba(239, 68, 68, .22);
+        --gm-danger-line: rgba(239, 68, 68, .4);
+        --gm-danger-line-strong: rgba(239, 68, 68, .55);
+        --gm-danger-solid: #ef4444;
+        --gm-danger-solid-vivid: var(--gm-color-red-500);
+        --gm-danger-solid-vivid-hover: var(--gm-color-red-600);
+        --gm-warn-deep: #fcd34d;
+        --gm-warn-deeper: #fde68a;
+        --gm-warn-soft-strong: rgba(245, 158, 11, .22);
+        --gm-warn-line: rgba(245, 158, 11, .45);
+        --gm-warn-line-soft: rgba(245, 158, 11, .32);
+        --gm-success-deep: #86efac;
+        --gm-success-bright: #4ade80;
+        --gm-success-softer: rgba(34, 197, 94, .08);
+        --gm-success-line: rgba(34, 197, 94, .4);
+        --gm-indigo-soft: rgba(99, 102, 241, .2);
+        --gm-indigo-text: #a5b4fc;
+        --gm-primary-disabled: #a24f2a;
+        --gm-shadow-06: rgba(0, 0, 0, .12);
+        --gm-shadow-08: rgba(0, 0, 0, .16);
+        --gm-shadow-12: rgba(0, 0, 0, .24);
+        --gm-shadow-15: rgba(0, 0, 0, .3);
+        --gm-shadow-18: rgba(0, 0, 0, .36);
+        --gm-shadow-20: rgba(0, 0, 0, .4);
+        --gm-shadow-25: rgba(0, 0, 0, .5);
+        --gm-shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, .2), 0 1px 2px -1px rgba(0, 0, 0, .2);
+        color: var(--gm-text);
+        color-scheme: dark;
+    }
+}
+
 /* ── 코어 DOM 공통 (FE-5b-2) — attach 모드에서는 .gm-root 밖(업무 페이지의 지도)에 그려진다.
    Tailwind preflight가 html에 주는 상속값을 바깥 상자에 직접 둔다(.gm-root의 상속 기본값과 같다) → 호스트 html에 값이 없어도 줄 높이 등이 같다.
    GTProject에서는 .gm-root(같은 값) 안이라 계산값이 바뀌지 않는다. 측정 툴팁은 아래 자기 규칙의 line-height가 덮는다 */
@@ -250,10 +482,10 @@
     align-items: center;
     overflow: hidden;
     margin: 0;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--gm-border, #e5e7eb);
     border-radius: .375rem;
-    background-color: #fff;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -4px rgba(0, 0, 0, .1);
+    background-color: var(--gm-surface, #fff);
+    box-shadow: 0 10px 15px -3px var(--gm-shadow-color, rgba(0, 0, 0, .1)), 0 4px 6px -4px var(--gm-shadow-color, rgba(0, 0, 0, .1));
 }
 
 /* 옛: px-3 py-2 text-sm text-gray-800 outline-none w-48 */
@@ -271,7 +503,7 @@
     letter-spacing: inherit;
     font-size: .875rem;
     line-height: calc(1.25 / .875);
-    color: #1e2939;
+    color: var(--gm-text-strong, #1e2939);
     opacity: 1;
     outline-style: none;
 }
@@ -288,7 +520,7 @@
     font-feature-settings: inherit;
     font-variation-settings: inherit;
     letter-spacing: inherit;
-    color: #99a1af;
+    color: var(--gm-text-faint, #9ca3af);
     opacity: 1;
     -webkit-appearance: button;
     -moz-appearance: button;
@@ -300,7 +532,7 @@
 
 @media (hover: hover) {
     .gm-text-input__close:hover {
-        color: #4a5565;
+        color: var(--gm-text-3, #4a5565);
     }
 }
 
@@ -324,27 +556,7 @@
     margin: 0;
     border-left: 6px solid transparent;
     border-right: 6px solid transparent;
-    border-top: 6px solid #e5e7eb;
-}
-
-@supports (color: lab(0% 0 0)) {
-    .gm-text-input__box {
-        border-color: lab(91.6229% -.159085 -2.26791);
-    }
-    .gm-text-input__field {
-        color: lab(16.1051% -1.18239 -11.7533);
-    }
-    .gm-text-input__close {
-        color: lab(65.9269% -.832707 -8.17474);
-    }
-}
-
-@media (hover: hover) {
-    @supports (color: lab(0% 0 0)) {
-        .gm-text-input__close:hover {
-            color: lab(35.6337% -1.58697 -10.8425);
-        }
-    }
+    border-top: 6px solid var(--gm-border, #e5e7eb);
 }
 
 /* ── 측정 툴팁 (core/tools/measureTooltip.ts) — 거리·면적·반경. ol.Overlay 요소 안에 그린다 ── */
@@ -445,7 +657,8 @@
 }
 
 /* ── 나만의지도 클릭 팝업 (core/overlays/MyMapPopup.ts) — ol.Overlay 요소 안에 그린다. attach 모드에서는 .gm-root 밖에 그려지므로
-   리셋을 규칙마다 직접 둔다(측정 툴팁과 같은 방식). 색은 --gm-* 변수 없이 고정값 ── */
+   리셋을 규칙마다 직접 둔다(측정 툴팁과 같은 방식). 색은 var(--gm-…, 라이트 대체값) — attach에서는 변수가 없어 대체값(= 라이트)이 쓰이고,
+   엔진이 팝업 요소에 data-gm-theme을 달면 위 다크 블록이 요소 자신에게 변수를 준다 ── */
 .gm-mymap-popup {
     position: relative;
     box-sizing: border-box;
@@ -453,12 +666,12 @@
     min-width: 160px;
     max-width: 300px;
     margin: 0;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--gm-border, #e5e7eb);
     border-radius: .5rem;
     padding: 0;
-    background-color: #fff;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -4px rgba(0, 0, 0, .1);
-    color: #1e2939;
+    background-color: var(--gm-surface, #fff);
+    box-shadow: 0 10px 15px -3px var(--gm-shadow-color, rgba(0, 0, 0, .1)), 0 4px 6px -4px var(--gm-shadow-color, rgba(0, 0, 0, .1));
+    color: var(--gm-text-strong, #1e2939);
     font-size: 12px;
     line-height: 1.4;
     text-align: left;
@@ -478,8 +691,8 @@
     margin-left: -6px;
     border-left: 6px solid transparent;
     border-right: 6px solid transparent;
-    border-top: 6px solid #fff;
-    filter: drop-shadow(0 1px 0 #e5e7eb);
+    border-top: 6px solid var(--gm-surface, #fff);
+    filter: drop-shadow(0 1px 0 var(--gm-border, #e5e7eb));
 }
 
 .gm-mymap-popup__header {
@@ -489,7 +702,7 @@
     gap: 6px;
     margin: 0;
     border: 0 solid;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid var(--gm-border-subtle, #f3f4f6);
     padding: 6px 6px 6px 10px;
 }
 
@@ -504,7 +717,7 @@
     white-space: nowrap;
     font-size: 12px;
     font-weight: 700;
-    color: #111827;
+    color: var(--gm-text, #111827);
 }
 
 .gm-mymap-popup__close {
@@ -517,7 +730,7 @@
     background-color: transparent;
     font: inherit;
     letter-spacing: inherit;
-    color: #99a1af;
+    color: var(--gm-text-faint, #9ca3af);
     opacity: 1;
     cursor: pointer;
     -webkit-appearance: button;
@@ -527,7 +740,7 @@
 
 @media (hover: hover) {
     .gm-mymap-popup__close:hover {
-        color: #4a5565;
+        color: var(--gm-text-3, #4a5565);
     }
 }
 
@@ -571,12 +784,12 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-weight: 600;
-    color: #64748b;
+    color: var(--gm-text-muted, #6b7280);
 }
 
 .gm-mymap-popup__table td {
     overflow-wrap: anywhere;
-    color: #111827;
+    color: var(--gm-text, #111827);
 }
 
 /* ── OL 축척 막대(ol.control.ScaleLine) 모양 (FE-6b, QA FE-6a F1) ──

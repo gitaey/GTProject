@@ -64,6 +64,8 @@ export interface LayerTreeController {
     setOpacity(layerId: number, opacity: number): void
     /** 모드를 바꾸고 배경지도 레이어들의 체크 상태를 그 모드에 맞춘다 */
     setBasemapMode(mode: BasemapMode): void
+    /** 이 모드로 바꿀 수 있나: 'none'은 항상, 그 밖은 트리에 그 모드의 배경지도 레이어가 있을 때(시작 화면 복원이 빈 지도를 만들지 않게 확인) */
+    hasBasemapMode(mode: BasemapMode): boolean
     /** 이름이 같은 첫 레이어를 켠다(이미 켜져 있으면 그대로) */
     enableLayerByName(name: string): void
     toggleExpanded(groupId: number, defaultExpanded?: boolean): void
@@ -198,6 +200,11 @@ export class LayerTreeControllerImpl implements LayerTreeController {
             if (override !== null) updates[layer.id] = override
         }
         this.state.setState({ basemapMode: mode, visible: { ...s.visible, ...updates } })
+    }
+
+    hasBasemapMode(mode: BasemapMode): boolean {
+        if (mode === 'none') return true
+        return this.allLayers().some(l => getBasemapVisibility(l, mode, this.opts.basemapModes) === true)
     }
 
     enableLayerByName(name: string): void {

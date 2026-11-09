@@ -39,7 +39,7 @@ GTProject의 인증 스토어·환경 변수·전역 상태에 묶이면 옮길 
 
 **패키지 안 금지:** 앱 import(`@/…`, 자기 자신 `@gtp/gis-map`, 패키지 밖 상대 경로), `process.env`·`import.meta.env`,
 모듈 전역 가변 상태(최상위 `let`/`var`·`new Map/Set`·zustand `create`·얼리지 않은 공개 상수 — 상태는 전부 `GisMap` 인스턴스와 그 컨트롤러 필드),
-`window`/`self`/`globalThis` 쓰기(UMD 진입점 2개만 예외), `localStorage`(`react/usePersistentExpanded.ts`만), Tailwind 클래스(`gm-` 접두사 CSS만,
+`window`/`self`/`globalThis` 쓰기(UMD 진입점 2개만 예외), `localStorage`(`react/usePersistentExpanded.ts`·`adapters/memory/browserStorage.ts`만 — 감사 7번 허용 목록), Tailwind 클래스(`gm-` 접두사 CSS만,
 조건부 클래스는 `cx()`, className 템플릿 문자열 금지), 호스트 경로·주소 하드코딩(`localhost`, `/api/…`·`/proxy/…` — **`adapters/`만** 허용,
 `core/host.ts`의 `DEFAULT_HOST` 기본값 예외), core에서 `'EPSG:3857'` 리터럴(`config.ts`·`projection.ts`만 — 뷰 좌표계는 `map.getView().getProjection()`).
 
@@ -48,10 +48,11 @@ GTProject의 인증 스토어·환경 변수·전역 상태에 묶이면 옮길 
 `getCurrentUser()`, `isFeatureAllowed(id)`·`permissionsReady`. 일부만 넘기면 `DEFAULT_HOST`로 채운다.
 React는 `<GisMapProvider host={…}>`(바뀌면 `map.setHost`), UMD는 `GisMap.create/attach({ host })`.
 **데이터는 `GisMapSources`로만** (`core/sources.ts`): `layerTree`(+`userSelection`)·`myMap`·`geoTiff`·`wind`(`restSources()`),
-`addressSearch`·`parcel`·`regionName`·`legend`·`wfs`(`proxySources()`). 소스가 없으면 그 기능은 조용히 꺼진다. 코어·위젯은 fetch를 직접 하지 않는다.
+`addressSearch`·`parcel`·`regionName`·`legend`·`wfs`(`proxySources()`). 소스가 없으면 그 기능은 조용히 꺼진다.
+설정 패널용 두 칸도 같은 규칙: `startView`(시작 화면 저장소 — `restStartView` 계정 저장이 `restSources()`에 자동 포함, 백엔드 없는 호스트는 `browserStartViewSource(key)`(adapters/memory, 브라우저 저장). **소스는 하나**라 둘을 섞지 않는다(뒤에 준 것이 이긴다))·`dataInfo`(데이터 기준 정보 `restDataInfo` — `/api/mymap/ref/status`+`/api/wind/frames`, `restSources()`에 자동 포함). 짝 백엔드가 그 API를 모르면(404) 카드가 조용히 빠진다. 코어·위젯은 fetch를 직접 하지 않는다.
 
 **GTProject 연결부(이식 안 함):** `app/map/page.tsx`(조립만) + `app/map/_gtp/`
-— `useGtpMapHost.ts`(authStore·menuStore·env → host), `gtpMap.tsx`(중심·브랜드 색·소스·바람길 플러그인·기타 패널 상수), `mapSession.ts`(앱 기억), `EtcPanel.tsx`.
+— `useGtpMapHost.ts`(authStore·menuStore·env → host), `gtpMap.tsx`(중심·브랜드 색·소스·바람길 플러그인·기타 패널 상수), `mapSession.ts`(앱 기억), `gtpTheme.ts`(화면 테마 선택 기억), `EtcPanel.tsx`.
 `app/map-admin/layer`는 엔진 없이 `usePersistentExpanded`와 `./types`만 쓴다. 앱은 공개 진입점 7개(`@gtp/gis-map/{core,core/wind,react,ui,adapters/rest,adapters/proxy,adapters/memory}`)만 import한다.
 
 **새 코드를 어디에 두나**
@@ -76,6 +77,18 @@ React는 `<GisMapProvider host={…}>`(바뀌면 `map.setHost`), UMD는 `GisMap.
 
 **호스트가 제공해야 하는 것:** `{proxyBaseUrl}` 아래 `/vworld/search`·`/vworld/legend-style`·`/vworld/data`·`/wfs`·`/region`(키 숨김 프록시),
 `{apiBaseUrl}/api/` 아래 `layers`·`mymap`·`geotiff`·`wind`·`gis/share-directory`(공유 상대 검색, 쓰는 기능만 — 없으면 아이디·역할 코드를 직접 입력하는 폴백). 엔드포인트·DDL은 `.claude/skills/map-module-export/references/`.
+
+## 설정 패널 · 시작 화면 · 화면 밝기 (2026-11, 1단계 구현)
+
+- 네비 아래 `설정`(`ui/settings/`)이 여는 셸 패널(`MapPanelDef.scope: 'shell'` — 분할 중에도 "대상 지도" 탭 없음, `SETTINGS_PANEL_ID = 'gm-settings'`). `MapShell settings`(기본 true, 객체면 `MapShellSettingsOptions`: `featureId`·`theme`·`startView`·`dataInfo`·`staticDataInfo`·`children`). **메뉴 권한 ID는 만들지 않는다**(새 ID가 `/admin/menu`에 저장된 역할에서 버튼을 숨기는 함정) — 막으려면 `settings.featureId`만.
+- **`settings={false}`는 UI(버튼·패널)만 끈다.** 시작 화면 자동 적용(저장값 조회·적용·그림 보류)을 끄려면 `config.startView.autoApply:false`를 따로 준다(지도 위치를 직접 정하는 화면 — 예: map-dev/dual — 이 저장 위치로 덮이지 않게).
+- 카드 3장: 화면 테마(`theme !== false`) · 시작 화면(소스 있음 + 서버 404 아님 + 엔진이 지도를 만든 경우) · 데이터 기준 정보(`sources.dataInfo` 또는 `staticDataInfo`). 패널을 열기만 해서는 요청 0, 데이터 기준 정보는 카드를 처음 펼칠 때만(닫으면 abort).
+- 시작 화면: 엔진 `map.startView`(`core/startView/`) — `store`(status 8종·`value`·`applied`·`late`·`invalid`·`holding`·`saving`·`errorOp`·`errorKind`)·`load/save/clear/applyNow`. 엔진이 지도를 만들면(`createGisMap`, 붙이기 제외) 저장값을 읽고, 비동기면 **지도 그림(`olMap.setTarget`)을 최대 `config.startView.waitMs`(기본 1500)까지 보류**했다가 값이 오면 적용한다(첫 그림이 곧 시작 화면). 늦게 온 값은 `late`로 store에만 두고 지도는 움직이지 않는다([시작 화면으로] 강조). 조회 5초·저장/삭제 10초 시간 초과는 `restStartView`가 `GisHttpError(408)`로. 사용자(`getCurrentUser().userId`)가 바뀌면 store를 비운다. 분할 보조 지도는 `startView.autoApply:false`(조회·적용 없음).
+- 저장하는 것: 분할 수·연동·활성 지도 + 지도마다 중심(4326)·줌·회전·배경지도. 저장 안 하는 것: 켠 레이어·열린 패널·그리기 스타일(`mapSession` 몫)·바람길. 순수 함수 `captureViewState/applyViewState/buildStartView/parseStartView`(`core`, UMD `GisMap.captureStartView/applyViewState/parseStartView`) — 서버는 형식·크기만 보므로 **내용 검사는 `parseStartView`가 유일한 관문**. 배경지도는 트리가 있으면 즉시·없으면 트리 도착 시 한 번(그 사이 사용자가 바꿨거나 그 모드 레이어가 없으면 건너뜀 — `layers.hasBasemapMode`).
+- 분할 복원은 `react/split/GisMapSplitProvider`(`restoreStartView`, 기본 true)가 한다: 0번 지도가 `applied`이고 `split.count>1`이면 한 번만 `applyStartView`(사용자가 먼저 분할 수를 바꿨으면 안 함). 설정 패널의 [시작 화면으로]도 같은 `split.applyStartView`. 자식 effect가 먼저 돌아 셸 안에서 하면 Provider의 "처음 상태 복사"가 덮어쓰므로 Provider 안에서만.
+- 화면 밝기: `config.appearance`·`map.setAppearance`(엔진이 직접 그리는 DOM용 — 엔진이 만드는 입력창·툴팁·팝업에 `data-gm-theme`를 단다)·`MapShell theme/defaultTheme/onThemeChange`·`MapRoot theme`(`data-gm-theme`, 라이트면 속성 없음). CSS는 `styles/gis-map.css`의 의미 토큰(`--gm-surface`·`--gm-text-muted`·`--gm-primary-soft`·… 라이트=지금 색, `[data-gm-theme="dark"]`·`@media (prefers-color-scheme: dark) [data-gm-theme="system"]` 두 블록은 값이 같고 함께 고친다). **다크 선택자는 속성 선택자만** — attach 빌드가 `.gm-root[...]`·`[...] .gm-root` 꼴을 실패시킨다. 위젯 CSS·인라인 색은 모두 의미 토큰으로 바뀌었다(데이터 색 — 그리기 견본·`DEPTH_COLORS`·나만의지도 팔레트·바람 척도·영역 분석 결과 색·필지 강조색 — 과 출력물은 토큰이 아니다, 출력은 항상 라이트). GTProject는 테마 카드를 켜고(`GTP_SETTINGS.theme:true`, 선택값은 localStorage `gtp-map-theme`이라 대시보드 테마와 별개) 공개 데모는 숨긴다(`DEMO_SETTINGS.theme:false`). `settings={false}`는 UI만 끈다 — 시작 화면 자동 적용을 끄려면 `config.startView.autoApply:false`. **함정:** 패키지 리셋 `.gm-root :where([class*="gm-"])`가 클래스 문자열에 "gm-"가 들어간 요소의 border·margin·padding을 0으로 만든다 — 기타 패널(Tailwind)은 `bg-(--gm-surface)`처럼 클래스에 `--gm-`을 직접 쓰지 말고 `_gtp/etc/EtcParts.tsx`의 `--etc-*` 별칭(`bg-(--etc-surface)`)을 쓴다. `document.body` 아래로 포털되는 모달은 `.gm-root` 밖이라 모달 루트에 `gm-root` 클래스와 `data-gm-theme`을 달아야 토큰을 받는다.
+- GTProject 연결: `_gtp/gtpTheme.ts`(테마 선택 기억 — localStorage `gtp-map-theme`, 대시보드와 별개), `gtpMap.tsx`의 `GTP_SETTINGS`(정적 항목 VWorld 1건), `isGtpPanelVisible`이 `SETTINGS_PANEL_ID` 인정. 공개 데모는 `browserStartViewSource('gtp-demo-start-view')`("이 브라우저에 저장").
+- 기록·시험: `_workspace/map-settings-panel/`(설계 `01_design.md`, 가짜 응답 `fake-fetch.js`, 순수 함수 시험 `check/run-check.sh`).
 
 ## 프론트 구조
 

@@ -10,3 +10,4 @@ export {
 } from './synthetic'
 export type { SyntheticData, SyntheticOptions } from './synthetic'
 export { buildXlsx } from './xlsx'
+export { browserStartViewSource } from './browserStorage'
