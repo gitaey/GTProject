@@ -23,17 +23,17 @@ interface FileChipProps {
 
 function FileChip({ name, rows, onRemove }: FileChipProps) {
     return (
-        <div className="flex items-center gap-1.5 rounded-md border border-[#E5E7EB] bg-[#F9FAFB] px-2 py-1.5 text-[11.5px]">
-            <FileSpreadsheet size={13} aria-hidden className="shrink-0 text-gray-400" />
-            <span className="min-w-0 flex-1 truncate font-semibold text-gray-700" title={name}>{name}</span>
-            {rows !== undefined && <small className="whitespace-nowrap text-[10.5px] text-gray-500">{fmt(rows)}행</small>}
+        <div className="flex items-center gap-1.5 rounded-md border border-(--etc-border) bg-(--etc-surface-muted) px-2 py-1.5 text-[11.5px]">
+            <FileSpreadsheet size={13} aria-hidden className="shrink-0 text-(--etc-text-faint)" />
+            <span className="min-w-0 flex-1 truncate font-semibold text-(--etc-text-2)" title={name}>{name}</span>
+            {rows !== undefined && <small className="whitespace-nowrap text-[10.5px] text-(--etc-text-muted)">{fmt(rows)}행</small>}
             {onRemove && (
                 <button
                     type="button"
                     onClick={onRemove}
                     aria-label="이 파일 빼기"
                     title="이 파일 빼기"
-                    className="shrink-0 rounded text-gray-400 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-[#F26722]"
+                    className="shrink-0 rounded text-(--etc-text-faint) hover:text-(--etc-text-2) focus-visible:outline-2 focus-visible:outline-(--etc-primary)"
                 >
                     <X size={13} aria-hidden />
                 </button>
@@ -72,10 +72,10 @@ function DropZone({ onFile, disabled }: DropZoneProps) {
                 onDragOver={(e) => { e.preventDefault(); if (!disabled) setOver(true) }}
                 onDragLeave={() => setOver(false)}
                 onDrop={handleDrop}
-                className={`flex cursor-pointer flex-col items-center gap-1 rounded-[7px] border-[1.5px] border-dashed px-2.5 py-3.5 text-center transition-colors hover:border-[#F26722] hover:bg-[#FFF7ED] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#F26722] ${over ? 'border-[#F26722] bg-[#FFF7ED] text-[#F26722]' : 'border-[#D1D5DC] text-gray-400'}`}
+                className={`flex cursor-pointer flex-col items-center gap-1 rounded-[7px] border-[1.5px] border-dashed px-2.5 py-3.5 text-center transition-colors hover:border-(--etc-primary) hover:bg-(--etc-primary-soft) peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-(--etc-primary) ${over ? 'border-(--etc-primary) bg-(--etc-primary-soft) text-(--etc-primary)' : 'border-(--etc-border-strong) text-(--etc-text-faint)'}`}
             >
                 <Upload size={16} aria-hidden />
-                <span className="text-[11.5px] font-semibold text-gray-700">엑셀 파일을 끌어 놓거나 눌러서 선택</span>
+                <span className="text-[11.5px] font-semibold text-(--etc-text-2)">엑셀 파일을 끌어 놓거나 눌러서 선택</span>
                 <small className="text-[10.5px]">
                     .xlsx · .xls / {fmt(MAX_DATA_ROWS)}행 · {MAX_FILE_BYTES / 1024 / 1024}MB까지
                 </small>
@@ -86,8 +86,8 @@ function DropZone({ onFile, disabled }: DropZoneProps) {
 
 function Hint({ children }: { children: React.ReactNode }) {
     return (
-        <div className="flex gap-[5px] text-[10.5px] leading-[1.45] text-gray-500">
-            <Info size={13} aria-hidden className="mt-px shrink-0 text-gray-400" />
+        <div className="flex gap-[5px] text-[10.5px] leading-[1.45] text-(--etc-text-muted)">
+            <Info size={13} aria-hidden className="mt-px shrink-0 text-(--etc-text-faint)" />
             <span>{children}</span>
         </div>
     )
@@ -120,18 +120,18 @@ interface SummaryRowProps {
 }
 
 function SummaryRow({ label, value, bad }: SummaryRowProps) {
-    const tone = value === 0 ? 'text-[#C4C9D2]' : 'text-gray-700'
+    const tone = value === 0 ? 'text-(--etc-text-faint)' : 'text-(--etc-text-2)'
     return (
-        <div className={`flex justify-between border-b border-[#F3F4F6] px-2 py-1 last:border-b-0 ${tone}`}>
+        <div className={`flex justify-between border-b border-(--etc-border-subtle) px-2 py-1 last:border-b-0 ${tone}`}>
             <span>{label}</span>
-            <em className={`font-bold not-italic tabular-nums ${value > 0 && bad ? 'text-[#DC2626]' : ''}`}>{fmt(value)}</em>
+            <em className={`font-bold not-italic tabular-nums ${value > 0 && bad ? 'text-(--etc-danger)' : ''}`}>{fmt(value)}</em>
         </div>
     )
 }
 
 function CheckSummary({ check }: { check: PnuCheckSummary }) {
     return (
-        <div className="overflow-hidden rounded-md border border-[#E5E7EB] text-[11px]">
+        <div className="overflow-hidden rounded-md border border-(--etc-border) text-[11px]">
             <SummaryRow label="데이터 행" value={check.rows} />
             <SummaryRow label="정상" value={check.ok} />
             <SummaryRow label="중복(한 번만 조회)" value={check.duplicates} />
@@ -146,12 +146,12 @@ function CheckSummary({ check }: { check: PnuCheckSummary }) {
 function ResultChips({ summary }: { summary: PnuResultSummary }) {
     const errors = summary.FORMAT + summary.NUMERIC + summary.EXP + summary.NOT_FETCHED
     const chips: { label: string; count: number; cls: string }[] = [
-        { label: '성공', count: summary.SUCCESS, cls: 'bg-[#F0FDF4] text-[#15803D]' },
-        { label: '건물 없음', count: summary.NO_BUILDING, cls: 'bg-[#FFFBEB] text-[#B45309]' },
-        { label: '지번만', count: summary.JIBUN_ONLY, cls: 'bg-[#FFFBEB] text-[#B45309]' },
-        { label: '법정동 없음', count: summary.NO_LEGAL_DONG, cls: 'bg-[#FFFBEB] text-[#B45309]' },
-        { label: '오류·복구 불가', count: errors, cls: 'bg-[#FEF2F2] text-[#DC2626]' },
-        { label: '빈 값', count: summary.EMPTY, cls: 'bg-[#F3F4F6] text-gray-700' },
+        { label: '성공', count: summary.SUCCESS, cls: 'bg-(--etc-success-soft) text-(--etc-success)' },
+        { label: '건물 없음', count: summary.NO_BUILDING, cls: 'bg-(--etc-warn-soft) text-(--etc-warn)' },
+        { label: '지번만', count: summary.JIBUN_ONLY, cls: 'bg-(--etc-warn-soft) text-(--etc-warn)' },
+        { label: '법정동 없음', count: summary.NO_LEGAL_DONG, cls: 'bg-(--etc-warn-soft) text-(--etc-warn)' },
+        { label: '오류·복구 불가', count: errors, cls: 'bg-(--etc-danger-soft) text-(--etc-danger)' },
+        { label: '빈 값', count: summary.EMPTY, cls: 'bg-(--etc-surface-sunken) text-(--etc-text-2)' },
     ]
     return (
         <div className="flex flex-wrap gap-1">
@@ -208,7 +208,7 @@ export default function PnuAddressTool() {
         return (
             <>
                 {job.fileName && <FileChip name={job.fileName} />}
-                <div role="status" className="flex items-center justify-center gap-1.5 py-2 text-[11px] text-gray-500">
+                <div role="status" className="flex items-center justify-center gap-1.5 py-2 text-[11px] text-(--etc-text-muted)">
                     <Loader2 size={13} aria-hidden className="animate-spin" />
                     파일을 읽는 중…
                 </div>
@@ -252,7 +252,7 @@ export default function PnuAddressTool() {
                         <>
                             PNU 열
                             {job.pnuColumn !== null && job.pnuColumn === job.suggestedColumn && !job.suggestBroken && (
-                                <span className="rounded bg-[#FFF7ED] px-[5px] py-px text-[9.5px] font-bold text-[#F26722]">추천</span>
+                                <span className="rounded bg-(--etc-primary-soft) px-[5px] py-px text-[9.5px] font-bold text-(--etc-primary)">추천</span>
                             )}
                         </>
                     }
@@ -289,7 +289,7 @@ export default function PnuAddressTool() {
         return (
             <>
                 {chip}
-                <div className="flex justify-between text-[11px] tabular-nums text-gray-700">
+                <div className="flex justify-between text-[11px] tabular-nums text-(--etc-text-2)">
                     <span>주소 찾는 중…</span>
                     <span>{fmt(job.done)} / {fmt(total)} · {percent}%</span>
                 </div>
@@ -299,9 +299,9 @@ export default function PnuAddressTool() {
                     aria-valuemin={0}
                     aria-valuemax={100}
                     aria-valuenow={percent}
-                    className="h-1.5 overflow-hidden rounded-full bg-[#F3F4F6]"
+                    className="h-1.5 overflow-hidden rounded-full bg-(--etc-surface-sunken)"
                 >
-                    <div className="h-full rounded-full bg-[#F26722] transition-[width]" style={{ width: `${percent}%` }} />
+                    <div className="h-full rounded-full bg-(--etc-primary) transition-[width]" style={{ width: `${percent}%` }} />
                 </div>
                 <button type="button" onClick={job.stop} className={BTN_SECONDARY}>
                     <Pause size={13} aria-hidden />중지
@@ -310,7 +310,7 @@ export default function PnuAddressTool() {
                     {job.retryNote && <NoticeBox tone="warn">{job.retryNote}</NoticeBox>}
                     {job.warmupHint && <Hint>처음 한 번은 주소 사전을 준비하느라 최대 1분쯤 걸릴 수 있습니다.</Hint>}
                 </div>
-                <div className="text-center text-[10.5px] text-gray-400">다른 탭으로 옮겨도 계속됩니다</div>
+                <div className="text-center text-[10.5px] text-(--etc-text-faint)">다른 탭으로 옮겨도 계속됩니다</div>
             </>
         )
     }
@@ -321,12 +321,12 @@ export default function PnuAddressTool() {
         return (
             <>
                 {chip}
-                <div className="flex justify-between text-[11px] tabular-nums text-gray-700">
+                <div className="flex justify-between text-[11px] tabular-nums text-(--etc-text-2)">
                     <span>멈춤</span>
                     <span>{fmt(job.done)} / {fmt(total)}</span>
                 </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-[#F3F4F6]">
-                    <div className="h-full rounded-full bg-[#F9B98F]" style={{ width: `${percent}%` }} />
+                <div className="h-1.5 overflow-hidden rounded-full bg-(--etc-surface-sunken)">
+                    <div className="h-full rounded-full bg-(--etc-primary-disabled)" style={{ width: `${percent}%` }} />
                 </div>
                 {job.error ? (
                     <NoticeBox tone="err" alert>{job.error.message}</NoticeBox>
@@ -359,7 +359,7 @@ export default function PnuAddressTool() {
                 <NoticeBox tone="warn">도로명주소 자료가 아직 준비되지 않아 지번주소만 채웠습니다.</NoticeBox>
             )}
             {job.resultSummary && <ResultChips summary={job.resultSummary} />}
-            {job.meta?.referenceVersion && <div className="text-[10.5px] text-gray-400">건물DB {job.meta.referenceVersion} 기준</div>}
+            {job.meta?.referenceVersion && <div className="text-[10.5px] text-(--etc-text-faint)">건물DB {job.meta.referenceVersion} 기준</div>}
             {job.meta && job.meta.roadAvailable && !job.meta.relatedIncluded && (
                 <Hint>관련지번으로 걸린 건물은 포함하지 않았습니다(대표지번 건물만).</Hint>
             )}

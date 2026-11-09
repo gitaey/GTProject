@@ -4,7 +4,7 @@
 // 단추가 먹통처럼 보이는 것을 막는다 — 되돌리는 것은 안내 띠의 VWorld 단추). 배경지도 출처 문구를 지도 오른쪽 아래에 둔다.
 import type { DemoBasemap } from '@gtp/gis-map/adapters/memory'
 import { MapShell } from '@gtp/gis-map/ui'
-import { DEMO_BRAND, DEMO_PANELS, DEMO_SPLIT, DEMO_USER_MENU, useOsmOn } from './demoConfig'
+import { DEMO_BRAND, DEMO_PANELS, DEMO_SETTINGS, DEMO_SPLIT, DEMO_USER_MENU, useOsmOn } from './demoConfig'
 
 export interface DemoShellProps {
     basemap: DemoBasemap
@@ -22,7 +22,7 @@ export default function DemoShell({ basemap, panel, onPanelChange }: DemoShellPr
     const osmOn = useOsmOn()
     return (
         <MapShell brand={DEMO_BRAND} panels={DEMO_PANELS} defaultPanel={panel} onPanelChange={onPanelChange}
-            userMenuItems={DEMO_USER_MENU} showBasemapSwitcher={basemap === 'both' && !osmOn} split={DEMO_SPLIT}>
+            userMenuItems={DEMO_USER_MENU} showBasemapSwitcher={basemap === 'both' && !osmOn} split={DEMO_SPLIT} settings={DEMO_SETTINGS}>
             <div className="demo-attr">{attributionText(basemap, osmOn)}</div>
         </MapShell>
     )

@@ -6,6 +6,7 @@
 
 import { useCallback, useState } from 'react'
 import EtcToolCard from './etc/EtcToolCard'
+import { ETC_THEME_VARS } from './etc/EtcParts'
 import { ETC_TOOLS } from './etc/etcTools'
 
 export default function EtcPanel() {
@@ -23,7 +24,8 @@ export default function EtcPanel() {
     }, [])
 
     return (
-        <div className="gm-panel">
+        // 루트가 --etc-* 별칭을 정한다(화면 테마의 --gm-* 를 읽음). 바탕은 .gm-panel(--gm-surface), 글자색을 안 준 요소는 여기서 상속
+        <div className="gm-panel text-(--etc-text)" style={ETC_THEME_VARS}>
             <div className="gm-panel__header">
                 <span className="gm-panel__title">기타 기능</span>
             </div>

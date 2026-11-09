@@ -87,6 +87,7 @@ export const SIDE_A = sideDef({
     config: freezeConfig({
         view: { center: [127.289, 36.48], zoom: 12, minZoom: 7, maxZoom: 21 },
         sources: SHARED_SOURCES,
+        startView: { autoApply: false }, // 저장한 시작 화면이 "세종 A / 서울 B" 비교 위치를 덮지 않게(settings={false}는 UI만 끈다)
     }),
     brand: Object.freeze({ title: '지도 A', subtitle: '세종 · 주황', logo: <MapPinned size={16} /> }),
     panels: defaultPanels,
@@ -104,6 +105,7 @@ export const SIDE_B = sideDef({
         view: { center: [126.978, 37.5665], zoom: 12, minZoom: 7, maxZoom: 21 },
         theme: { primary: '#0055aa' },
         sources: SHARED_SOURCES,
+        startView: { autoApply: false },
     }),
     brand: Object.freeze({ title: '지도 B', subtitle: '서울 · 파랑', logo: <Building2 size={16} /> }),
     panels: Object.freeze([layerPanel, imagePanel]),

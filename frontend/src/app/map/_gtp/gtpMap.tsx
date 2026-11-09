@@ -4,14 +4,14 @@
 // 모두 모듈 상수·모듈 함수라 렌더마다 참조가 바뀌지 않는다(Provider config는 최초 1회만 읽고, setup은 엔진마다 1번).
 import { Earth, MoreHorizontal } from 'lucide-react'
 import { defaultLayerCrossOrigin, isVWorldUrl } from '@gtp/gis-map/core'
-import type { GisMap, GisMapConfig, LayerCrossOriginResolver } from '@gtp/gis-map/core'
+import type { GisDataInfoItem, GisMap, GisMapConfig, LayerCrossOriginResolver } from '@gtp/gis-map/core'
 import { createWindPlugin } from '@gtp/gis-map/core/wind'
 import { browserExpandedStorage } from '@gtp/gis-map/react'
 import type { GisMapSetupInfo } from '@gtp/gis-map/react'
 import { restSources } from '@gtp/gis-map/adapters/rest'
 import { proxySources } from '@gtp/gis-map/adapters/proxy'
-import { defaultPanels, windPanel } from '@gtp/gis-map/ui'
-import type { MapPanelDef, MapShellBrand, MapShellSplitOptions } from '@gtp/gis-map/ui'
+import { SETTINGS_PANEL_ID, defaultPanels, windPanel } from '@gtp/gis-map/ui'
+import type { MapPanelDef, MapShellBrand, MapShellSettingsOptions, MapShellSplitOptions } from '@gtp/gis-map/ui'
 import { useAuthStore } from '@/stores/authStore'
 import { useMenuStore } from '@/stores/menuStore'
 import EtcPanel from './EtcPanel'
@@ -85,12 +85,30 @@ function sessionOwner(): string {
  * GTP_PANELS에 있고, featureId가 없거나, 메뉴 권한을 아직 못 받았거나(이때 네비도 전부 보인다), 권한이 있으면 true
  */
 function isGtpPanelVisible(panelId: string): boolean {
+    // 설정 패널은 셸이 만든다(GTP_PANELS에 없다). 메뉴 권한 ID가 없어 로그인한 누구나 보인다
+    if (panelId === SETTINGS_PANEL_ID) return true
     const panel = GTP_PANELS.find(p => p.id === panelId)
     if (!panel) return false
     if (panel.featureId == null) return true
     const { loaded, isAllowed } = useMenuStore.getState()
     return !loaded || isAllowed(panel.featureId)
 }
+
+/** 데이터 기준 정보 끝에 붙는 배경지도 안내 한 줄(요청 없는 정적 항목 — VWorld는 기준일 API가 없다) */
+const VWORLD_INFO: Readonly<GisDataInfoItem> = Object.freeze({
+    id: 'vworld-basemap', label: '배경지도·위성영상', source: '브이월드(국토교통부 공간정보 오픈플랫폼)', version: null,
+    baseDate: null, loadedAt: null, updateCycle: '제공처 수시 갱신', status: 'ready', stale: false, note: '기준일은 브이월드 공지를 따릅니다',
+})
+
+/**
+ * 설정 패널 설정(모듈 상수). 시작 화면은 restSources()에 자동 포함된 계정 저장(restStartView)을 그대로 쓴다 — 추가 코드 없음.
+ * 메뉴 권한 ID는 만들지 않는다(settings.featureId를 안 준다 → 로그인한 누구나). 화면 테마 카드는 켠다(theme 생략 = 노출).
+ * 선택값은 page.tsx의 useGtpMapTheme(_gtp/gtpTheme.ts)가 대시보드와 따로 기억한다
+ */
+export const GTP_SETTINGS: Readonly<MapShellSettingsOptions> = Object.freeze({
+    theme: true,
+    staticDataInfo: Object.freeze([VWORLD_INFO]),
+})
 
 /**
  * 화면 분할 설정(모듈 상수 — MapShell이 참조로 비교하지 않아도 렌더마다 새 객체를 만들지 않는다). 처음엔 분할 없음, 화면 연동 켬.

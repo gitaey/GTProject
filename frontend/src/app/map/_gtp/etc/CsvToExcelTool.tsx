@@ -120,10 +120,10 @@ export default function CsvToExcelTool() {
                     onDragOver={(e) => { e.preventDefault(); if (status !== 'processing') setOver(true) }}
                     onDragLeave={() => setOver(false)}
                     onDrop={handleDrop}
-                    className={`flex cursor-pointer flex-col items-center gap-1 rounded-[7px] border-[1.5px] border-dashed px-2.5 py-3.5 text-center transition-colors hover:border-[#F26722] hover:bg-[#FFF7ED] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[#F26722] ${over ? 'border-[#F26722] bg-[#FFF7ED] text-[#F26722]' : 'border-[#D1D5DC] text-gray-400'}`}
+                    className={`flex cursor-pointer flex-col items-center gap-1 rounded-[7px] border-[1.5px] border-dashed px-2.5 py-3.5 text-center transition-colors hover:border-(--etc-primary) hover:bg-(--etc-primary-soft) peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-(--etc-primary) ${over ? 'border-(--etc-primary) bg-(--etc-primary-soft) text-(--etc-primary)' : 'border-(--etc-border-strong) text-(--etc-text-faint)'}`}
                 >
                     <Upload size={16} aria-hidden />
-                    <span className="max-w-full break-all text-[11.5px] font-semibold text-gray-700">{fileName ?? 'CSV 파일을 끌어 놓거나 눌러서 선택'}</span>
+                    <span className="max-w-full break-all text-[11.5px] font-semibold text-(--etc-text-2)">{fileName ?? 'CSV 파일을 끌어 놓거나 눌러서 선택'}</span>
                     <small className="text-[10.5px]">EUC-KR(한글) CSV</small>
                 </label>
             </div>

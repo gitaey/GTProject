@@ -38,7 +38,7 @@ const DualSideView = memo(function DualSideView({ def, host, onMap }: {
         <section data-dual-side={def.side} style={{ position: 'relative', minWidth: 0, minHeight: 0, height: '100%' }}>
             <GisMapProvider host={host} config={def.config} setup={def.setup}>
                 <EngineTap onMap={onMap} />
-                <MapShell brand={def.brand} panels={def.panels} defaultPanel={initialPanel} onPanelChange={def.onPanelChange}
+                <MapShell settings={false} brand={def.brand} panels={def.panels} defaultPanel={initialPanel} onPanelChange={def.onPanelChange}
                     statusBarProjection={def.statusBarProjection} showUser={def.showUser}
                     showMobileLayerButton={def.showMobileLayerButton} showWindLegend={false} />
             </GisMapProvider>

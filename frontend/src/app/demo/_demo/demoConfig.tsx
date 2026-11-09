@@ -7,8 +7,9 @@ import type { GisMap, GisMapConfig, LayerDef, LayerGroupDef, LayerTree, LayerTre
 import { createWindPlugin } from '@gtp/gis-map/core/wind'
 import { useLayerTreeState } from '@gtp/gis-map/react'
 import type { GisMapSetupInfo, GisMapSplitCount } from '@gtp/gis-map/react'
+import { browserStartViewSource } from '@gtp/gis-map/adapters/memory'
 import { layerPanel, myMapPanel, windPanel } from '@gtp/gis-map/ui'
-import type { MapPanelDef, MapShellBrand, MapShellSplitOptions, MapUserMenuItem } from '@gtp/gis-map/ui'
+import type { MapPanelDef, MapShellBrand, MapShellSettingsOptions, MapShellSplitOptions, MapUserMenuItem } from '@gtp/gis-map/ui'
 import { demoCrossOrigin } from './demoSources'
 import type { DemoBundle } from './demoSources'
 
@@ -16,6 +17,9 @@ export const DEMO_BRAND: Readonly<MapShellBrand> = Object.freeze({ title: 'GIS �
 
 /** 네비 패널: 레이어·나만의지도·바람지도(TIFF·기타는 없다) */
 export const DEMO_PANELS: readonly MapPanelDef[] = Object.freeze([layerPanel, myMapPanel, windPanel])
+
+/** 설정 패널: 시작 화면(이 브라우저에 저장 — 백엔드가 없다)만. 테마 카드는 2단계(다크 모드 색 치환)가 끝날 때까지 숨긴다 */
+export const DEMO_SETTINGS: Readonly<MapShellSettingsOptions> = Object.freeze({ theme: false })
 
 /** 영역 분석 상한을 낮춘다 — 우리 GeoServer에 익명 부하를 주지 않게(한 번에 한 레이어·1,000건·10㎢ 경고) */
 export const DEMO_AREA_ANALYSIS = Object.freeze({ maxFeaturesPerLayer: 1000, areaWarnKm2: 10, maxConcurrent: 1 })
@@ -32,7 +36,7 @@ export function buildDemoConfig(bundle: DemoBundle): Omit<GisMapConfig, 'target'
     return {
         view: { center: demo.view.center, zoom: demo.view.zoom, minZoom: 7, maxZoom: 21 },
         theme: { primary: '#F26722' },
-        sources: [bundle.sources],
+        sources: [bundle.sources, { startView: browserStartViewSource('gtp-demo-start-view') }],
         layers: { crossOrigin: demoCrossOrigin },
         print: { organization: 'GIS 데모', attributions: demo.config.print?.attributions },
         areaAnalysis: { ...DEMO_AREA_ANALYSIS },

@@ -5,6 +5,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
+import { useGisMap } from '@gtp/gis-map/react'
+import { ETC_THEME_VARS } from './EtcParts'
 import { buildPreview, usePnuAddressJob } from './pnuAddressJob'
 import { RESULT_COLUMN_NAMES } from './pnuAddressModel'
 import type { StatusTone } from './pnuAddressModel'
@@ -12,10 +14,10 @@ import type { StatusTone } from './pnuAddressModel'
 const PREVIEW_ROWS = 50
 
 const TONE_CLASS: Readonly<Record<StatusTone, string>> = Object.freeze({
-    ok: 'bg-[#F0FDF4] text-[#15803D]',
-    warn: 'bg-[#FFFBEB] text-[#B45309]',
-    err: 'bg-[#FEF2F2] text-[#DC2626]',
-    none: 'bg-[#F3F4F6] text-gray-600',
+    ok: 'bg-(--etc-success-soft) text-(--etc-success)',
+    warn: 'bg-(--etc-warn-soft) text-(--etc-warn)',
+    err: 'bg-(--etc-danger-soft) text-(--etc-danger)',
+    none: 'bg-(--etc-surface-sunken) text-(--etc-text-2)',
 })
 
 const fmt = (n: number): string => n.toLocaleString('ko-KR')
@@ -26,6 +28,10 @@ interface PnuPreviewDialogProps {
 
 export default function PnuPreviewDialog({ onClose }: PnuPreviewDialogProps) {
     const titleId = useId()
+    // 모달은 body 포털이라 지도 루트(.gm-root) 밖이다: 열 때의 화면 테마를 엔진에서 읽어 모달 루트에 data-gm-theme로 달고,
+    // gm-root 클래스로 --gm-* 라이트 값을 받는다(다크·system은 속성이 값을 덮는다). 모달이 떠 있는 동안은 테마를 못 바꾸므로 한 번만 읽는다
+    const gis = useGisMap()
+    const [appearance] = useState(() => gis?.appearance ?? 'light')
     const [onlyIssues, setOnlyIssues] = useState(false)
     const closeRef = useRef<HTMLButtonElement>(null)
     const dialogRef = useRef<HTMLDivElement>(null)
@@ -63,11 +69,13 @@ export default function PnuPreviewDialog({ onClose }: PnuPreviewDialogProps) {
     }, [])
 
     const tabCls = (on: boolean) =>
-        `rounded-t-md border-b-2 px-2.5 py-1.5 text-[12px] focus-visible:outline-2 focus-visible:outline-[#F26722] ${on ? 'border-[#F26722] font-bold text-[#F26722]' : 'border-transparent text-gray-500 hover:text-gray-700'}`
+        `rounded-t-md border-b-2 px-2.5 py-1.5 text-[12px] focus-visible:outline-2 focus-visible:outline-(--etc-primary) ${on ? 'border-(--etc-primary) font-bold text-(--etc-primary)' : 'border-transparent text-(--etc-text-muted) hover:text-(--etc-text-2)'}`
 
     return createPortal(
         <div
-            className="fixed inset-0 z-[1000] flex items-center justify-center bg-[rgba(17,24,39,0.45)] p-3"
+            className="gm-root fixed inset-0 z-[1000] flex items-center justify-center bg-(--etc-backdrop) p-3"
+            style={ETC_THEME_VARS}
+            data-gm-theme={appearance === 'dark' || appearance === 'system' ? appearance : undefined}
             onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
         >
             <div
@@ -75,16 +83,16 @@ export default function PnuPreviewDialog({ onClose }: PnuPreviewDialogProps) {
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby={titleId}
-                className="flex max-h-[85vh] w-[min(760px,92vw)] flex-col overflow-hidden rounded-[10px] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.2)]"
+                className="flex max-h-[85vh] w-[min(760px,92vw)] flex-col overflow-hidden rounded-[10px] bg-(--etc-surface) text-(--etc-text) shadow-[0_10px_30px_rgba(0,0,0,0.2)]"
             >
-                <div className="flex shrink-0 items-center justify-between border-b border-[#E5E7EB] px-3.5 py-3">
-                    <b id={titleId} className="text-[14px] text-gray-900">결과 미리보기</b>
+                <div className="flex shrink-0 items-center justify-between border-b border-(--etc-border) px-3.5 py-3">
+                    <b id={titleId} className="text-[14px] text-(--etc-text)">결과 미리보기</b>
                     <button
                         ref={closeRef}
                         type="button"
                         onClick={onClose}
                         aria-label="닫기"
-                        className="rounded text-gray-400 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-[#F26722]"
+                        className="rounded text-(--etc-text-faint) hover:text-(--etc-text-2) focus-visible:outline-2 focus-visible:outline-(--etc-primary)"
                     >
                         <X size={16} aria-hidden />
                     </button>
@@ -97,32 +105,32 @@ export default function PnuPreviewDialog({ onClose }: PnuPreviewDialogProps) {
                         확인 필요한 행 {fmt(issueCount)}
                     </button>
                 </div>
-                <div className="min-h-0 flex-1 overflow-auto border-t border-[#E5E7EB]">
+                <div className="min-h-0 flex-1 overflow-auto border-t border-(--etc-border)">
                     <table className="w-full min-w-[640px] border-collapse text-[12px]">
                         <thead>
-                            <tr className="sticky top-0 bg-[#F9FAFB] text-left text-[11px] font-semibold text-gray-500">
-                                <th className="whitespace-nowrap border-b border-[#F3F4F6] px-2.5 py-[7px]">행</th>
-                                <th className="whitespace-nowrap border-b border-[#F3F4F6] px-2.5 py-[7px]">PNU(원본)</th>
-                                <th className="whitespace-nowrap border-b border-[#F3F4F6] px-2.5 py-[7px]">상태</th>
-                                <th className="whitespace-nowrap border-b border-[#F3F4F6] px-2.5 py-[7px]">지번주소</th>
-                                <th className="whitespace-nowrap border-b border-[#F3F4F6] px-2.5 py-[7px]">도로명주소(대표)</th>
+                            <tr className="sticky top-0 bg-(--etc-surface-muted) text-left text-[11px] font-semibold text-(--etc-text-muted)">
+                                <th className="whitespace-nowrap border-b border-(--etc-border-subtle) px-2.5 py-[7px]">행</th>
+                                <th className="whitespace-nowrap border-b border-(--etc-border-subtle) px-2.5 py-[7px]">PNU(원본)</th>
+                                <th className="whitespace-nowrap border-b border-(--etc-border-subtle) px-2.5 py-[7px]">상태</th>
+                                <th className="whitespace-nowrap border-b border-(--etc-border-subtle) px-2.5 py-[7px]">지번주소</th>
+                                <th className="whitespace-nowrap border-b border-(--etc-border-subtle) px-2.5 py-[7px]">도로명주소(대표)</th>
                             </tr>
                         </thead>
                         <tbody>
                             {preview.rows.map((r) => (
                                 <tr key={r.rowNumber}>
-                                    <td className="whitespace-nowrap border-b border-[#F3F4F6] px-2.5 py-[7px] tabular-nums">{r.rowNumber}</td>
-                                    <td className="whitespace-nowrap border-b border-[#F3F4F6] px-2.5 py-[7px] font-mono text-[11.5px] text-gray-700">{r.rawPnu || '—'}</td>
-                                    <td className="whitespace-nowrap border-b border-[#F3F4F6] px-2.5 py-[7px]">
+                                    <td className="whitespace-nowrap border-b border-(--etc-border-subtle) px-2.5 py-[7px] tabular-nums">{r.rowNumber}</td>
+                                    <td className="whitespace-nowrap border-b border-(--etc-border-subtle) px-2.5 py-[7px] font-mono text-[11.5px] text-(--etc-text-2)">{r.rawPnu || '—'}</td>
+                                    <td className="whitespace-nowrap border-b border-(--etc-border-subtle) px-2.5 py-[7px]">
                                         <span title={r.detail ?? undefined} className={`rounded px-1.5 py-0.5 text-[10.5px] font-bold ${TONE_CLASS[r.status.tone]}`}>
                                             {r.status.label}
                                         </span>
                                     </td>
-                                    <td className="whitespace-nowrap border-b border-[#F3F4F6] px-2.5 py-[7px]">{r.jibun ?? '—'}</td>
-                                    <td className="whitespace-nowrap border-b border-[#F3F4F6] px-2.5 py-[7px]">
+                                    <td className="whitespace-nowrap border-b border-(--etc-border-subtle) px-2.5 py-[7px]">{r.jibun ?? '—'}</td>
+                                    <td className="whitespace-nowrap border-b border-(--etc-border-subtle) px-2.5 py-[7px]">
                                         {r.road ?? '—'}
                                         {r.moreRoads > 0 && (
-                                            <span title={r.allRoads ?? undefined} className="ml-1 rounded bg-[#FFF7ED] px-[5px] py-px text-[10px] font-bold text-[#F26722]">
+                                            <span title={r.allRoads ?? undefined} className="ml-1 rounded bg-(--etc-primary-soft) px-[5px] py-px text-[10px] font-bold text-(--etc-primary)">
                                                 +{r.moreRoads}
                                             </span>
                                         )}
@@ -130,12 +138,12 @@ export default function PnuPreviewDialog({ onClose }: PnuPreviewDialogProps) {
                                 </tr>
                             ))}
                             {preview.rows.length === 0 && (
-                                <tr><td colSpan={5} className="px-2.5 py-6 text-center text-[12px] text-gray-500">표시할 행이 없습니다.</td></tr>
+                                <tr><td colSpan={5} className="px-2.5 py-6 text-center text-[12px] text-(--etc-text-muted)">표시할 행이 없습니다.</td></tr>
                             )}
                         </tbody>
                     </table>
                 </div>
-                <div className="flex shrink-0 flex-wrap justify-between gap-1.5 border-t border-[#E5E7EB] px-3.5 py-2.5 text-[11.5px] text-gray-500">
+                <div className="flex shrink-0 flex-wrap justify-between gap-1.5 border-t border-(--etc-border) px-3.5 py-2.5 text-[11.5px] text-(--etc-text-muted)">
                     <span>결과 파일에는 원본 열 오른쪽에 {RESULT_COLUMN_NAMES.join(' · ')}이(가) 붙습니다.</span>
                     <span>{fmt(preview.rows.length)} / {fmt(preview.total)}행 표시(앞 {PREVIEW_ROWS}행까지)</span>
                 </div>
