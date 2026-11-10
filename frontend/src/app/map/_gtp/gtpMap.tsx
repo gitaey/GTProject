@@ -146,15 +146,19 @@ export function setupGtpMap(map: GisMap, info: GisMapSetupInfo): void {
     restoreMapSession(map, SESSION, sessionOwner())
 }
 
+/** 처음 들어왔을 때 열어 두는 왼쪽 패널 */
+const DEFAULT_PANEL_ID = 'mymap'
+
 /**
- * 처음 열 패널(같은 사용자가 떠나기 전에 열어 둔 패널). 처음 들어오면·다른 사용자의 기억이었으면 undefined →
- * layerFloat를 켠 MapShell은 왼쪽 패널을 닫은 채 시작한다(레이어는 플로팅 패널이 맡는다).
- * 기억한 패널을 지금 사용자가 볼 수 없으면(권한이 없음·목록에서 빠짐 — 예전에 기억한 'layer' 포함) 역시 undefined
+ * 처음 열 패널. 같은 사용자가 떠나기 전에 열어 둔 패널이 있으면 그것(닫아 두고 떠났으면 닫힘 null).
+ * 처음 들어오면·다른 사용자의 기억이면, 또 기억한 패널을 지금 사용자가 볼 수 없으면(권한이 없음·목록에서 빠짐 —
+ * 예전에 기억한 'layer' 포함) 나만의지도(DEFAULT_PANEL_ID). 그것도 볼 수 없으면 닫힘
  */
-export function gtpInitialPanel(): string | null | undefined {
+export function gtpInitialPanel(): string | null {
     const panel = readMapSession(SESSION, sessionOwner()).panel
-    if (panel === undefined || panel === null) return panel
-    return isGtpPanelVisible(panel) ? panel : undefined
+    if (panel === null) return null
+    if (panel !== undefined && isGtpPanelVisible(panel)) return panel
+    return isGtpPanelVisible(DEFAULT_PANEL_ID) ? DEFAULT_PANEL_ID : null
 }
 
 /** MapShell onPanelChange */
@@ -162,9 +166,9 @@ export function rememberGtpPanel(panel: string | null): void {
     rememberMapPanel(SESSION, panel, sessionOwner())
 }
 
-/** 레이어 목록 처음 열림 여부(같은 사용자의 떠나기 전 값). 없으면 undefined → MapShell 기본(열림) */
-export function gtpInitialLayerFloatOpen(): boolean | undefined {
-    return readMapSession(SESSION, sessionOwner()).layerFloatOpen
+/** 레이어 목록 처음 열림 여부(같은 사용자의 떠나기 전 값). 처음 들어오면 닫힘(지도 패키지 기본은 열림이지만 이 화면은 닫아 둔다) */
+export function gtpInitialLayerFloatOpen(): boolean {
+    return readMapSession(SESSION, sessionOwner()).layerFloatOpen ?? false
 }
 
 /** MapShell onLayerFloatOpenChange */

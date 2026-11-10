@@ -28,7 +28,7 @@ export default function MapPage() {
     const host = useGtpMapHost()
     const userMenuItems = useGtpUserMenu()
     const [theme, setTheme] = useGtpMapTheme()
-    // 마운트 때 한 번만 읽는다(서버 렌더·새로고침 직후 = undefined → 왼쪽 패널 닫힘, 레이어 목록 열림)
+    // 마운트 때 한 번만 읽는다(서버 렌더·새로고침 직후 = 왼쪽은 나만의지도 열림, 레이어 목록 닫힘)
     const [initialPanel] = useState(gtpInitialPanel)
     const [initialLayerFloat] = useState(gtpInitialLayerFloatOpen)
 
