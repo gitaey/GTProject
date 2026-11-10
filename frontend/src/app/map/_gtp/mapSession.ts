@@ -4,6 +4,7 @@
 // 반경 입력값·열린 패널이 남았다(새로고침하면 처음부터). 지도 패키지는 이제 모듈 전역 상태를 갖지 않는다(이식성 규칙) →
 // 기억은 앱이 하고, 패키지는 초기값을 받는 통로만 준다.
 //   · 열린 패널: MapShell defaultPanel(처음 값) + onPanelChange(바뀔 때)
+//   · 레이어 목록 열림: MapShell defaultLayerFloatOpen + onLayerFloatOpenChange
 //   · 그리기 스타일·켠 도구·반경 입력값: GisMapProvider setup에서 엔진 공개 API로 되살리고(map.draw.setStyle, map.tools.*),
 //     엔진 스토어를 구독해 바뀔 때마다 적어 둔다(엔진 destroy 이벤트에서 구독 해제)
 //   · 바람길 켬 여부는 기억하지 않는다 — 항상 꺼진 채 시작한다. 켠 채 돌아오면 곧바로 /api/wind/latest를 다시 불러
@@ -22,6 +23,8 @@ import type { DrawStyle, GisMap, MapTool } from '@gtp/gis-map/core'
 export interface MapSessionState {
     /** 열린 패널 id(닫혔으면 null, 한 번도 안 바꿨으면 없음) */
     panel?: string | null
+    /** 레이어 목록(플로팅 패널) 열림 여부(한 번도 안 바꿨으면 없음) */
+    layerFloatOpen?: boolean
     drawStyle?: Readonly<DrawStyle>
     activeTool?: MapTool
     radiusMeters?: number | null
@@ -70,17 +73,28 @@ function remember(name: string, owner: string | undefined, patch: Partial<MapSes
     }))
 }
 
-/** 그리기·도구·반경 기억만 지운다(열린 패널은 남긴다 — 되살리기 실패 때) */
+/** 그리기·도구·반경 기억만 지운다(열린 패널·레이어 목록 열림은 남긴다 — 되살리기 실패 때) */
 function forgetEngineState(name: string): void {
     const prev = sessions.get(name)
     if (!prev) return
-    const { panel } = prev.state
-    sessions.set(name, Object.freeze({ owner: prev.owner, state: Object.freeze(panel === undefined ? {} : { panel }) }))
+    const { panel, layerFloatOpen } = prev.state
+    sessions.set(name, Object.freeze({
+        owner: prev.owner,
+        state: Object.freeze({
+            ...(panel === undefined ? undefined : { panel }),
+            ...(layerFloatOpen === undefined ? undefined : { layerFloatOpen }),
+        }),
+    }))
 }
 
 /** 열린 패널 기억(MapShell onPanelChange) */
 export function rememberMapPanel(name: string, panel: string | null, owner?: string): void {
     remember(name, owner, { panel })
+}
+
+/** 레이어 목록 열림 기억(MapShell onLayerFloatOpenChange) */
+export function rememberMapLayerFloat(name: string, open: boolean, owner?: string): void {
+    remember(name, owner, { layerFloatOpen: open })
 }
 
 /**

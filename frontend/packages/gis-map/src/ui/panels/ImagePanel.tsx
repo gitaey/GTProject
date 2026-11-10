@@ -14,22 +14,42 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
 }
 
+/** 안내 문구용 용량 표기: 1GB 이상은 GB(소수 1자리, 끝 0 생략), 그 아래는 MB 정수 */
+function formatLimit(bytes: number): string {
+  const gb = 1024 * 1024 * 1024
+  return bytes >= gb ? `${+(bytes / gb).toFixed(1)}GB` : `${Math.round(bytes / (1024 * 1024))}MB`
+}
+
+export interface ImagePanelProps {
+  /** 파일당 최대 용량(바이트). 주면 안내 문구에 보이고, 이보다 큰 파일은 올리지 않고 안내한다. 서버 한도를 호스트가 알려 준다. 기본: 안내·검사 없음 */
+  maxUploadBytes?: number
+  /** 이 용량 이상이면 업로드·변환이 오래 걸릴 수 있다는 안내 기준(바이트). 기본: 안내 없음 */
+  slowUploadBytes?: number
+}
+
 const selectCatalog = (s: GeoTiffCatalogState) => s
 const selectVisibleIds = (s: RasterOverlayState) => s.visibleIds
 
 // 목록·업로드·상태 폴링·삭제·좌표 재추출은 패널이 열려 있는 동안의 목록 객체(map.raster.openCatalog)가,
 // 지도에 올린 레이어와 체크 상태는 엔진 인스턴스(map.raster)가 가진다 → 패널을 닫았다 열어도 체크 = 지도
-export default function ImagePanel() {
+export default function ImagePanel({ maxUploadBytes, slowUploadBytes }: ImagePanelProps = {}) {
   const raster = useGisMap()?.raster ?? null
   const catalog = useGeoTiffCatalog()
   const { items, loading, uploading } = useStoreValue(catalog?.store, selectCatalog, EMPTY_GEOTIFF_CATALOG_STATE)
   const visibleIdList = useRasterOverlayState(selectVisibleIds)
   const visibleIds = useMemo(() => new Set(visibleIdList), [visibleIdList])
   const [dragging, setDragging] = useState(false)
+  const [sizeError, setSizeError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const hasHint = maxUploadBytes !== undefined || slowUploadBytes !== undefined
 
-  // .tif/.tiff 검사·uploadedBy·폴링 시작은 목록 객체가 한다
+  // .tif/.tiff 검사·uploadedBy·폴링 시작은 목록 객체가 한다. 용량 한도를 호스트가 알려 줬으면 큰 파일은 서버로 보내기 전에 막는다
   const handleUpload = (file: File) => {
+    if (maxUploadBytes !== undefined && file.size > maxUploadBytes) {
+      setSizeError(`파일이 너무 큽니다(${formatFileSize(file.size)}). 파일당 최대 ${formatLimit(maxUploadBytes)}까지 올릴 수 있습니다.`)
+      return
+    }
+    setSizeError(null)
     void catalog?.upload(file)
   }
 
@@ -91,6 +111,14 @@ export default function ImagePanel() {
           className="gm-file-input"
           onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = '' }}
         />
+        {sizeError && <p className="gm-image-panel__hint gm-image-panel__hint--error" role="alert">{sizeError}</p>}
+        {hasHint && (
+          <ul className="gm-image-panel__hint">
+            {maxUploadBytes !== undefined && <li>파일당 최대 {formatLimit(maxUploadBytes)}까지 올릴 수 있습니다.</li>}
+            {slowUploadBytes !== undefined && <li>{formatLimit(slowUploadBytes)} 이상은 업로드와 변환에 시간이 오래 걸릴 수 있습니다.</li>}
+            <li>업로드 뒤 '변환 중'이 끝나면 체크해서 지도에 올립니다.</li>
+          </ul>
+        )}
       </div>
 
       {/* 목록 */}

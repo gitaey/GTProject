@@ -160,7 +160,13 @@ export default function LayerSettingsPanel({ onClose }: { onClose: () => void })
     const someSelected = allLayers.some(l => selectedIds.has(l.id))
 
     return (
-        <div className="gm-layer-settings">
+        // Esc: 덮개만 닫는다(바깥 레이어 목록 플로팅 패널까지 닫히지 않게 전파 중단). 한글 입력 중 Esc는 무시
+        <div className="gm-layer-settings"
+            onKeyDown={e => {
+                if (e.key !== 'Escape' || e.nativeEvent.isComposing) return
+                e.stopPropagation()
+                onClose()
+            }}>
             {/* 헤더 */}
             <div className="gm-layer-settings__header">
                 <span className="gm-layer-settings__title">레이어 설정</span>

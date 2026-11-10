@@ -3,7 +3,7 @@
 // 레이어 패널: 머리줄(새로고침·설정) + 레이어 트리 + 설정 패널 (스타일: gm-panel__header, gm-layer-panel)
 // FE-5b-2: 옛 panel/LayerPanel.tsx. 설정 패널(LayerSettingsPanel·SettingGroupNode)은 LayerSettingsPanel.tsx로 떼어 냈다(본문 그대로)
 import { useState } from 'react'
-import { RefreshCw, Settings } from 'lucide-react'
+import { RefreshCw, Settings, X } from 'lucide-react'
 import type { LayerTreeState } from '../../core'
 import { useGisMap, useLayerTreeState } from '../../react'
 import LayerTreeItem from './LayerTreeItem'
@@ -12,7 +12,12 @@ import LayerSettingsPanel from './LayerSettingsPanel'
 // 엔진 레이어 트리 상태 선택자(모듈 상수)
 const selectTree = (s: LayerTreeState) => s.tree
 
-export default function LayerPanel() {
+export interface LayerPanelProps {
+    /** 주면 머리줄 오른쪽 끝에 닫기(X) 단추(aria-label '레이어 목록 닫기'). 없으면 지금 그대로(왼쪽 패널용) */
+    onClose?: () => void
+}
+
+export default function LayerPanel({ onClose }: LayerPanelProps = {}) {
     const gis = useGisMap()
     const tree = useLayerTreeState(selectTree)
     const loadTree = () => { void gis?.layers.load() }
@@ -41,6 +46,15 @@ export default function LayerPanel() {
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                         title="레이어 설정">
                         <Settings size={14} />
+                    </button>
+                    )}
+                    {onClose && (
+                    <button type="button" onClick={onClose}
+                        className="gm-layer-panel__icon-btn"
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--gm-border)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        aria-label="레이어 목록 닫기" title="닫기">
+                        <X size={14} />
                     </button>
                     )}
                 </div>

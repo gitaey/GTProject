@@ -82,6 +82,8 @@
    호스트가 바꾸고 싶으면 .gm-root { --gm-…: … } 를 이 파일 뒤에 둔다(GTProject: app/globals.css의 --gm-font-mono). */
 .gm-root {
     --gm-spacing: .25rem;
+    /* 레이어 목록 드로어(MapShell layerFloat) 폭 — 열려 있는 동안 도구 모음이 이 폭만큼 왼쪽으로 밀린다. 호스트가 .gm-root { --gm-layer-float-width: … }로 바꿀 수 있다 */
+    --gm-layer-float-width: 320px;
     --gm-text-xs: .75rem;
     --gm-text-xs--line-height: calc(1 / .75);
     --gm-text-sm: .875rem;

@@ -18,6 +18,24 @@ export interface MapPanelDef {
     scope?: 'map' | 'shell'
 }
 
+/** 레이어 목록 플로팅 패널 내용 교체(render)에 넘기는 값 */
+export interface LayerFloatRenderContext {
+    /** 패널 닫기(호스트 render가 자기 닫기 단추를 그릴 때) */
+    close: () => void
+}
+
+/** 레이어 목록 플로팅 패널(오른쪽 끝 드로어) 옵션(MapShell layerFloat). 전부 선택. 모듈 상수로 둔다(렌더마다 새 객체 금지) */
+export interface MapShellLayerFloatOptions {
+    /** 권한 기능 ID. 기본 'map.panel.layer'(왼쪽 레이어 메뉴와 같은 ID — 새 메뉴 ID를 만들지 않는다). null이면 검사 안 함 */
+    featureId?: GisFeatureId | string | null
+    /** 단추 글자·패널 접근 이름. 기본 '레이어 목록' */
+    label?: string
+    /** 패널 내용 교체. 기본 (map, { close }) => <LayerPanel onClose={close} /> */
+    render?: (map: GisMap | null, ctx: LayerFloatRenderContext) => ReactNode
+    /** panels 안의 패키지 기본 레이어 패널(layerPanel 객체, === 비교)을 왼쪽 네비에서 뺀다. 기본 true */
+    removeFromPanels?: boolean
+}
+
 /** 셸이 만드는 설정 패널의 id(열린 패널 기억·defaultPanel에 쓴다 — panels 목록에는 없다) */
 export const SETTINGS_PANEL_ID = 'gm-settings'
 

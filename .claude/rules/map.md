@@ -90,6 +90,15 @@ React는 `<GisMapProvider host={…}>`(바뀌면 `map.setHost`), UMD는 `GisMap.
 - GTProject 연결: `_gtp/gtpTheme.ts`(테마 선택 기억 — localStorage `gtp-map-theme`, 대시보드와 별개), `gtpMap.tsx`의 `GTP_SETTINGS`(정적 항목 VWorld 1건), `isGtpPanelVisible`이 `SETTINGS_PANEL_ID` 인정. 공개 데모는 `browserStartViewSource('gtp-demo-start-view')`("이 브라우저에 저장").
 - 기록·시험: `_workspace/map-settings-panel/`(설계 `01_design.md`, 가짜 응답 `fake-fetch.js`, 순수 함수 시험 `check/run-check.sh`).
 
+## 레이어 목록 플로팅 패널 — 오른쪽 끝 드로어 (2026-11)
+
+- `MapShell layerFloat`(기본 **꺼짐 = DOM까지 예전과 같음**, `true` 또는 `MapShellLayerFloatOptions`: `featureId`(기본 `map.panel.layer`, null이면 검사 안 함)·`label`(기본 '레이어 목록')·`render`·`removeFromPanels`(기본 true)) + `defaultLayerFloatOpen`(기본 true, 마운트 때 한 번) + `onLayerFloatOpenChange`. 켜면 지도 무대 오른쪽 위 모서리에 딱 붙은 주황 "레이어 목록" 단추(`ui/layer/LayerFloat.tsx`, 높이 36px)가 생기고, 패키지 `layerPanel` 객체(`===`)만 왼쪽 네비에서 자동 제외된다(호스트가 직접 만든 레이어 패널은 안 뺀다). 왼쪽 패널은 `defaultPanel`을 생략하면 **닫힌 채** 시작한다.
+- 목록은 단추 아래부터 무대 맨 아래까지 **오른쪽 끝에 붙은 전체 높이 드로어**(폭 `--gm-layer-float-width` 320px, 지도 위에 떠서 지도 크기는 그대로). 도구 모음은 단추 아래(44px)로 내려가고(`MapToolbar belowLauncher`), 도구 모음은 **움직이지 않고**, 열린 드로어(z-index 11)가 그 위를 덮는다(사용자 요청: 밀지 말고 뒤에 가려지게). 드로어(320)보다 왼쪽으로 더 나오는 도구 패널(출력 300·영역 분석/필지 320이 도구 모음 왼쪽 56px부터)이 삐져나오지 않게 `MapToolbar covered`(`gm-toolbar--covered`, `visibility:hidden` — 마운트·입력값·진행 유지, Tab·스크린리더에서 빠짐, 768px 이상에서만)가 도구 모음과 패널을 통째로 숨긴다. 오른쪽 아래 축척 막대만 무대에 `gm-has-drawer`(열림·분할 아님)가 붙으면 비킨다. 도구를 쓰려면 드로어를 닫는다 — 도구 단추 규칙·점 표시는 없다.
+- 닫아도 목록은 `hidden`으로 남아 펼친 그룹·스크롤·설정 덮개가 유지된다. 분할 중에는 "대상 지도" 탭을 붙이고 활성 지도가 바뀌면 `key=map.id`로 다시 그린다. Esc는 포커스가 목록 안일 때만(한글 입력 중 무시, 설정 덮개가 열려 있으면 덮개만), 닫히면 단추로 포커스. 768px 미만은 CSS가 단추·드로어를 통째로 숨기고(도구 모음 이동 규칙도 `@media (min-width: 48rem)` 안에만) 기존 모바일 레이어 시트를 쓴다.
+- GTProject: `_gtp/gtpMap.tsx`(`GTP_PANELS`에서 layer 제거, `GTP_LAYER_FLOAT`, `gtpInitialLayerFloatOpen`·`rememberGtpLayerFloat`), `_gtp/mapSession.ts`(`layerFloatOpen` — 페이지 이동 사이에만 기억, 새로고침하면 다시 열림), `app/map/page.tsx`. **공개 데모·`/map-dev/dual`은 옵션을 안 줘서 예전 그대로**(데모 투어가 왼쪽 레이어 패널을 연다). UMD(`GisMap.create`/`attach`)는 UI를 싣지 않아 영향 없음.
+- 알려진 약점: 드로어가 열려 있으면 지도 오른쪽 320px를 가린다(2·3분할에서는 맨 오른쪽 칸 일부와 그 칸의 축척 막대 — 닫으면 해결, 분할 칸 레이아웃은 안 바뀐다). 드로어가 열려 있으면 도구 모음과 열린 도구 패널이 숨겨져 도구를 못 쓴다(닫으면 해결, 진행 중이던 출력 등은 유지). 지역명 배지(가운데 위)가 좁은 화면에서 단추와 겹칠 수 있다. 낮은 노트북 화면에서 분할을 켜면 도구 모음 맨 아래가 잘릴 수 있다. "사용자 레이어" 탭(나만의지도·TIFF 목록)은 만들지 않았다 — 끈 TIFF 재표시에 엔진 수정이 필요하다.
+- 기록·시험: `_workspace/layer-float-panel/`(설계 `01_design.md`·목업 — 설계의 "덮어씌우기"는 사용자 요청으로 드로어로 바뀜, 구현 `02_impl_stage1.md`·`02_impl_stage2_drawer.md`, QA `03_qa.md`, 시험 `check/run-check.mjs`).
+
 ## 프론트 구조
 
 - 좌표계: GTProject 뷰는 EPSG:3857(코어 기본값, `config.view.projection`으로 5179·5186 뷰 가능). 서버와 주고받는 GeoJSON·범위는 EPSG:4326.

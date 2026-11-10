@@ -59,9 +59,15 @@ export interface MapToolbarProps {
     showParcelInfo?: boolean
     /** 도구 모음 맨 위 작은 칩(예: 분할 중 '지도 2' — 이 도구 모음이 어느 지도를 조작하는지). 없으면 칩을 그리지 않는다 */
     targetLabel?: string
+    /** 지도 오른쪽 위 모서리에 "레이어 목록" 단추가 있다: 도구 모음을 단추 아래(44px)로 내리고 출력·영역 분석·필지 카드 최대 높이를 그만큼 줄인다. 기본 false */
+    belowLauncher?: boolean
+    /** 오른쪽 끝 레이어 목록 드로어가 열려 있다: 도구 모음(과 열린 패널)을 숨겨 드로어 뒤에 가려진 것처럼 보이게 한다(visibility — 마운트·입력값·진행은 그대로). 기본 false */
+    covered?: boolean
 }
 
-export default function MapToolbar({ showPrint = true, showAreaAnalysis = true, showParcelInfo = true, targetLabel }: MapToolbarProps = {}) {
+export default function MapToolbar({
+    showPrint = true, showAreaAnalysis = true, showParcelInfo = true, targetLabel, belowLauncher = false, covered = false,
+}: MapToolbarProps = {}) {
     // 바람길 토글은 엔진의 바람길 플러그인(설치: app/map/page.tsx의 setup)
     const wind = useWindPlugin()
     const windLayerVisible = useWindState(selectWindVisible)
@@ -144,7 +150,7 @@ export default function MapToolbar({ showPrint = true, showAreaAnalysis = true, 
     }
 
     return (
-        <div className="gm-toolbar">
+        <div className={cx('gm-toolbar', belowLauncher && 'gm-toolbar--below-launcher', covered && 'gm-toolbar--covered')}>
 
             {targetLabel != null && <div className="gm-toolbar__target">{targetLabel}</div>}
 

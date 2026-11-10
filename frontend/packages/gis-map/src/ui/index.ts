@@ -14,7 +14,7 @@
 // 셸·패널
 export { default as MapShell } from './shell/MapShell'
 export type { MapShellProps, MapShellSplitOptions } from './shell/MapShell'
-export type { MapPanelDef, MapShellBrand, MapUserMenuItem, MapShellSettingsOptions } from './shell/types'
+export type { MapPanelDef, MapShellBrand, MapUserMenuItem, MapShellSettingsOptions, MapShellLayerFloatOptions, LayerFloatRenderContext } from './shell/types'
 export { SETTINGS_PANEL_ID } from './shell/types'
 // 설정 패널(화면 테마·시작 화면·데이터 기준 정보) — MapShell이 settings 옵션으로 그린다. 따로 조립할 때는 GisMapProvider 안에 둔다
 export { default as SettingsPanel } from './settings/SettingsPanel'
@@ -39,6 +39,10 @@ export { default as ParcelInfoCard } from './parcelInfo/ParcelInfoCard'
 export { default as PrintPanel } from './print/PrintPanel'
 export type { PrintPanelProps } from './print/PrintPanel'
 export { default as LayerPanel } from './layer/LayerPanel'
+export type { LayerPanelProps } from './layer/LayerPanel'
+// 레이어 목록 플로팅 패널(MapShell layerFloat이 쓴다 — 따로 조립할 때는 MapToolbar belowLauncher와 함께)
+export { default as LayerFloat } from './layer/LayerFloat'
+export type { LayerFloatProps } from './layer/LayerFloat'
 export { default as ImagePanel } from './panels/ImagePanel'
 export { default as MyMapPanel } from './panels/MyMapPanel'
 export { default as WindPanel } from './panels/WindPanel'

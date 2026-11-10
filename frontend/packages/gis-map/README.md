@@ -83,6 +83,12 @@ export default function MapPage() {
   (패키지는 라우터·로그아웃 방식을 모른다 — `GisMapHost`는 건드리지 않는다). 없거나 빈 배열이면 사용자 표시는 옛 모양 그대로. `host.getCurrentUser()`가 사용자를 줄 때만 보이고 `headerRight`·`showUser={false}`면 쓰이지 않는다.
   GTProject 예: `_gtp/useGtpUserMenu.ts`(훅) + `_gtp/gtpUserMenu.tsx`(항목 — `MAP_USER`는 `/`가 `/map`으로 되돌려지므로 대시보드 항목을 뺀다).
   `MapHeader`도 같은 prop(`userMenuItems`).
+- **레이어 목록 플로팅 패널(드로어)** `layerFloat`(옵션, **기본 꺼짐 = 지금과 DOM까지 같다**): 지도 오른쪽 위 모서리에 딱 붙은 주황 "레이어 목록" 단추가 생기고, 누르면 그 아래 **오른쪽 끝에 붙은 전체 높이 패널**이 열린다(지도 위에 뜬다 — 지도 크기는 그대로, 닫으면 `hidden`으로 남아 펼친 상세·스크롤이 유지됨).
+  켜면 ① 도구 모음이 단추 아래(44px)로 내려가고, 드로어가 열려 있는 동안 **도구 모음과 그 왼쪽으로 열리는 그리기·출력·영역 분석·필지 패널이 드로어 폭만큼 왼쪽으로 밀린다**(겹치지 않고 동시에 쓴다, 닫으면 원위치, 오른쪽 아래 축척 막대도 비킨다) ② 왼쪽 네비에서 `layerPanel` 객체(`===` 비교)가 빠진다(`removeFromPanels:false`로 끔)
+  ③ `defaultPanel`을 생략하면 왼쪽 패널은 닫힌 채 시작 ④ 768px 미만은 단추·드로어가 없고 기존 모바일 레이어 시트를 쓴다. 권한은 왼쪽 레이어 메뉴와 같은 기능 ID `map.panel.layer`(`featureId`로 바꿈, `null`이면 검사 안 함). 분할 중에는 맨 위에 "대상 지도" 탭이 붙고 드로어가 맨 오른쪽 칸 일부를 가린다(닫으면 해결).
+  `<MapShell layerFloat={LAYER_FLOAT} defaultLayerFloatOpen={saved} onLayerFloatOpenChange={save} />` — 옵션 객체(`MapShellLayerFloatOptions`: `featureId`·`label`·`render(map, { close })`·`removeFromPanels`)는 모듈 상수로 둔다.
+  열림 상태는 패키지가 기억하지 않는다(`localStorage` 없음) — 페이지 이동 사이에 이어 가려면 호스트가 `onLayerFloatOpenChange`로 받아 다음 마운트의 `defaultLayerFloatOpen`(기본 true)으로 넘긴다.
+  폭은 CSS 변수 `--gm-layer-float-width`(기본 320px). 위젯을 따로 조립할 때는 `<LayerFloat open onOpenChange />`를 `position: relative` 지도 영역 안에 두고 같은 영역의 `<MapToolbar belowLauncher covered={open} />`로 이어 준다(도구 모음은 안 움직이고 열린 목록이 위를 덮는다) — 삐져나오는 패널이 없게 도 준다(분할 중이면 `<LayerFloat split />`).
 - 위젯을 따로 조립할 때는 `<MapRoot>`(또는 class `gm-root`) 안에 두고, 지도 div는 `<GisMapView>`로 만든다. 위젯은 가장 가까운 Provider의 엔진만 본다
   → 한 화면에 Provider 둘이면 지도 둘이 서로 독립이다.
 - 이미 만든 `ol.Map`에 붙이려면 `<GisMapProvider attachTo={olMap}>`(이때 `<GisMapView>`는 필요 없다). 앱과 패키지가 **같은 ol 사본**을 써야 한다.

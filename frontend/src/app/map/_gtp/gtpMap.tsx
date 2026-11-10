@@ -10,8 +10,8 @@ import { browserExpandedStorage } from '@gtp/gis-map/react'
 import type { GisMapSetupInfo } from '@gtp/gis-map/react'
 import { restSources } from '@gtp/gis-map/adapters/rest'
 import { proxySources } from '@gtp/gis-map/adapters/proxy'
-import { SETTINGS_PANEL_ID, defaultPanels, windPanel } from '@gtp/gis-map/ui'
-import type { MapPanelDef, MapShellBrand, MapShellSettingsOptions, MapShellSplitOptions } from '@gtp/gis-map/ui'
+import { ImagePanel, SETTINGS_PANEL_ID, imagePanel, myMapPanel, windPanel } from '@gtp/gis-map/ui'
+import type { MapPanelDef, MapShellBrand, MapShellLayerFloatOptions, MapShellSettingsOptions, MapShellSplitOptions } from '@gtp/gis-map/ui'
 import { useAuthStore } from '@/stores/authStore'
 import { useMenuStore } from '@/stores/menuStore'
 import EtcPanel from './EtcPanel'
@@ -22,7 +22,7 @@ import {
     GTP_VIEW_MIN_ZOOM,
     GTP_VIEW_ZOOM,
 } from './gtpView'
-import { readMapSession, rememberMapPanel, restoreMapSession } from './mapSession'
+import { readMapSession, rememberMapLayerFloat, rememberMapPanel, restoreMapSession } from './mapSession'
 
 /** 앱 쪽 기억(mapSession)의 이름 — /map의 지도는 하나 */
 const SESSION = 'gtp-map'
@@ -69,8 +69,27 @@ const ETC_PANEL: Readonly<MapPanelDef> = Object.freeze({
     id: 'etc', label: '기타', icon: MoreHorizontal, featureId: 'map.panel.etc', render: () => <EtcPanel />,
 })
 
-/** 네비 패널: 패키지 기본 3개(레이어·TIFF·나만의지도) + 바람지도(바람길 플러그인을 setupGtpMap에서 설치하므로) + 기타 */
-export const GTP_PANELS: readonly MapPanelDef[] = Object.freeze([...defaultPanels, windPanel, ETC_PANEL])
+/**
+ * TIFF 업로드 안내 값. 최대 2GB = 백엔드 spring.servlet.multipart.max-file-size(application.yml). 운영 nginx의 client_max_body_size가
+ * 이보다 작으면 그 값이 실제 한도다(서버 설정 — 저장소 밖). 500MB는 실측이 아니라 "오래 걸릴 수 있다"는 안내 기준
+ */
+const TIFF_MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024
+const TIFF_SLOW_UPLOAD_BYTES = 500 * 1024 * 1024
+
+/** 패키지 기본 TIFF 패널에 용량 안내를 더한 호스트용 패널(id·권한·아이콘은 그대로) */
+const GTP_IMAGE_PANEL: Readonly<MapPanelDef> = Object.freeze({
+    ...imagePanel,
+    render: () => <ImagePanel maxUploadBytes={TIFF_MAX_UPLOAD_BYTES} slowUploadBytes={TIFF_SLOW_UPLOAD_BYTES} />,
+})
+
+/**
+ * 네비 패널(위에서 아래 순서): 나만의지도·TIFF(패키지 기본 중 둘) + 바람지도(바람길 플러그인을 setupGtpMap에서 설치하므로) + 기타.
+ * 레이어는 네비가 아니라 지도 오른쪽 위 "레이어 목록" 플로팅 패널이다(GTP_LAYER_FLOAT) — 여기서 뺀다
+ */
+export const GTP_PANELS: readonly MapPanelDef[] = Object.freeze([myMapPanel, GTP_IMAGE_PANEL, windPanel, ETC_PANEL])
+
+/** 레이어 목록 플로팅 패널(모듈 상수). 권한은 기본 map.panel.layer(기존 레이어 메뉴와 같은 ID) */
+export const GTP_LAYER_FLOAT: Readonly<MapShellLayerFloatOptions> = Object.freeze({})
 
 /**
  * 기억(mapSession)의 주인 = 지금 로그인한 사용자 id(로그인 전이면 '').
@@ -128,8 +147,9 @@ export function setupGtpMap(map: GisMap, info: GisMapSetupInfo): void {
 }
 
 /**
- * 처음 열 패널(같은 사용자가 떠나기 전에 열어 둔 패널). 처음 들어오면·다른 사용자의 기억이었으면 undefined → MapShell 기본 = 첫 패널 '레이어'.
- * 기억한 패널을 지금 사용자가 볼 수 없으면(권한이 없음·목록에서 빠짐) 역시 undefined
+ * 처음 열 패널(같은 사용자가 떠나기 전에 열어 둔 패널). 처음 들어오면·다른 사용자의 기억이었으면 undefined →
+ * layerFloat를 켠 MapShell은 왼쪽 패널을 닫은 채 시작한다(레이어는 플로팅 패널이 맡는다).
+ * 기억한 패널을 지금 사용자가 볼 수 없으면(권한이 없음·목록에서 빠짐 — 예전에 기억한 'layer' 포함) 역시 undefined
  */
 export function gtpInitialPanel(): string | null | undefined {
     const panel = readMapSession(SESSION, sessionOwner()).panel
@@ -140,4 +160,14 @@ export function gtpInitialPanel(): string | null | undefined {
 /** MapShell onPanelChange */
 export function rememberGtpPanel(panel: string | null): void {
     rememberMapPanel(SESSION, panel, sessionOwner())
+}
+
+/** 레이어 목록 처음 열림 여부(같은 사용자의 떠나기 전 값). 없으면 undefined → MapShell 기본(열림) */
+export function gtpInitialLayerFloatOpen(): boolean | undefined {
+    return readMapSession(SESSION, sessionOwner()).layerFloatOpen
+}
+
+/** MapShell onLayerFloatOpenChange */
+export function rememberGtpLayerFloat(open: boolean): void {
+    rememberMapLayerFloat(SESSION, open, sessionOwner())
 }

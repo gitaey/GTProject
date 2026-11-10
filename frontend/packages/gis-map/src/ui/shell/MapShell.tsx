@@ -9,10 +9,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Settings } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { GisMapAppearance, StartViewState } from '../../core'
-import { GisMapSplitProvider, GisMapView, useGisMap, useGisMapSplit, useStoreValue } from '../../react'
+import { GisMapSplitProvider, GisMapView, useGisHost, useGisMap, useGisMapSplit, useStoreValue } from '../../react'
 import type { GisMapSplitCount, GisMapSplitInitialState } from '../../react'
 import { cx } from '../cx'
-import { defaultPanels } from '../panels/defaultPanels'
+import { defaultPanels, layerPanel } from '../panels/defaultPanels'
+import LayerFloat from '../layer/LayerFloat'
+import { isLayerFloatAllowed, withoutPanel } from '../layer/layerFloatRules'
 import MapStatusBar from '../statusbar/MapStatusBar'
 import MapToolbar from '../toolbar/MapToolbar'
 import MobileLayerButton from '../mobile/MobileLayerButton'
@@ -26,7 +28,7 @@ import MapRoot from './MapRoot'
 import NavRail from './NavRail'
 import SidePanel from './SidePanel'
 import { SETTINGS_PANEL_ID } from './types'
-import type { MapPanelDef, MapShellBrand, MapShellSettingsOptions, MapUserMenuItem } from './types'
+import type { MapPanelDef, MapShellBrand, MapShellLayerFloatOptions, MapShellSettingsOptions, MapUserMenuItem } from './types'
 
 /** 화면 분할 옵션(MapShell split). 전부 선택 */
 export interface MapShellSplitOptions {
@@ -53,7 +55,7 @@ export interface MapShellProps {
     brand?: MapShellBrand | false
     /** 왼쪽 네비 버튼·패널 목록(순서대로). 기본 defaultPanels(레이어·TIFF·나만의지도). 호스트 패널은 이 배열에 더한다 */
     panels?: readonly MapPanelDef[]
-    /** 처음 열 패널 id. null이면 닫힌 채. 기본: 첫 패널. panels에 없는 id(기억한 값이 낡은 경우 등)도 첫 패널. 마운트 때 한 번만 읽는다.
+    /** 처음 열 패널 id. null이면 닫힌 채. 기본: 첫 패널(layerFloat를 켰으면 null = 닫힘). panels에 없는 id(기억한 값이 낡은 경우 등)도 첫 패널. 마운트 때 한 번만 읽는다.
      *  권한은 보지 않는다 — 권한 없는 패널 id를 넘기지 않는 것은 호스트 몫(NavRail만 featureId로 버튼을 거른다) */
     defaultPanel?: string | null
     /** 열린 패널이 바뀔 때(닫으면 null). 호스트가 기억했다가 다음 마운트의 defaultPanel로 넘기면 이어서 열린다 */
@@ -107,12 +109,29 @@ export interface MapShellProps {
     theme?: GisMapAppearance
     defaultTheme?: GisMapAppearance
     onThemeChange?: (value: GisMapAppearance) => void
+    /**
+     * 레이어 목록 플로팅 패널(지도 오른쪽 위 "레이어 목록" 단추). 기본 false = 지금과 완전히 같다.
+     * 켜면: 지도 오른쪽 위 모서리에 "레이어 목록" 단추가 붙고, 누르면 오른쪽 끝에 붙은 전체 높이 드로어가 열린다(지도 위에 뜬다 — 지도 크기는 그대로) ·
+     * 도구 모음은 단추 아래로 내려가고, 드로어가 열려 있으면 도구 모음과 그 패널들이 드로어 폭만큼 왼쪽으로 밀린다(겹치지 않고 동시에 쓴다) ·
+     * panels에서 layerPanel을 뺀다(removeFromPanels) · defaultPanel을 생략하면 왼쪽 패널은 닫힌 채 시작한다 · 768px 미만에서는 보이지 않는다(모바일 레이어 시트).
+     * 객체 옵션은 렌더마다 새로 만들지 말고 모듈 상수로 둔다
+     */
+    layerFloat?: boolean | MapShellLayerFloatOptions
+    /** 레이어 목록 처음 열림. 기본 true. 마운트 때 한 번만 읽는다 */
+    defaultLayerFloatOpen?: boolean
+    /** 레이어 목록 열림이 바뀔 때(처음 값은 알리지 않음). 단추·X·Esc로 닫힌 것도 알린다. 호스트가 기억했다가 다음 마운트의 defaultLayerFloatOpen으로 넘긴다 */
+    onLayerFloatOpenChange?: (open: boolean) => void
     /** 지도 위에 더 올릴 호스트 위젯(지도 영역 안, 기본 위젯들 뒤) */
     children?: ReactNode
 }
 
 /** settings={true}일 때 쓰는 빈 옵션(얼린 상수 — 렌더마다 새 객체를 만들지 않는다) */
 const EMPTY_SETTINGS: Readonly<MapShellSettingsOptions> = Object.freeze({})
+
+/** layerFloat={true}일 때 쓰는 빈 옵션(얼린 상수 — 렌더마다 새 객체를 만들지 않는다) */
+const EMPTY_LAYER_FLOAT: Readonly<MapShellLayerFloatOptions> = Object.freeze({})
+
+const DEFAULT_LAYER_FLOAT_FEATURE_ID = 'map.panel.layer'
 
 const selectHolding = (s: StartViewState): boolean => s.holding
 
@@ -145,7 +164,8 @@ function MapShellView({
     className, brand, panels = defaultPanels, defaultPanel, onPanelChange,
     showHeader = true, showSearch = true, showBasemapSwitcher = true, showUser = true, headerRight, userMenuItems,
     showNavRail = true, showToolbar = true, showPrint = true, showAreaAnalysis = true, showParcelInfo = true, showRegionBadge = true, showMobileLayerButton = true, showWindLegend = true,
-    showStatusBar = true, statusBarProjection, split, settings = true, theme: themeProp, defaultTheme, onThemeChange, children,
+    showStatusBar = true, statusBarProjection, split, settings = true, theme: themeProp, defaultTheme, onThemeChange,
+    layerFloat, defaultLayerFloatOpen, onLayerFloatOpenChange, children,
 }: MapShellProps) {
     const map = useGisMap()
 
@@ -179,8 +199,30 @@ function MapShellView({
     const splitUi = !!split && splitState !== null && splitState.available
     const splitActive = splitUi && splitState.count > 1
 
-    // 열린 패널: 같은 패널 아이콘을 다시 누르면 닫힘(옛 panelStore.togglePanel)
-    const [activePanel, setActivePanel] = useState<string | null>(() => initialPanelId(panels, defaultPanel, settingsPanel))
+    // 레이어 목록 플로팅 패널: 켜면 왼쪽 네비에서 패키지 기본 레이어 패널(layerPanel 객체)을 뺀다 — 같은 내용이 두 곳에 나오지 않게.
+    // 같은 id의 호스트 패널이 사라지는 사고를 막으려고 id가 아니라 객체(===)로 거른다. 끄면 panels 그대로(DOM·동작 변화 없음)
+    const floatOptions: Readonly<MapShellLayerFloatOptions> | null = layerFloat === true ? EMPTY_LAYER_FLOAT : layerFloat || null
+    const effectivePanels = useMemo(
+        () => (floatOptions ? withoutPanel(panels, layerPanel, floatOptions.removeFromPanels !== false) : panels),
+        [panels, floatOptions],
+    )
+    // 권한: 왼쪽 레이어 메뉴와 같은 기능 ID(기본). NavRail과 같은 규칙(권한 로딩 전엔 보임)
+    const { isFeatureAllowed, permissionsReady } = useGisHost()
+    const floatFeatureId = floatOptions?.featureId === undefined ? DEFAULT_LAYER_FLOAT_FEATURE_ID : floatOptions.featureId
+    const floatVisible = floatOptions !== null && isLayerFloatAllowed(permissionsReady, floatFeatureId, isFeatureAllowed)
+    const [floatOpen, setFloatOpen] = useState<boolean>(defaultLayerFloatOpen ?? true)
+    const onFloatChangeRef = useRef(onLayerFloatOpenChange)
+    onFloatChangeRef.current = onLayerFloatOpenChange
+    const floatNotifiedRef = useRef(floatOpen)
+    useEffect(() => {
+        if (floatNotifiedRef.current === floatOpen) return
+        floatNotifiedRef.current = floatOpen
+        onFloatChangeRef.current?.(floatOpen)
+    }, [floatOpen])
+
+    // 열린 패널: 같은 패널 아이콘을 다시 누르면 닫힘(옛 panelStore.togglePanel). 레이어 목록을 켜고 defaultPanel을 생략하면 닫힌 채 시작
+    const [activePanel, setActivePanel] = useState<string | null>(
+        () => initialPanelId(effectivePanels, floatOptions !== null && defaultPanel === undefined ? null : defaultPanel, settingsPanel))
     const togglePanel = useCallback((panelId: string) => {
         setActivePanel(cur => (cur === panelId ? null : panelId))
     }, [])
@@ -196,7 +238,7 @@ function MapShellView({
     }, [activePanel])
 
     // 마운트 뒤 호스트가 panels에서 열린 패널을 빼면 패널을 그리지 않는다(처음 값의 방어는 initialPanelId)
-    const panel = activePanel === null ? null : panels.find(p => p.id === activePanel) ?? (settingsPanel !== null && activePanel === settingsPanel.id ? settingsPanel : null)
+    const panel = activePanel === null ? null : effectivePanels.find(p => p.id === activePanel) ?? (settingsPanel !== null && activePanel === settingsPanel.id ? settingsPanel : null)
 
     return (
         <MapRoot className={cx('gm-map-view', className)} theme={theme}>
@@ -207,11 +249,11 @@ function MapShellView({
             )}
 
             <div className="gm-map-view__body">
-                {showNavRail && <NavRail panels={panels} activePanel={activePanel} togglePanel={togglePanel} settingsPanel={settingsPanel} />}
+                {showNavRail && <NavRail panels={effectivePanels} activePanel={activePanel} togglePanel={togglePanel} settingsPanel={settingsPanel} />}
                 <SidePanel panel={panel} map={map} split={splitActive} />
 
                 {/* 커서 안내·텍스트 입력창은 엔진(코어 DOM)이 지도 요소 안에, 측정 툴팁은 ol.Overlay로 그린다 */}
-                <div className="gm-map-view__stage">
+                <div className={cx('gm-map-view__stage', floatVisible && floatOpen && !splitActive && 'gm-has-drawer')}>
                     {/* 분할 중에는 칸마다 지도·번호 칩·(활성 칸) 지역명·바람 범례를 SplitStage가 그린다. 분할 없음 = 지금 그대로 */}
                     {splitActive
                         ? <SplitStage showRegionBadge={showRegionBadge} showWindLegend={showWindLegend}
@@ -220,12 +262,18 @@ function MapShellView({
                     {startHolding && <div className="gm-map-pending" role="status" aria-label="지도를 준비하는 중" />}
                     {showRegionBadge && !splitActive && <RegionBadge />}
 
+                    {/* 레이어 목록 플로팅 패널: 도구 모음보다 DOM 앞(Tab 순서 단추 → 목록 → 도구 모음). 켜지 않으면 아무것도 그리지 않는다 */}
+                    {floatVisible && (
+                        <LayerFloat open={floatOpen} onOpenChange={setFloatOpen} label={floatOptions?.label} split={splitActive} render={floatOptions?.render} />
+                    )}
+
                     {/* 도구 모음·모바일 레이어 버튼은 무대에 하나 — 대상은 활성 지도. 활성 지도가 바뀌면 key로 새로 마운트해
                         열려 있던 그리기·출력·영역 분석 패널을 닫고 옛 지도의 틀·결과를 정리한다 */}
                     {showToolbar && (
                         <MapToolbar key={splitActive && map ? map.id : undefined}
                             targetLabel={splitActive ? '지도 ' + (splitState.activeIndex + 1) : undefined}
-                            showPrint={showPrint} showAreaAnalysis={showAreaAnalysis} showParcelInfo={showParcelInfo} />
+                            showPrint={showPrint} showAreaAnalysis={showAreaAnalysis} showParcelInfo={showParcelInfo}
+                            belowLauncher={floatVisible} covered={floatVisible && floatOpen} />
                     )}
                     {showMobileLayerButton && <MobileLayerButton />}
                     {showWindLegend && !splitActive && <WindLegend />}
