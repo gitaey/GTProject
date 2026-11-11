@@ -82,6 +82,18 @@ export interface MyMapCatalog extends Catalog<UserMapListItem, MyMapCatalogState
     saveStyle(id: number, json: string | null): Promise<void>
 }
 
+/**
+ * "이 화면에서 방금 올린 레이어" 기억(처음 등록했을 때 결과 창을 한 번 띄우기 위한 UI용 메모).
+ * 엔진 인스턴스 필드라 패널을 닫았다 열어도 남고, 페이지를 새로 열거나 엔진을 destroy하면 사라진다(저장소에 쓰지 않는다)
+ */
+export interface FreshUploadMemory {
+    add(id: number): void
+    has(id: number): boolean
+    remove(id: number): void
+    /** 기억 중인 id(오래된 것부터) */
+    ids(): readonly number[]
+}
+
 export interface MyMapFeatureHit {
     layerId: number
     /** 속성(지오메트리 제외) */
@@ -114,6 +126,8 @@ export interface VectorOverlayController {
     featureLonLatExtent(feature: Feature<Geometry>): [number, number, number, number] | null
     /** 목록(openCatalog)에서 본 레이어 이름. 모르면 null — 출력 범례가 쓴다 */
     nameOf(id: number): string | null
+    /** 방금 올린 레이어 기억(결과 창 한 번 띄우기용). 엔진 인스턴스마다 하나 */
+    readonly freshUploads: FreshUploadMemory
     /** 목록 하나를 연다(패널 한 번 열림). autoLoad 기본 true. 엔진 destroy 때 열린 목록도 전부 dispose */
     openCatalog(opts?: { autoLoad?: boolean }): MyMapCatalog
 
@@ -308,6 +322,13 @@ export class VectorOverlayControllerImpl implements VectorOverlayController {
     private readonly previews = new Map<number, MyMapStyleConfig>()
     /** 팝업 제목용 레이어 이름 */
     private readonly names = new Map<number, string>()
+    private readonly freshSet = new Set<number>()
+    readonly freshUploads: FreshUploadMemory = {
+        add: id => { this.freshSet.add(id) },
+        has: id => this.freshSet.has(id),
+        remove: id => { this.freshSet.delete(id) },
+        ids: () => Array.from(this.freshSet),
+    }
     private popup: MyMapPopup | null = null
     private popupEnabled = true
     private popupLayerId: number | null = null
@@ -905,6 +926,7 @@ export class VectorOverlayControllerImpl implements VectorOverlayController {
         this.saved.clear()
         this.previews.clear()
         this.names.clear()
+        this.freshSet.clear()
         this.state.destroy()
     }
 }

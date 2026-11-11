@@ -31,7 +31,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** 앱에 포함된 샘플 엑셀 3종: 내려받기, 안내 문구, 그리고 실제로 올려 보면 7건이 전부 매칭되는지(가짜 필지). */
+/** 앱에 포함된 샘플 엑셀 3종: 내려받기, 안내 문구, 그리고 실제로 올려 보면 정상 10건은 매칭되고 일부러 틀린 3건은 실패로 남는지(가짜 필지). */
 @DataJpaTest
 class SampleFilesTest {
 
@@ -78,20 +78,20 @@ class SampleFilesTest {
     }
 
     @Test
-    void PNU_샘플은_PNU로_추천되고_7건이_모두_매칭된다() throws Exception {
+    void PNU_샘플은_PNU로_추천되고_정상_10건은_매칭_틀린_3건은_실패한다() throws Exception {
         Path f = file("pnu");
         Suggestions s = suggest(f);
         assertThat(s.getMode()).isEqualTo("PNU");
         assertThat(s.getPnuColumn()).isEqualTo("PNU");
 
-        UserMap m = repo.saveAndFlush(UserMap.builder().name("샘플").ownerId("alice").sourceType("EXCEL").sourceSrid("EPSG:4326").progressTotal(7).build());
-        job().execute(new UserMapImportJob.Request(m.getId(), "alice", ImportMode.PNU, f, 7, "PNU", null, null, "EPSG:4326"));
-        assertThat(jdbc.queryForObject("SELECT matched_count FROM tbl_user_map WHERE id = ?", Integer.class, m.getId())).isEqualTo(7);
-        assertThat(jdbc.queryForObject("SELECT failed_count FROM tbl_user_map WHERE id = ?", Integer.class, m.getId())).isZero();
+        UserMap m = repo.saveAndFlush(UserMap.builder().name("샘플").ownerId("alice").sourceType("EXCEL").sourceSrid("EPSG:4326").progressTotal(13).build());
+        job().execute(new UserMapImportJob.Request(m.getId(), "alice", ImportMode.PNU, f, 13, "PNU", null, null, "EPSG:4326"));
+        assertThat(jdbc.queryForObject("SELECT matched_count FROM tbl_user_map WHERE id = ?", Integer.class, m.getId())).isEqualTo(10);
+        assertThat(jdbc.queryForObject("SELECT failed_count FROM tbl_user_map WHERE id = ?", Integer.class, m.getId())).isEqualTo(3);
     }
 
     @Test
-    void 좌표_샘플은_위경도로_추천되고_7건이_모두_올라간다() throws Exception {
+    void 좌표_샘플은_위경도로_추천되고_정상_10건은_올라가고_틀린_3건은_실패한다() throws Exception {
         Path f = file("coord");
         Suggestions s = suggest(f);
         assertThat(s.getMode()).isEqualTo("COORD");
@@ -99,24 +99,24 @@ class SampleFilesTest {
         assertThat(s.getLonColumn()).isEqualTo("경도");
         assertThat(s.getSourceSrid()).isEqualTo("EPSG:4326");
 
-        UserMap m = repo.saveAndFlush(UserMap.builder().name("샘플").ownerId("alice").sourceType("EXCEL").sourceSrid("EPSG:4326").progressTotal(7).build());
-        job().execute(new UserMapImportJob.Request(m.getId(), "alice", ImportMode.COORD, f, 7, null, "위도", "경도", "EPSG:4326"));
-        assertThat(jdbc.queryForObject("SELECT matched_count FROM tbl_user_map WHERE id = ?", Integer.class, m.getId())).isEqualTo(7);
-        assertThat(jdbc.queryForObject("SELECT failed_count FROM tbl_user_map WHERE id = ?", Integer.class, m.getId())).isZero();
+        UserMap m = repo.saveAndFlush(UserMap.builder().name("샘플").ownerId("alice").sourceType("EXCEL").sourceSrid("EPSG:4326").progressTotal(13).build());
+        job().execute(new UserMapImportJob.Request(m.getId(), "alice", ImportMode.COORD, f, 13, null, "위도", "경도", "EPSG:4326"));
+        assertThat(jdbc.queryForObject("SELECT matched_count FROM tbl_user_map WHERE id = ?", Integer.class, m.getId())).isEqualTo(10);
+        assertThat(jdbc.queryForObject("SELECT failed_count FROM tbl_user_map WHERE id = ?", Integer.class, m.getId())).isEqualTo(3);
     }
 
     @Test
-    void 주소_샘플은_주소_컬럼으로_추천되고_7곳이_모두_필지가_된다() throws Exception {
+    void 주소_샘플은_주소_컬럼으로_추천되고_정상_10곳은_필지가_되고_틀린_3곳은_실패한다() throws Exception {
         Path f = file("address");
         var s = suggest(f);
         assertThat(s.getMode()).isEqualTo("ADDRESS");
         assertThat(s.getAddressColumn()).isEqualTo("주소");
 
-        UserMap m = repo.saveAndFlush(UserMap.builder().name("주소 샘플").ownerId("alice").sourceType("EXCEL").sourceKind("EXCEL_ADDRESS").sourceSrid("EPSG:4326").progressTotal(7).build());
-        job().execute(new UserMapImportJob.Request(m.getId(), "alice", ImportMode.ADDRESS, f, 7, null, null, null, "EPSG:4326", "주소"));
+        UserMap m = repo.saveAndFlush(UserMap.builder().name("주소 샘플").ownerId("alice").sourceType("EXCEL").sourceKind("EXCEL_ADDRESS").sourceSrid("EPSG:4326").progressTotal(13).build());
+        job().execute(new UserMapImportJob.Request(m.getId(), "alice", ImportMode.ADDRESS, f, 13, null, null, null, "EPSG:4326", "주소"));
         assertThat(jdbc.queryForObject("SELECT status FROM tbl_user_map WHERE id = ?", String.class, m.getId())).isEqualTo("READY");
-        assertThat(jdbc.queryForObject("SELECT matched_count FROM tbl_user_map WHERE id = ?", Integer.class, m.getId())).isEqualTo(7);
-        assertThat(jdbc.queryForObject("SELECT failed_count FROM tbl_user_map WHERE id = ?", Integer.class, m.getId())).isZero();
+        assertThat(jdbc.queryForObject("SELECT matched_count FROM tbl_user_map WHERE id = ?", Integer.class, m.getId())).isEqualTo(10);
+        assertThat(jdbc.queryForObject("SELECT failed_count FROM tbl_user_map WHERE id = ?", Integer.class, m.getId())).isEqualTo(3);
     }
 
     @Test
@@ -141,13 +141,32 @@ class SampleFilesTest {
     }
 
     @Test
-    void 샘플_PNU_열은_텍스트_서식이라_19자리가_보존된다() throws Exception {
+    void 샘플_PNU_열은_텍스트_서식이라_정상_10행은_19자리가_보존된다() throws Exception {
         com.gtp.domain.mymap.XlsxTestUtil.Table t = com.gtp.domain.mymap.XlsxTestUtil.read(file("pnu"));
-        assertThat(t.rows()).hasSize(7);
-        for (ExcelSheet.Row row : t.rows()) {
+        assertThat(t.rows()).hasSize(13);
+        for (ExcelSheet.Row row : t.rows().subList(0, 10)) {
             CellData d = row.cells().get(0);
             assertThat(d.numeric()).isFalse();
             assertThat(d.text()).hasSize(19);
+        }
+    }
+
+    @Test
+    void 세_샘플_모두_정상_10행_뒤에_일부러_틀린_3행이_맨_아래에_있다() throws Exception {
+        for (String kind : List.of("pnu", "address", "coord")) {
+            try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(samples.load(kind).bytes()))) {
+                Sheet data = wb.getSheet("데이터");
+                assertThat(data.getLastRowNum()).as(kind).isEqualTo(13);   // 머리글 1 + 정상 10 + 틀린 3
+                for (int r = 1; r <= 13; r++) {
+                    Row row = data.getRow(r);
+                    String note = row.getCell(row.getLastCellNum() - 1).getStringCellValue();
+                    assertThat(note.contains("일부러 틀린 값")).as(kind + " 행 " + r).isEqualTo(r > 10);
+                }
+                // 세종시청 인근 샘플이다 — 옛 전국 청사 이름이 남아 있으면 안 된다
+                StringBuilder all = new StringBuilder();
+                for (Row row : data) for (Cell c : row) all.append(c.toString()).append('\n');
+                assertThat(all.toString()).as(kind).contains("세종특별자치시청").doesNotContain("서울특별시청").doesNotContain("부산광역시청");
+            }
         }
     }
 

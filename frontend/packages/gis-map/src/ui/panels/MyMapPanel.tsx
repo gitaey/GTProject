@@ -1,13 +1,14 @@
 'use client'
 
 // 나만의지도 패널 — 스타일: gm-panel(TIFF·나만의지도 공용), gm-mymap-panel
-// 내 레이어 / 공유받은 레이어 두 묶음. 항목은 두 줄(이름 / 종류 칩·개수·공유 수·처리 중·실패 N·보낸 사람) + 위치 이동·⋯ 메뉴.
-// 결과 줄(매칭·실패·기준월)은 툴팁으로만, 실패가 있으면 줄 끝 빨간 `실패 N`(누르면 결과 보고서). ⋯ 메뉴: 스타일·라벨 / 업로드 결과 / 속성 테이블 / 내보내기 / 삭제.
-// 불러오는 중(GeoJSON 받기·피처 변환)은 줄 끝 "불러오는 중 42%"(받는 동안은 회전 아이콘만)와 아래 얇은 막대, 묶음으로 그리는 레이어는 "묶음 보기" 칩.
-// 처리 중은 항목 아래 얇은 진행 막대, 상단 `내 레이어 n/20`(한도는 소스의 quota가 있을 때만). 켜짐·진행률처럼 값에 따라 바뀌는 것만 인라인 style
-import { useEffect, useMemo, useRef, useState } from 'react'
+// 머리줄: 공유(보조 단추·선택 모드) + 업로드(주 단추). 그 아래 탭 `내 레이어` / `공유받은`(한 번에 한쪽 목록만 — 지도에 켠 레이어는 그대로),
+// 내 레이어 탭에만 `3 / 20`·한도 안내. 목록 전체(두 탭 합계)가 8개 이상이면 검색창(검색은 현재 탭 안에서만). 선택 모드(일괄 공유)는 내 레이어 탭에서만. 행은 ui/mymap/MyMapListRow(그리는 규칙은 mymap/listModel), 빈 화면·목록 오류는 mymap/MyMapEmptyState.
+// 목록 행에는 실패 개수·사유를 적지 않는다 — 처음 등록한 레이어의 처리가 끝나면 업로드 결과 창(MyMapImportReport)을 한 번 자동으로 띄우고(처음 한 번 규칙은
+// listModel.planFreshReports, 기억은 엔진 map.vector.freshUploads), 이후에는 ⋯ 메뉴 `업로드 결과 보기`로 다시 연다.
+// ⋯ 메뉴: 스타일·라벨 / 공유 / 속성 테이블 / 내보내기 / 업로드 결과 보기 / 삭제. 켜짐·진행률처럼 값에 따라 바뀌는 것만 인라인 style
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Trash2, Upload, Loader2, Share2, Locate, Palette, Users, ClipboardList, Table2, Download } from 'lucide-react'
+import { Trash2, Loader2, Share2, Palette, ClipboardList, Table2, Download, Plus, Search, X, AlertTriangle, Info } from 'lucide-react'
 import { EMPTY_MYMAP_CATALOG_STATE } from '../../core'
 import type { MyMapCatalogState, MyMapConfirmResult, UserMapListItem, VectorOverlayState } from '../../core'
 import { useGisMap, useMyMapCatalog, useStoreValue, useVectorOverlayState } from '../../react'
@@ -19,25 +20,24 @@ import MyMapStyleDialog from '../mymap/MyMapStyleDialog'
 import MyMapDeleteConfirm from '../mymap/MyMapDeleteConfirm'
 import MyMapTableDialog from '../mymap/MyMapTableDialog'
 import MyMapExportDialog from '../mymap/MyMapExportDialog'
-import MyMapItemMenu from '../mymap/MyMapItemMenu'
 import type { ItemMenuEntry } from '../mymap/MyMapItemMenu'
-import { hasImportResult, itemMenuIds } from '../mymap/itemMenuModel'
+import MyMapListRow from '../mymap/MyMapListRow'
+import MyMapEmptyState, { MyMapListError, MyMapSharedEmpty } from '../mymap/MyMapEmptyState'
+import MyMapTabs, { tabId, tabPanelId } from '../mymap/MyMapTabs'
+import { canViewImportResult, itemMenuIds } from '../mymap/itemMenuModel'
 import type { ItemMenuId } from '../mymap/itemMenuModel'
-import { formatCount, kindLabel, resultTooltip } from '../mymap/format'
+import { formatCount } from '../mymap/format'
+import { defaultTab, hasNoLocation, hiddenActiveCount, itemsForTab, limitNoteText, newOwnedIds, planFreshReports, quotaText, resolveTab, rowView, shouldShowSearch, splitItems, swatchOf } from '../mymap/listModel'
+import type { ListTab } from '../mymap/listModel'
 import { SHARE_MAX_ITEMS } from '../share/shareModel'
-
-/** 종류 배지 색 클래스(sourceKind를 아는 새 서버일 때만) */
-const KIND_CLASS: Readonly<Record<string, string>> = Object.freeze({
-    SHP: 'gm-mymap-panel__kind--shp', EXCEL_PNU: 'gm-mymap-panel__kind--pnu',
-    EXCEL_ADDRESS: 'gm-mymap-panel__kind--address', EXCEL_COORD: 'gm-mymap-panel__kind--coord',
-})
 
 /** ⋯ 메뉴 항목의 글자·아이콘(어떤 항목이 들어가는지는 mymap/itemMenuModel이 정한다) */
 const MENU_DEF: Readonly<Record<ItemMenuId, { label: string; icon: ReactNode }>> = Object.freeze({
     style: { label: '스타일·라벨', icon: <Palette size={13} /> },
-    report: { label: '업로드 결과', icon: <ClipboardList size={13} /> },
+    share: { label: '공유', icon: <Share2 size={13} /> },
+    report: { label: '업로드 결과 보기', icon: <ClipboardList size={13} /> },
     table: { label: '속성 테이블', icon: <Table2 size={13} /> },
-    export: { label: '내보내기…', icon: <Download size={13} /> },
+    export: { label: '내보내기', icon: <Download size={13} /> },
     delete: { label: '삭제', icon: <Trash2 size={13} /> },
 })
 
@@ -47,18 +47,31 @@ const selectLoadingIds = (s: VectorOverlayState) => s.loadingIds
 const selectLoadProgress = (s: VectorOverlayState) => s.loadProgress
 const selectClusteredIds = (s: VectorOverlayState) => s.clusteredIds
 
+/** 결과 창에 넘길 대상. auto = 처음 등록 직후 자동으로 띄운 창, failure = 처리 실패 레이어의 이유 */
+interface ReportTarget {
+    id: number
+    name: string
+    auto?: boolean
+    failure?: { message: string | null } | null
+}
+
 // 목록·상태 폴링·삭제는 패널이 열려 있는 동안의 목록 객체(map.vector.openCatalog)가,
 // 지도에 올린 레이어와 체크 상태는 엔진 인스턴스(map.vector)가 가진다 → 패널을 닫았다 열어도 체크 = 지도
 export default function MyMapPanel() {
     const map = useGisMap()
     const vector = map?.vector ?? null
-    const reportAvailable = !!map?.sources.myMap?.importReport
+    const myMapSource = map?.sources.myMap
+    const reportAvailable = !!myMapSource?.importReport
     // 스타일 저장(PATCH)을 할 수 있는 소스일 때만 스타일 단추를 보인다(없으면 옛 화면 그대로)
-    const styleAvailable = !!map?.sources.myMap?.update
-    // 내보내기(exportLayer)가 있는 소스일 때만 ⋯ 메뉴에 `내보내기…`를 보인다
-    const exportAvailable = !!map?.sources.myMap?.exportLayer
+    const styleAvailable = !!myMapSource?.update
+    // 내보내기(exportLayer)가 있는 소스일 때만 ⋯ 메뉴에 `내보내기`를 보인다
+    const exportAvailable = !!myMapSource?.exportLayer
+    // 공유 저장소가 있는 소스일 때만 ⋯ 메뉴에 `공유`를 보인다(공유 창이 쓰는 것과 같은 판단)
+    const shareAvailable = !!(myMapSource?.shareTarget || (myMapSource?.getShare && myMapSource?.setShare))
+    // 업로드 단추·빈 화면의 첫 레이어 올리기는 올릴 수 있는 소스일 때만
+    const uploadAvailable = !!(myMapSource?.uploadShp || myMapSource?.previewExcel)
     const catalog = useMyMapCatalog()
-    const { items, loading, quota } = useStoreValue(catalog?.store, selectCatalog, EMPTY_MYMAP_CATALOG_STATE)
+    const { items, loading, error: listError, quota } = useStoreValue(catalog?.store, selectCatalog, EMPTY_MYMAP_CATALOG_STATE)
     const visibleIdList = useVectorOverlayState(selectVisibleIds)
     const visibleIds = useMemo(() => new Set(visibleIdList), [visibleIdList])
     const loadingIdList = useVectorOverlayState(selectLoadingIds)
@@ -74,7 +87,7 @@ export default function MyMapPanel() {
     // 다중 선택 모드(일괄 공유) — 표시 체크와 따로 고르는 선택 집합
     const [selectMode, setSelectMode] = useState(false)
     const [selectedIds, setSelectedIds] = useState<ReadonlySet<number>>(() => new Set<number>())
-    const [reportTarget, setReportTarget] = useState<{ id: number; name: string } | null>(null)
+    const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null)
     const [styleTarget, setStyleTarget] = useState<{ id: number; name: string } | null>(null)
     const [tableTarget, setTableTarget] = useState<{ id: number; name: string } | null>(null)
     const [exportTarget, setExportTarget] = useState<{ id: number; name: string; featureCount: number } | null>(null)
@@ -84,35 +97,100 @@ export default function MyMapPanel() {
     const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null)
     // 스타일 저장 요청이 도는 동안 true — 그 사이 다른 레이어의 스타일 창을 열면 저장 결과·오류를 볼 창이 사라진다
     const styleSavingRef = useRef(false)
-    // 업로드 직후 확정 응답의 "예정" 기준월(처리 중인 동안만 쓴다 — 끝나면 목록·상태의 확정값). 패널이 닫히면 사라진다
-    const [expectedVersions, setExpectedVersions] = useState<Readonly<Record<number, string>>>({})
+    const [query, setQuery] = useState('')
+    // 사용자가 직접 고른 탭(null이면 기본 규칙: 내 레이어, 내 레이어가 0개이고 공유받은 것만 있으면 공유받은). 패널이 닫히면 사라진다
+    const [tabChoice, setTabChoice] = useState<ListTab | null>(null)
+    const limitNoteId = useId()
+    const tabsId = useId()
+    // 처음 등록 결과 창: 이 패널을 연 뒤 이 화면에서 올린 id(목록에 아직 없을 수 있다) · 처리 중으로 관찰한 id. 패널이 닫히면 사라지고, 엔진의 vector.freshUploads가 그 너머를 기억한다
+    const mineRef = useRef<Set<number>>(new Set())
+    const seenProcessingRef = useRef<Set<number>>(new Set())
 
-    const owned = useMemo(() => items.filter(i => i.owner), [items])
-    const shared = useMemo(() => items.filter(i => !i.owner), [items])
-    // 한도: 서버가 준 maxLayers에 지금 목록의 내 레이어 수(업로드·삭제 직후에도 맞는 값)
+    const { owned, shared } = useMemo(() => splitItems(items), [items])
+    const searching = query.trim() !== ''
+    // 기본 탭 규칙은 목록을 처음 제대로 받았을 때 한 번만 적용해 고정한다(그 뒤 마지막 내 레이어를 지워도 보던 탭을 유지)
+    const listReady = !loading && !(listError && items.length === 0)
+    useEffect(() => {
+        if (listReady && tabChoice === null) setTabChoice(defaultTab(owned.length, shared.length))
+    }, [listReady, tabChoice, owned.length, shared.length])
+    const activeTab = resolveTab(tabChoice, owned.length, shared.length)
+    // 현재 탭의 목록(검색은 이 탭 안에서만)
+    const tabItems = useMemo(() => itemsForTab(items, activeTab, query), [items, activeTab, query])
     // 공유(선택 모드) 단추: 항상 보인다. 내 레이어가 1개 이상이면 눌리고, 0개면 비활성
     // (1개만 골라도 단일 공유 창이 열린다 — 레이어를 1개만 가진 사용자도 쓸 수 있게).
     // 소스에 일괄 공유(shareTarget.bulk)가 없으면(옛 소스) 한 번에 1개만 고른다 — 공유 창이 단일 모드만 지원한다
-    const bulkAvailable = !!map?.sources.myMap?.shareTarget?.bulk
-    const selecting = selectMode && owned.length >= 1
+    const bulkAvailable = !!myMapSource?.shareTarget?.bulk
+    const selecting = selectMode && owned.length >= 1 && activeTab === 'owned'
+    // 선택 모드에서 고를 수 있는 내 레이어(처리 실패는 공유할 게 없다)
+    const pickableOwned = useMemo(() => owned.filter(i => i.status !== 'FAILED'), [owned])
+    const visiblePickable = useMemo(() => (activeTab === 'owned' ? tabItems.filter(i => i.status !== 'FAILED') : []), [activeTab, tabItems])
     // 목록이 바뀌어 사라진 레이어는 선택에서 뺀다
-    const pickedIds = useMemo(() => owned.filter(i => selectedIds.has(i.id)).map(i => i.id), [owned, selectedIds])
+    const pickedIds = useMemo(() => pickableOwned.filter(i => selectedIds.has(i.id)).map(i => i.id), [pickableOwned, selectedIds])
     // 선택(공유) 모드로 들어가면 항목 버튼이 사라지므로 열린 메뉴도 닫는다(끝났을 때 다시 열려 있지 않게)
     useEffect(() => { if (selecting) setOpenMenuId(null) }, [selecting])
-    const menuEnv = useMemo(() => ({ styleAvailable, reportAvailable, exportAvailable }), [styleAvailable, reportAvailable, exportAvailable])
+    const menuEnv = useMemo(() => ({ styleAvailable, reportAvailable, exportAvailable, shareAvailable }), [styleAvailable, reportAvailable, exportAvailable, shareAvailable])
     const maxLayers = quota?.maxLayers ?? null
     const layerFull = maxLayers !== null && owned.length >= maxLayers
+    const hasFailedOwned = owned.some(i => i.status === 'FAILED')
+    const modalOpen = showUpload || !!shareItems || !!reportTarget || !!styleTarget || !!tableTarget || !!exportTarget || !!deleteTarget
 
-    // 업로드 뒤 목록 다시 받기(옛 fetchList — loading 표시는 다시 켜지 않는다)
+    // 업로드 뒤 목록 다시 받기(옛 fetchList — loading 표시는 다시 켜지 않는다).
+    // 방금 올린 레이어를 기억한다: 엑셀은 확정 응답의 id, SHP·옛 서버는 id가 없으니 올리기 전 목록과 비교해 새로 생긴 내 레이어
     const fetchList = (result?: MyMapConfirmResult) => {
-        if (result && typeof result.parcelVersion === 'string' && result.parcelVersion) {
-            const { id, parcelVersion } = result
-            setExpectedVersions(cur => ({ ...cur, [id]: parcelVersion }))
+        if (!catalog) return
+        const mem = vector?.freshUploads
+        // 방금 올린 레이어가 보이도록 내 레이어 탭으로
+        setTabChoice('owned')
+        if (typeof result?.id === 'number') {
+            mineRef.current.add(result.id)
+            mem?.add(result.id)
+            void catalog.load()
+            return
         }
-        void catalog?.load()
+        // 올리기 직전 목록을 제대로 받아 둔 경우에만 비교한다(조회 실패·로딩 중이면 기존 레이어를 새 것으로 잘못 잡는다) — listModel.newOwnedIds
+        const prev = catalog.store.getState()
+        const trusted = !prev.loading && prev.error === null
+        void catalog.load().then(() => {
+            newOwnedIds(prev.items, trusted, catalog.store.getState().items).forEach(id => {
+                mineRef.current.add(id)
+                mem?.add(id)
+            })
+        })
     }
 
+    // 처음 등록한 레이어의 처리가 끝나면 결과 창을 한 번만(listModel.planFreshReports). 다른 창이 열려 있으면 닫힌 뒤에, 여럿이 끝나면 가장 최근 하나만
+    useEffect(() => {
+        if (!vector || loading) return
+        const mem = vector.freshUploads
+        const plan = planFreshReports({
+            fresh: mem.ids(), mine: mineRef.current, seenProcessing: seenProcessingRef.current, items,
+            canOpen: item => canViewImportResult(item, reportAvailable),
+        })
+        plan.seen.forEach(id => seenProcessingRef.current.add(id))
+        plan.drop.forEach(id => { mem.remove(id); mineRef.current.delete(id); seenProcessingRef.current.delete(id) })
+        if (plan.open === null || modalOpen) return
+        const target = items.find(i => i.id === plan.open)
+        plan.ready.forEach(id => { mem.remove(id); mineRef.current.delete(id); seenProcessingRef.current.delete(id) })
+        if (target) {
+            setReportTarget({
+                id: target.id, name: target.name, auto: true,
+                failure: target.status === 'FAILED' ? { message: target.errorMessage ?? null } : null,
+            })
+        }
+    }, [vector, items, loading, modalOpen, reportAvailable])
+
     const exitSelect = () => { setSelectMode(false); setSelectedIds(new Set<number>()) }
+    // 탭을 바꾸면 선택 모드는 끝난다(선택 모드는 내 레이어 탭에서만). 지도에 켠 레이어(체크)는 엔진 상태라 그대로
+    const changeTab = (tab: ListTab) => {
+        if (tab !== activeTab) exitSelect()
+        setTabChoice(tab)
+    }
+    // 공유 단추: 공유받은 탭에서 누르면 내 레이어 탭으로 옮긴 뒤 선택 모드로 들어간다
+    const toggleSelectMode = () => {
+        if (selecting) { exitSelect(); return }
+        setTabChoice('owned')
+        setSelectMode(true)
+    }
     const toggleSelected = (id: number) => setSelectedIds(cur => {
         // 일괄 공유가 없는 소스: 하나만 고른다(이미 고른 걸 다시 누르면 해제, 다른 걸 누르면 바뀜)
         if (!bulkAvailable) return cur.has(id) ? new Set<number>() : new Set([id])
@@ -121,14 +199,24 @@ export default function MyMapPanel() {
         else if (next.size < SHARE_MAX_ITEMS) next.add(id)
         return next
     })
-    const allPicked = owned.length > 0 && pickedIds.length === Math.min(owned.length, SHARE_MAX_ITEMS)
-    const toggleAllSelected = () => setSelectedIds(allPicked ? new Set<number>() : new Set(owned.slice(0, SHARE_MAX_ITEMS).map(i => i.id)))
+    // 전체 선택: 지금 보이는(검색으로 걸러진) 고를 수 있는 행만
+    const visibleIdsToPick = visiblePickable.slice(0, SHARE_MAX_ITEMS).map(i => i.id)
+    const allPicked = visibleIdsToPick.length > 0 && visibleIdsToPick.every(id => selectedIds.has(id))
+    const toggleAllSelected = () => setSelectedIds(cur => {
+        if (allPicked) return new Set(Array.from(cur).filter(id => !visibleIdsToPick.includes(id)))
+        const next = new Set(cur)
+        for (const id of visibleIdsToPick) {
+            if (next.size >= SHARE_MAX_ITEMS) break
+            next.add(id)
+        }
+        return next
+    })
 
     // 옛 동작: 서버 응답과 관계없이 지도·목록에서 뺀다(네트워크 오류만 드러남)
     const handleDelete = (id: number): Promise<void> => catalog?.remove(id) ?? Promise.resolve()
 
     const toggleVisibility = (item: UserMapListItem) => {
-        if (item.status !== 'READY') return
+        if (item.status !== 'READY' || hasNoLocation(item)) return
         if (visibleIds.has(item.id)) {
             vector?.hide(item.id)
         } else {
@@ -138,7 +226,7 @@ export default function MyMapPanel() {
 
     // 지도에 없으면 먼저 불러와 켠 뒤(체크도 켜짐) 피처 범위로 이동
     const handleLocate = async (item: UserMapListItem) => {
-        if (item.status !== 'READY') return
+        if (item.status !== 'READY' || hasNoLocation(item)) return
         await vector?.zoomTo(item.id)
     }
 
@@ -146,7 +234,8 @@ export default function MyMapPanel() {
     const selectMenu = (id: ItemMenuId, item: UserMapListItem) => {
         const target = { id: item.id, name: item.name }
         if (id === 'style') { if (!styleSavingRef.current) setStyleTarget(target) }
-        else if (id === 'report') setReportTarget(target)
+        else if (id === 'share') { setShareFromSelection(false); setShareItems([target]) }
+        else if (id === 'report') setReportTarget({ ...target, failure: item.status === 'FAILED' ? { message: item.errorMessage ?? null } : null })
         else if (id === 'table') setTableTarget(target)
         else if (id === 'export') setExportTarget({ ...target, featureCount: item.featureCount })
         else setDeleteTarget(target)
@@ -155,205 +244,120 @@ export default function MyMapPanel() {
     const renderItem = (item: UserMapListItem) => {
         const active = visibleIds.has(item.id)
         // 지도에 올리는 중(받기 → 피처 변환). 진행률은 변환 단계에서만 있다
-        const layerLoading = active && loadingIds.has(item.id)
-        const layerPct = loadProgress[item.id] === undefined ? null : Math.min(100, Math.floor(loadProgress[item.id] * 100))
-        const layerClustered = active && !layerLoading && clusteredIds.has(item.id)
-        const isProcessing = item.status === 'PROCESSING'
-        const isFailed = item.status === 'FAILED'
-        const total = item.progressTotal ?? 0
-        const done = Math.min(item.progressDone ?? 0, total)
-        const hasProgress = isProcessing && total > 0
-        const failedRows = item.failedCount ?? 0
-        const hasResult = hasImportResult(item)
-        // 보고서는 소유자만(서버가 403) — 소스가 importReport를 안 가졌으면 글자로만
-        const canOpenReport = reportAvailable && item.owner && failedRows > 0
-        // 결과 줄(매칭·실패·기준월)은 평소 숨기고 툴팁으로만 — 실패가 있을 때만 줄 끝에 빨간 `실패 N`
-        const tip = resultTooltip(item, expectedVersions[item.id])
-        // 공유받은 레이어: 보낸 사람 이름만 줄 끝에(없으면 아이디), 툴팁에 이름(아이디)
-        const senderName = !item.owner ? (item.ownerName || item.ownerId || '') : ''
-        const senderTitle = item.ownerName && item.ownerId ? `${item.ownerName}(${item.ownerId})` : senderName
-        // 선택 모드: 내 레이어는 줄 전체가 선택 대상(왼쪽 체크 = 선택 체크), 공유받은 레이어는 흐리게·선택 불가
-        const pickable = selecting && item.owner
-        const dim = selecting && !item.owner
-        const picked = pickable && selectedIds.has(item.id)
+        const pctRaw = loadProgress[item.id]
+        const mapLoadPct = pctRaw === undefined ? null : Math.min(100, Math.floor(pctRaw * 100))
+        const view = rowView(item, {
+            selecting, active, mapLoading: loadingIds.has(item.id), mapLoadPct, mapClustered: clusteredIds.has(item.id),
+        })
         const menuEntries: ItemMenuEntry[] = itemMenuIds(item, menuEnv).map(mid => ({
             id: mid, ...MENU_DEF[mid], danger: mid === 'delete', onSelect: () => selectMenu(mid, item),
         }))
         return (
-            <div key={item.id} className={cx('gm-panel__item', 'gm-mymap-panel__item', pickable && 'gm-panel__item--select', picked && 'gm-is-picked', dim && 'gm-is-dim')}
-                style={selecting ? undefined : { background: active ? 'rgba(var(--gm-primary-rgb), 0.04)' : 'transparent' }}
-                onClick={pickable ? e => {
-                    // 체크 상자를 직접 누른 클릭은 onChange가 처리한다(두 번 바뀌지 않게)
-                    if ((e?.target as { tagName?: string } | null | undefined)?.tagName !== 'INPUT') toggleSelected(item.id)
-                } : undefined}>
-                {pickable ? (
-                    <input type="checkbox" checked={picked} onChange={() => toggleSelected(item.id)}
-                        aria-label={`${item.name} 선택`} className="gm-panel__item-check gm-panel__item-check--select" />
-                ) : (
-                    <input type="checkbox" checked={active} disabled={isProcessing || isFailed || dim}
-                        onChange={() => toggleVisibility(item)}
-                        className="gm-panel__item-check"
-                        style={{ cursor: isProcessing || isFailed || dim ? 'default' : 'pointer' }} />
-                )}
-
-                <div className="gm-panel__item-body">
-                    <div className={cx('gm-panel__item-name', 'gm-mymap-panel__name', active && 'gm-is-active', isFailed && 'gm-is-failed')} title={tip ?? item.name}>
-                        {item.name}
-                    </div>
-                    <div className="gm-panel__item-meta gm-mymap-panel__meta" title={tip}>
-                        <span className={cx('gm-mymap-panel__kind', item.sourceKind && 'gm-mymap-panel__kind--badge', item.sourceKind && KIND_CLASS[item.sourceKind])}>{kindLabel(item)}</span>
-                        {!isProcessing && !isFailed && (
-                            <>
-                                <span className="gm-mymap-panel__dot" aria-hidden="true" />
-                                <span>{formatCount(item.featureCount)}개</span>
-                            </>
-                        )}
-                        {layerLoading && (
-                            <>
-                                <span className="gm-mymap-panel__dot" aria-hidden="true" />
-                                <span className="gm-panel__item-status gm-panel__item-status--busy" role="status">
-                                    {layerPct !== null ? `불러오는 중 ${layerPct}%` : <><Loader2 size={9} className="gm-loader" /> 불러오는 중</>}
-                                </span>
-                            </>
-                        )}
-                        {layerClustered && (
-                            <>
-                                <span className="gm-mymap-panel__dot" aria-hidden="true" />
-                                <span className="gm-mymap-panel__cluster-chip" title="화면 안 피처가 많아 원과 숫자로 묶어 보여 줍니다. 확대하거나 원을 누르면 원래 모양이 보입니다">묶음 보기</span>
-                            </>
-                        )}
-                        {item.owner && (item.shareCount ?? 0) > 0 && (
-                            <>
-                                <span className="gm-mymap-panel__dot" aria-hidden="true" />
-                                <span className="gm-mymap-panel__share-count" title={`공유 대상 ${item.shareCount}`} role="img" aria-label={`공유 ${item.shareCount}`}>
-                                    <Users size={10} aria-hidden="true" />{formatCount(item.shareCount ?? 0)}
-                                </span>
-                            </>
-                        )}
-                        {isProcessing && (
-                            <>
-                                <span className="gm-mymap-panel__dot" aria-hidden="true" />
-                                <span className="gm-panel__item-status gm-panel__item-status--busy">
-                                    {hasProgress ? `처리 중 ${formatCount(done)}/${formatCount(total)}` : <><Loader2 size={9} className="gm-loader" /> 처리 중</>}
-                                </span>
-                            </>
-                        )}
-                        {isFailed && (
-                            <>
-                                <span className="gm-mymap-panel__dot" aria-hidden="true" />
-                                <span className="gm-panel__item-status gm-panel__item-status--failed" title={item.errorMessage ?? undefined}>처리 실패</span>
-                                {item.errorMessage && (
-                                    <>
-                                        <span className="gm-mymap-panel__dot" aria-hidden="true" />
-                                        <span className="gm-mymap-panel__error" title={item.errorMessage}>{item.errorMessage}</span>
-                                    </>
-                                )}
-                            </>
-                        )}
-                        {hasResult && failedRows > 0 && (
-                            <>
-                                <span className="gm-mymap-panel__dot" aria-hidden="true" />
-                                {canOpenReport ? (
-                                    <button type="button" className="gm-mymap-panel__fail-link" title="실패한 행 보기"
-                                        onClick={() => setReportTarget({ id: item.id, name: item.name })}>
-                                        실패 {formatCount(failedRows)}
-                                    </button>
-                                ) : (
-                                    <span className="gm-mymap-panel__fail-text">실패 {formatCount(failedRows)}</span>
-                                )}
-                            </>
-                        )}
-                        {senderName && (
-                            <>
-                                <span className="gm-mymap-panel__dot" aria-hidden="true" />
-                                <span className="gm-mymap-panel__sender" title={senderTitle}>{senderName}</span>
-                            </>
-                        )}
-                    </div>
-                </div>
-
-                {!selecting && (item.status === 'READY' || menuEntries.length > 0) && (
-                    <div className="gm-mymap-panel__acts">
-                        {item.status === 'READY' && (
-                            <button onClick={() => handleLocate(item)} title="레이어 위치로 이동" aria-label="레이어 위치로 이동"
-                                className="gm-panel__item-btn gm-mymap-panel__ib">
-                                <Locate size={13} />
-                            </button>
-                        )}
-                        {menuEntries.length > 0 && (
-                            <MyMapItemMenu label={item.name} open={openMenuId === item.id}
-                                onOpenChange={o => setOpenMenuId(cur => (o ? item.id : cur === item.id ? null : cur))}
-                                entries={menuEntries} />
-                        )}
-                    </div>
-                )}
-
-                {layerLoading && layerPct !== null && (
-                    <div className="gm-mymap-panel__loadbar" role="progressbar" aria-label={`${item.name} 불러오기 진행률`}
-                        aria-valuemin={0} aria-valuemax={100} aria-valuenow={layerPct}>
-                        <div className="gm-mymap-panel__loadbar-fill" style={{ width: `${layerPct}%` }} />
-                    </div>
-                )}
-                {hasProgress && (
-                    <div className="gm-mymap-panel__bar" role="progressbar" aria-label={`${item.name} 처리 진행률`}
-                        aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}>
-                        <div className="gm-mymap-panel__bar-fill" style={{ width: `${(done / total) * 100}%` }} />
-                    </div>
-                )}
-            </div>
+            <MyMapListRow key={item.id} item={item} view={view} swatch={swatchOf(item)} active={active}
+                selecting={selecting} picked={view.pickable && selectedIds.has(item.id)} mapLoadPct={mapLoadPct}
+                menuEntries={menuEntries} menuOpen={openMenuId === item.id}
+                onMenuOpenChange={o => setOpenMenuId(cur => (o ? item.id : cur === item.id ? null : cur))}
+                onToggle={() => toggleVisibility(item)} onLocate={() => { void handleLocate(item) }}
+                onPick={() => toggleSelected(item.id)} onDelete={() => setDeleteTarget({ id: item.id, name: item.name })} />
         )
     }
+
+    const showSearch = shouldShowSearch(items.length) || searching
+    const hiddenActive = searching ? hiddenActiveCount(items.filter(i => i.owner === (activeTab === 'owned')), tabItems, visibleIds) : 0
+    const noMatch = searching && tabItems.length === 0 && (activeTab === 'owned' ? owned.length : shared.length) > 0
+    const reloadList = () => { void catalog?.load() }
 
     return (
         <div className="gm-panel">
             <div className="gm-panel__header">
                 <span className="gm-panel__title">나만의지도</span>
                 <div className="gm-mymap-panel__header-actions">
-                    <button onClick={() => (selecting ? exitSelect() : setSelectMode(true))} aria-pressed={selecting}
+                    <button type="button" onClick={toggleSelectMode} aria-pressed={selecting}
                         disabled={owned.length === 0}
                         title={owned.length === 0 ? '공유할 내 레이어가 없습니다' : owned.length === 1 || !bulkAvailable ? '내 레이어를 골라 공유' : '여러 레이어를 골라 한 번에 공유'}
-                        aria-label="공유"
-                        className={cx('gm-mymap-panel__upload', selecting && 'gm-is-on')}>
-                        <Share2 size={13} /> 공유
+                        className={cx('gm-mymap-panel__ghost', selecting && 'gm-is-on')}>
+                        <Share2 size={12} aria-hidden="true" />{selecting ? '공유 취소' : '공유'}
                     </button>
-                    <button onClick={() => setShowUpload(true)} disabled={layerFull}
-                        title={layerFull ? `나만의지도는 최대 ${maxLayers}개까지 만들 수 있습니다` : undefined}
-                        className="gm-mymap-panel__upload">
-                        <Upload size={13} /> 업로드
-                    </button>
+                    {uploadAvailable && (
+                        <button type="button" onClick={() => setShowUpload(true)} disabled={layerFull}
+                            aria-describedby={layerFull && activeTab === 'owned' ? limitNoteId : undefined}
+                            title={layerFull ? `나만의지도는 최대 ${maxLayers}개까지 만들 수 있습니다` : undefined}
+                            className="gm-mymap-panel__primary">
+                            <Plus size={12} aria-hidden="true" />업로드
+                        </button>
+                    )}
                 </div>
             </div>
             {selecting && (
                 <div className="gm-mymap-panel__select-banner">
-                    {bulkAvailable && owned.length >= 2 ? '공유할 내 레이어를 고르세요 (여러 개 선택 가능)' : '공유할 내 레이어를 고르세요'}
-                </div>
-            )}
-            {maxLayers !== null && (
-                <div className={cx('gm-mymap-panel__quota', layerFull && 'gm-is-full')}>
-                    내 레이어 {formatCount(owned.length)}/{formatCount(maxLayers)}
+                    {bulkAvailable && pickableOwned.length >= 2 ? '공유할 내 레이어를 고르세요 (여러 개 선택 가능)' : '공유할 내 레이어를 고르세요'}
                 </div>
             )}
 
+            {!loading && !(items.length === 0 && listError) && (
+                <MyMapTabs active={activeTab} ownedCount={owned.length} sharedCount={shared.length} onChange={changeTab} idBase={tabsId} />
+            )}
             <div className="gm-panel__list">
                 {loading ? (
                     <div className="gm-panel__loading">
                         <Loader2 size={18} className="gm-loader gm-loader--primary" />
                     </div>
-                ) : items.length === 0 ? (
-                    <div className="gm-panel__empty">
-                        업로드된 나만의지도 없음
-                    </div>
+                ) : items.length === 0 && listError ? (
+                    <MyMapListError onRetry={reloadList} />
                 ) : (
-                    <>
-                        {shared.length > 0 && owned.length > 0 && (
-                            <div className="gm-mymap-panel__group">내 레이어 <span>{formatCount(owned.length)}</span></div>
+                    <div role="tabpanel" id={tabPanelId(tabsId)} aria-labelledby={tabId(tabsId, activeTab)}>
+                        {listError && <MyMapListError banner onRetry={reloadList} />}
+                        {showSearch && (
+                            <div className="gm-mymap-panel__search">
+                                <label className="gm-mymap-panel__searchbox">
+                                    <Search size={12} aria-hidden="true" />
+                                    <input type="text" value={query} onChange={e => setQuery(e.target.value)}
+                                        placeholder="이름·보낸 사람 검색" aria-label="레이어 검색(현재 탭 안에서)" className="gm-mymap-panel__search-input" />
+                                    {query !== '' && (
+                                        <button type="button" onClick={() => setQuery('')} aria-label="검색어 지우기" className="gm-mymap-panel__search-clear">
+                                            <X size={12} aria-hidden="true" />
+                                        </button>
+                                    )}
+                                </label>
+                            </div>
                         )}
-                        {owned.map(renderItem)}
-                        {shared.length > 0 && (
-                            <div className="gm-mymap-panel__group">공유받은 레이어 <span>{formatCount(shared.length)}</span></div>
+                        {hiddenActive > 0 && (
+                            <div className="gm-mymap-panel__snote">지도에 켠 레이어 {formatCount(hiddenActive)}개가 목록에서 가려져 있습니다</div>
                         )}
-                        {shared.map(renderItem)}
-                    </>
+                        {noMatch && (
+                            <div className="gm-mymap-panel__nomatch" role="status">
+                                <span>&quot;{query.trim()}&quot;에 맞는 레이어가 없습니다</span>
+                                <button type="button" className="gm-mymap-panel__sbtn" onClick={() => setQuery('')}>검색 지우기</button>
+                            </div>
+                        )}
+
+                        {activeTab === 'owned' ? (
+                            <>
+                                {maxLayers !== null && owned.length > 0 && (
+                                    <div className="gm-mymap-panel__sec">
+                                        <span>내 레이어</span>
+                                        <span className={cx('gm-mymap-panel__sec-count', layerFull && 'gm-is-full')}>
+                                            {layerFull && <AlertTriangle size={11} aria-hidden="true" />}{quotaText(owned.length, maxLayers)}
+                                        </span>
+                                    </div>
+                                )}
+                                {layerFull && maxLayers !== null && (
+                                    <div id={limitNoteId} className="gm-mymap-panel__limit-note">
+                                        <Info size={12} aria-hidden="true" />{limitNoteText(maxLayers, hasFailedOwned)}
+                                    </div>
+                                )}
+                                {owned.length === 0 ? (
+                                    <MyMapEmptyState uploadAvailable={uploadAvailable} onUpload={() => setShowUpload(true)} />
+                                ) : (
+                                    tabItems.map(renderItem)
+                                )}
+                            </>
+                        ) : shared.length === 0 ? (
+                            <MyMapSharedEmpty />
+                        ) : (
+                            tabItems.map(renderItem)
+                        )}
+                    </div>
                 )}
             </div>
 
@@ -364,7 +368,7 @@ export default function MyMapPanel() {
                         <button type="button" onClick={toggleAllSelected} className="gm-mymap-panel__select-link">{allPicked ? '선택 해제' : '전체 선택'}</button>
                     )}
                     <button type="button" disabled={pickedIds.length === 0}
-                        onClick={() => { setShareFromSelection(true); setShareItems(owned.filter(i => selectedIds.has(i.id)).map(i => ({ id: i.id, name: i.name }))) }}
+                        onClick={() => { setShareFromSelection(true); setShareItems(pickableOwned.filter(i => selectedIds.has(i.id)).map(i => ({ id: i.id, name: i.name }))) }}
                         className="gm-mymap-panel__select-share"><Share2 size={12} /> 공유하기</button>
                     <button type="button" onClick={exitSelect} className="gm-mymap-panel__select-link">취소</button>
                 </div>
@@ -379,7 +383,10 @@ export default function MyMapPanel() {
                         void catalog?.load()
                     }} />
             )}
-            {reportTarget && <MyMapImportReportDialog id={reportTarget.id} name={reportTarget.name} onClose={() => setReportTarget(null)} />}
+            {reportTarget && (
+                <MyMapImportReportDialog key={`${reportTarget.id}-${reportTarget.auto ? 'auto' : 'manual'}`} id={reportTarget.id} name={reportTarget.name}
+                    auto={reportTarget.auto} failure={reportTarget.failure} onClose={() => setReportTarget(null)} />
+            )}
             {deleteTarget && (
                 <MyMapDeleteConfirm key={deleteTarget.id} name={deleteTarget.name} onConfirm={() => handleDelete(deleteTarget.id)}
                     onClose={() => setDeleteTarget(null)} />

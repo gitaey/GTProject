@@ -1,8 +1,9 @@
 // 나만의지도 항목 `⋯` 메뉴에 어떤 항목이 들어가는지 정하는 규칙(순수 함수 — React·DOM과 무관).
-// 순서(소유자): 스타일·라벨 / 업로드 결과 / 속성 테이블 / 내보내기 / 삭제 (공유는 패널 상단 `공유` 하나로만). 공유받은 레이어: 속성 테이블 / 내보내기
+// 순서(소유자): 스타일·라벨 / 공유 / 속성 테이블 / 내보내기 / 업로드 결과 보기 / 삭제. 공유받은 레이어: 속성 테이블 / 내보내기
+// 목록 행에는 실패 개수·사유를 보이지 않으므로 `업로드 결과 보기`가 결과를 다시 보는 유일한 길이다(소유자만 — 서버도 403).
 import type { UserMapListItem } from '../../core'
 
-export type ItemMenuId = 'style' | 'report' | 'table' | 'export' | 'delete'
+export type ItemMenuId = 'style' | 'share' | 'report' | 'table' | 'export' | 'delete'
 
 export interface ItemMenuEnv {
     /** 소스가 스타일 저장(update)을 가졌다 */
@@ -11,6 +12,8 @@ export interface ItemMenuEnv {
     reportAvailable: boolean
     /** 소스가 내보내기(exportLayer)를 가졌다 */
     exportAvailable: boolean
+    /** 소스가 공유 저장소(shareTarget 또는 옛 getShare+setShare)를 가졌다 */
+    shareAvailable: boolean
 }
 
 type KindFields = Pick<UserMapListItem, 'sourceKind' | 'sourceType'>
@@ -25,17 +28,28 @@ export function hasImportResult(item: Pick<UserMapListItem, 'status' | 'matchedC
     return item.status !== 'PROCESSING' && (item.matchedCount ?? 0) + (item.failedCount ?? 0) > 0
 }
 
+/**
+ * 업로드 결과 창을 열 수 있는 항목인가(소유자만). 처리 실패(FAILED)는 소스의 보고서 없이도 창이 이유 문장을 보여 주므로 항상 열 수 있고,
+ * 끝난(READY) 항목은 소스에 importReport가 있고 결과가 확정된 항목(건수가 있거나 엑셀 레이어 — 실패 0이어도 요약을 본다)만
+ */
+export function canViewImportResult(item: UserMapListItem, reportAvailable: boolean): boolean {
+    if (!item.owner || item.status === 'PROCESSING') return false
+    if (item.status === 'FAILED') return true
+    return reportAvailable && (hasImportResult(item) || isExcelItem(item))
+}
+
 export function itemMenuIds(item: UserMapListItem, env: ItemMenuEnv): ItemMenuId[] {
     const ready = item.status === 'READY'
     // 공유받은 레이어: 속성 테이블·내보내기만(스타일·결과·삭제는 소유자 몫 — 서버도 403). 볼 수 있으면 받을 수 있다
     if (!item.owner) return !ready ? [] : env.exportAvailable ? ['table', 'export'] : ['table']
     const ids: ItemMenuId[] = []
     if (env.styleAvailable && ready) ids.push('style')
-    // 결과가 확정된 항목: 건수가 있거나(실패한 업로드도 포함) 끝난 엑셀 레이어(실패 0이어도 요약을 본다)
-    if (env.reportAvailable && item.status !== 'PROCESSING' && (hasImportResult(item) || (ready && isExcelItem(item)))) ids.push('report')
+    // 공유: 끝난(READY) 내 레이어만 — 목록 머리의 `공유`(여러 개 선택)를 거치지 않고 하나만 바로 공유
+    if (env.shareAvailable && ready) ids.push('share')
     if (ready) ids.push('table')
     // 내보내기: 끝난(READY) 항목만 — 처리 중·실패에는 내보낼 피처가 없다
     if (env.exportAvailable && ready) ids.push('export')
+    if (canViewImportResult(item, env.reportAvailable)) ids.push('report')
     ids.push('delete')
     return ids
 }

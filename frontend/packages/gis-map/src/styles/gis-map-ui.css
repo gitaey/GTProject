@@ -1606,37 +1606,33 @@
     line-height: 1.4;
 }
 
-/* 업로드 안내(용량 한도·느릴 수 있음) — ImagePanel에 maxUploadBytes/slowUploadBytes를 줄 때만 나온다.
-   패키지 리셋(.gm-root :where([class*="gm-"]))이 margin·padding을 0으로 만들므로 부모 class를 더해 이긴다 */
-.gm-image-panel__upload .gm-image-panel__hint {
-    margin: 7px 2px 0;
-    padding: 0 0 0 14px;
-    list-style: disc;
-    font-size: 11px;
+/* 업로드 안내(용량 한도·느릴 수 있음) — 점선 상자 안, 업로드 문구 아래. ImagePanel에 maxUploadBytes/slowUploadBytes를 줄 때만 나온다.
+   패키지 리셋(.gm-root :where([class*="gm-"]))이 margin·padding을 0으로 만들므로 부모 class를 더해 값을 확정한다 */
+.gm-image-panel__drop .gm-image-panel__drop-hint {
+    margin: 0;
+    padding: 6px 0 0;
+    border-top: 1px dashed var(--gm-border);
+    font-size: 10.5px;
     line-height: 1.55;
     color: var(--gm-text-muted);
+    text-align: center;
 }
 
-.gm-image-panel__upload .gm-image-panel__hint--error {
+.gm-image-panel__drop .gm-image-panel__drop-hint p {
+    margin: 0;
     padding: 0;
-    list-style: none;
+}
+
+/* 용량 초과 안내(상자 아래) */
+.gm-image-panel__upload .gm-image-panel__hint--error {
+    margin: 6px 2px 0;
+    padding: 0;
+    font-size: 11px;
+    line-height: 1.5;
     color: var(--gm-danger-text);
 }
 
 /* ── 나만의지도 패널 (ui/panels/MyMapPanel) ── */
-/* 옛 인라인: background none, border none, cursor pointer, color 브랜드색, display flex, alignItems center, gap 4, fontSize 11, fontWeight 600 */
-.gm-mymap-panel__upload {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--gm-primary);
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    font-weight: 600;
-}
-
 /* ── 레이어 패널 (ui/layer/LayerPanel) ── */
 /* 옛 인라인: position relative, display flex, flexDirection column, height 100% */
 .gm-layer-panel {
@@ -2504,184 +2500,6 @@
 }
 
 /* ── 나만의지도 1단계: 패널(한도·묶음·진행률·결과) · 업로드 마법사(gm-wizard) · 결과 보고서(gm-report) ── */
-.gm-mymap-panel__upload:disabled {
-    color: var(--gm-text-disabled);
-    cursor: default;
-}
-
-/* 머리줄 아래 `내 레이어 n/20` */
-.gm-mymap-panel__quota {
-    flex-shrink: 0;
-    padding: 4px 12px;
-    font-size: 10.5px;
-    color: var(--gm-text-muted);
-    background: var(--gm-surface-muted);
-    border-bottom: 1px solid var(--gm-border-subtle);
-}
-
-.gm-mymap-panel__quota.gm-is-full {
-    color: var(--gm-danger);
-}
-
-/* 내 레이어 / 공유받은 레이어 묶음 제목 */
-.gm-mymap-panel__group {
-    padding: 8px 12px 4px;
-    font-size: 10.5px;
-    font-weight: 600;
-    color: var(--gm-text-muted);
-}
-
-.gm-mymap-panel__group span {
-    font-weight: 400;
-}
-
-/* 항목 한 줄(두 줄 구성) — 이름 / 종류 칩 · 개수 · 공유 수 · 처리 중 · 실패 N · 보낸 사람. 처리 중 막대는 항목 맨 아래에 얇게 */
-.gm-mymap-panel__item {
-    position: relative;
-    padding-right: 6px;
-}
-
-.gm-mymap-panel__name {
-    color: var(--gm-text-2);
-}
-
-.gm-mymap-panel__name.gm-is-active {
-    color: var(--gm-text);
-    font-weight: 600;
-}
-
-.gm-mymap-panel__name.gm-is-failed {
-    color: var(--gm-danger);
-}
-
-/* 정보 줄: 한 줄 고정(넘치면 보낸 사람·오류 메시지만 말줄임) */
-.gm-mymap-panel__meta {
-    flex-wrap: nowrap;
-    gap: 5px;
-    margin-top: 2px;
-    overflow: hidden;
-    white-space: nowrap;
-}
-
-.gm-mymap-panel__meta > * {
-    flex-shrink: 0;
-}
-
-.gm-mymap-panel__meta > .gm-mymap-panel__sender,
-.gm-mymap-panel__meta > .gm-mymap-panel__error {
-    flex-shrink: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.gm-mymap-panel__dot {
-    width: 3px;
-    height: 3px;
-    border-radius: 50%;
-    background: var(--gm-border-strong);
-}
-
-/* 종류 배지(SHP·PNU·주소·좌표) — 종류를 아는 새 서버일 때만 배지 모양 */
-.gm-mymap-panel__kind--badge {
-    padding: 0 5px;
-    border-radius: 4px;
-    font-size: 9.5px;
-    font-weight: 600;
-}
-
-.gm-mymap-panel__kind--shp {
-    background: var(--gm-surface-sunken);
-    color: var(--gm-text-2);
-}
-
-.gm-mymap-panel__kind--pnu {
-    background: var(--gm-indigo-soft);
-    color: var(--gm-indigo-text);
-}
-
-.gm-mymap-panel__kind--address {
-    background: var(--gm-success-soft);
-    color: var(--gm-success-deep);
-}
-
-.gm-mymap-panel__kind--coord {
-    background: var(--gm-warn-soft-strong);
-    color: var(--gm-warn-deep);
-}
-
-.gm-mymap-panel__sender {
-    color: var(--gm-text-faint);
-}
-
-.gm-mymap-panel__error {
-    color: var(--gm-danger);
-}
-
-.gm-mymap-panel__bar {
-    position: absolute;
-    left: 12px;
-    right: 12px;
-    bottom: 0;
-    height: 2px;
-    border-radius: 2px;
-    background: var(--gm-surface-sunken);
-    overflow: hidden;
-}
-
-.gm-mymap-panel__bar-fill {
-    height: 100%;
-    background: var(--gm-primary);
-    transition: width .3s;
-}
-
-/* 지도에 올리는 중(피처 변환) 진행 막대 — 처리 중 막대와 같은 자리·모양, 짧은 간격으로 갱신되므로 transition 없음 */
-.gm-mymap-panel__loadbar {
-    position: absolute;
-    left: 12px;
-    right: 12px;
-    bottom: 0;
-    height: 2px;
-    border-radius: 2px;
-    background: var(--gm-surface-sunken);
-    overflow: hidden;
-}
-
-.gm-mymap-panel__loadbar-fill {
-    height: 100%;
-    background: var(--gm-primary);
-}
-
-/* "묶음 보기" 칩 — 화면 안 피처가 많아 원 + 숫자로 묶어 그리는 중 */
-.gm-mymap-panel__cluster-chip {
-    padding: 0 5px;
-    border-radius: 4px;
-    font-size: 9.5px;
-    font-weight: 600;
-    background: rgba(var(--gm-primary-rgb), 0.1);
-    color: var(--gm-primary);
-}
-
-/* 실패 N — 있을 때만 빨갛게. 소유자는 눌러서 결과 보고서 */
-.gm-mymap-panel__fail-link {
-    background: none;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-    font: inherit;
-    font-weight: 600;
-    color: var(--gm-danger);
-}
-
-.gm-mymap-panel__fail-link:hover {
-    text-decoration: underline;
-}
-
-.gm-mymap-panel__fail-text {
-    font-weight: 600;
-    color: var(--gm-danger);
-}
-
 /* 항목 오른쪽 단추 묶음(위치 이동 · ⋯) */
 .gm-mymap-panel__acts {
     display: flex;
@@ -3954,18 +3772,6 @@
     color: var(--gm-danger-deeper);
 }
 
-/* 나만의지도 패널: 머리줄 단추 묶음 · 선택 모드 */
-.gm-mymap-panel__header-actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.gm-mymap-panel__upload.gm-is-on {
-    color: var(--gm-primary-deep);
-    text-decoration: underline;
-}
-
 .gm-mymap-panel__select-banner {
     flex-shrink: 0;
     padding: 4px 12px;
@@ -3974,23 +3780,6 @@
     color: var(--gm-primary);
     background: rgba(var(--gm-primary-rgb), .08);
     border-bottom: 1px solid rgba(var(--gm-primary-rgb), .25);
-}
-
-.gm-panel__item--select {
-    cursor: pointer;
-}
-
-.gm-panel__item--select.gm-is-picked {
-    background: rgba(var(--gm-primary-rgb), .1);
-    box-shadow: inset 3px 0 0 var(--gm-primary);
-}
-
-.gm-panel__item.gm-is-dim {
-    opacity: .45;
-}
-
-.gm-panel__item-check--select {
-    cursor: pointer;
 }
 
 .gm-mymap-panel__select-bar {
@@ -4037,12 +3826,6 @@
     background: var(--gm-surface-strong);
     color: var(--gm-text-faint);
     cursor: default;
-}
-
-.gm-mymap-panel__share-count {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
 }
 
 /* 공유 대화상자 보강: 일괄 대상 머리 · 역할 이름 · 목록에 없는 역할 묶음 · 단일 공유 안내 */
@@ -6971,4 +6754,776 @@
     [data-gm-theme="system"] .gm-draw-panel__swatch {
         box-shadow: inset 0 0 0 1px var(--gm-border-strong);
     }
+}
+
+/* ── 나만의지도 패널 목록 개편 (ui/panels/MyMapPanel · ui/mymap/MyMapListRow·MyMapTabs·MyMapEmptyState) ──
+   색은 의미 토큰만. 패키지 리셋(.gm-root :where([class*="gm-"]))이 margin·padding·border를 0으로 만들므로 padding·margin·border가 있는 규칙은 `.gm-panel`(패널 뿌리)을 앞에 붙여 값을 확정한다.
+   색 견본(swatch)의 색만 데이터 색이라 인라인 style이다 */
+
+/* 머리줄 단추: 업로드 = 채운 주 단추, 공유 = 테두리 보조 단추(선택 모드 중에는 눌린 모양). 보이는 높이 28px + 가상 요소로 누르는 영역 32px */
+.gm-panel .gm-mymap-panel__header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.gm-panel .gm-mymap-panel__primary,
+.gm-panel .gm-mymap-panel__ghost {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 28px;
+    padding: 0 9px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.gm-panel .gm-mymap-panel__primary::after,
+.gm-panel .gm-mymap-panel__ghost::after,
+.gm-panel .gm-mymap-panel__sbtn::after {
+    content: "";
+    position: absolute;
+    inset: -2px 0;
+}
+
+.gm-panel .gm-mymap-panel__primary {
+    border: 0;
+    background: var(--gm-primary);
+    color: var(--gm-on-primary);
+}
+
+.gm-panel .gm-mymap-panel__primary:disabled {
+    background: var(--gm-primary-disabled);
+    cursor: default;
+}
+
+.gm-panel .gm-mymap-panel__primary--wide {
+    width: 100%;
+    height: 32px;
+}
+
+.gm-panel .gm-mymap-panel__ghost {
+    border: 1px solid var(--gm-border);
+    background: var(--gm-surface);
+    color: var(--gm-text-2);
+}
+
+.gm-panel .gm-mymap-panel__ghost.gm-is-on {
+    border-color: var(--gm-primary);
+    background: var(--gm-primary-soft);
+    color: var(--gm-text);
+}
+
+.gm-panel .gm-mymap-panel__ghost:disabled {
+    opacity: .5;
+    cursor: default;
+}
+
+.gm-panel .gm-mymap-panel__primary:focus-visible,
+.gm-panel .gm-mymap-panel__ghost:focus-visible,
+.gm-panel .gm-mymap-panel__sbtn:focus-visible,
+.gm-panel .gm-mymap-panel__sample:focus-visible,
+.gm-panel .gm-mymap-panel__tab:focus-visible,
+.gm-panel .gm-mymap-panel__search-clear:focus-visible {
+    outline: 2px solid var(--gm-primary);
+    outline-offset: 1px;
+}
+
+/* 탭: 내 레이어 / 공유받은 — 선택은 글자 굵기 + 아래 줄 + 색(색만으로 구분하지 않는다). 높이 36px */
+.gm-panel .gm-mymap-panel__tabs {
+    display: flex;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--gm-border);
+    background: var(--gm-surface);
+}
+
+.gm-panel .gm-mymap-panel__tab {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 36px;
+    margin-bottom: -1px;
+    padding: 0 6px;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    background: transparent;
+    color: var(--gm-text-muted);
+    font-size: 11.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.gm-panel .gm-mymap-panel__tab.gm-is-selected {
+    border-bottom-color: var(--gm-primary);
+    color: var(--gm-text);
+    font-weight: 700;
+}
+
+.gm-panel .gm-mymap-panel__tab-count {
+    min-width: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--gm-surface-sunken);
+    color: var(--gm-text-2);
+    font-size: 10px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+.gm-panel .gm-mymap-panel__tab.gm-is-selected .gm-mymap-panel__tab-count {
+    background: var(--gm-primary-soft);
+}
+
+/* 선택 모드 안내·아래 막대 */
+.gm-panel .gm-mymap-panel__select-banner {
+    padding: 6px 12px;
+    color: var(--gm-text);
+}
+
+.gm-panel .gm-mymap-panel__select-link {
+    height: 32px;
+    padding: 0 4px;
+}
+
+.gm-panel .gm-mymap-panel__select-share {
+    height: 32px;
+    padding: 0 12px;
+}
+
+/* 검색창(목록 전체 8개 이상일 때) · 가려진 켠 레이어 안내 · 결과 없음 */
+.gm-panel .gm-mymap-panel__search {
+    padding: 8px 10px 2px;
+}
+
+.gm-panel .gm-mymap-panel__searchbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 4px 0 8px;
+    border: 1px solid var(--gm-border);
+    border-radius: 7px;
+    background: var(--gm-surface);
+    color: var(--gm-text-muted);
+}
+
+.gm-panel .gm-mymap-panel__searchbox:focus-within {
+    border-color: var(--gm-primary);
+    box-shadow: 0 0 0 1px var(--gm-primary);
+}
+
+.gm-panel .gm-mymap-panel__search-input {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--gm-text);
+    font-size: 11.5px;
+}
+
+.gm-panel .gm-mymap-panel__search-clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: var(--gm-text-muted);
+    cursor: pointer;
+}
+
+.gm-panel .gm-mymap-panel__snote {
+    padding: 4px 12px 0;
+    font-size: 10px;
+    line-height: 1.45;
+    color: var(--gm-text-muted);
+}
+
+.gm-panel .gm-mymap-panel__nomatch {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 20px 14px;
+    font-size: 11.5px;
+    color: var(--gm-text-2);
+    text-align: center;
+}
+
+/* 내 레이어 탭 맨 위: `3 / 20`(한도, 다 차면 앰버) · 한도 안내 상자 */
+.gm-panel .gm-mymap-panel__sec {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px 4px;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--gm-text-muted);
+}
+
+.gm-panel .gm-mymap-panel__sec-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+.gm-panel .gm-mymap-panel__sec-count.gm-is-full {
+    font-weight: 700;
+    color: var(--gm-warn-deep);
+}
+
+.gm-panel .gm-mymap-panel__limit-note {
+    display: flex;
+    gap: 6px;
+    margin: 2px 10px 6px;
+    padding: 7px 9px;
+    border: 1px solid var(--gm-warn-line);
+    border-radius: 6px;
+    background: var(--gm-warn-soft);
+    color: var(--gm-warn-deep);
+    font-size: 10.5px;
+    line-height: 1.5;
+}
+
+/* 행 한 줄 */
+.gm-panel .gm-mymap-panel__row {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 4px 4px 6px 6px;
+    border-bottom: 1px solid var(--gm-border-subtle);
+}
+
+.gm-panel .gm-mymap-panel__row.gm-is-on {
+    background: rgba(var(--gm-primary-rgb), .05);
+}
+
+.gm-panel .gm-mymap-panel__row.gm-is-pickable {
+    cursor: pointer;
+}
+
+.gm-panel .gm-mymap-panel__row.gm-is-picked {
+    background: rgba(var(--gm-primary-rgb), .09);
+    box-shadow: inset 3px 0 0 var(--gm-primary);
+}
+
+/* 고른 행은 바탕이 주황으로 진해져서 정보 줄 글자를 한 단계 진한 토큰으로(muted는 4.38:1로 모자람) */
+.gm-panel .gm-mymap-panel__row.gm-is-picked .gm-mymap-panel__info,
+.gm-panel .gm-mymap-panel__row.gm-is-picked .gm-mymap-panel__sender {
+    color: var(--gm-text-2);
+}
+
+/* 흐림은 체크·이름·정보 줄에만 준다 — 안내 문장(.note)은 그 행의 유일한 설명이라 흐리게 하지 않는다(대비 유지) */
+.gm-panel .gm-mymap-panel__row.gm-is-dim .gm-mymap-panel__hit,
+.gm-panel .gm-mymap-panel__row.gm-is-dim .gm-mymap-panel__nm,
+.gm-panel .gm-mymap-panel__row.gm-is-dim .gm-mymap-panel__info {
+    opacity: .55;
+}
+
+/* 표시 체크 자리(누르는 영역 32×32) */
+.gm-panel .gm-mymap-panel__hit {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+}
+
+.gm-panel .gm-mymap-panel__hit.gm-is-clickable {
+    cursor: pointer;
+}
+
+.gm-panel .gm-mymap-panel__check {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--gm-primary);
+    cursor: pointer;
+}
+
+.gm-panel .gm-mymap-panel__check:disabled {
+    cursor: default;
+}
+
+.gm-panel .gm-mymap-panel__check:focus-visible {
+    outline: 2px solid var(--gm-primary);
+    outline-offset: 2px;
+}
+
+/* 선택 모드의 둥근 선택 표시(표시 체크와 모양이 달라 헷갈리지 않는다) — 실제 input은 투명하게 위에 덮어 Tab·스페이스가 그대로 된다 */
+.gm-panel .gm-mymap-panel__pick-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.gm-panel .gm-mymap-panel__pick {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid var(--gm-border-strong);
+    border-radius: 50%;
+    background: var(--gm-surface);
+    color: transparent;
+    pointer-events: none;
+}
+
+.gm-panel .gm-mymap-panel__row.gm-is-picked .gm-mymap-panel__pick {
+    border-color: var(--gm-primary);
+    background: var(--gm-primary);
+    color: var(--gm-on-primary);
+}
+
+.gm-panel .gm-mymap-panel__pick-input:focus-visible + .gm-mymap-panel__pick {
+    outline: 2px solid var(--gm-primary);
+    outline-offset: 2px;
+}
+
+.gm-panel .gm-mymap-panel__body {
+    flex: 1;
+    min-width: 0;
+    padding-top: 8px;
+}
+
+.gm-panel .gm-mymap-panel__nm {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+}
+
+/* 색 견본(보기만): 면 사각 · 점 원 · 선 가는 막대. 색은 인라인(데이터 색) */
+.gm-panel .gm-mymap-panel__swatch {
+    flex-shrink: 0;
+    width: 9px;
+    height: 9px;
+    margin-top: 3px;
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1px var(--gm-shadow-18);
+}
+
+.gm-panel .gm-mymap-panel__swatch--circle {
+    border-radius: 50%;
+}
+
+.gm-panel .gm-mymap-panel__swatch--line {
+    height: 3px;
+    margin-top: 6px;
+}
+
+/* 이름: 2줄까지, 넘치면 title. 켜져 있으면 굵게 */
+.gm-panel .gm-mymap-panel__nt {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    font-size: 11.5px;
+    line-height: 1.35;
+    color: var(--gm-text-2);
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+}
+
+.gm-panel .gm-mymap-panel__nt.gm-is-clickable {
+    cursor: pointer;
+}
+
+.gm-panel .gm-mymap-panel__nt.gm-is-active {
+    color: var(--gm-text);
+    font-weight: 700;
+}
+
+.gm-panel .gm-mymap-panel__nt.gm-is-muted {
+    color: var(--gm-text-muted);
+}
+
+/* 정보 줄: 종류 칩(모두 회색) · 개수 · 상태 */
+.gm-panel .gm-mymap-panel__info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 5px;
+    margin-top: 3px;
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: var(--gm-text-muted);
+}
+
+.gm-mymap-panel__dot {
+    flex-shrink: 0;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--gm-border-strong);
+}
+
+.gm-panel .gm-mymap-panel__kindchip,
+.gm-panel .gm-mymap-panel__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 0 5px;
+    border-radius: 4px;
+    background: var(--gm-surface-sunken);
+    color: var(--gm-text-2);
+    font-size: 9.5px;
+    font-weight: 700;
+}
+
+.gm-panel .gm-mymap-panel__chip {
+    font-weight: 600;
+}
+
+.gm-mymap-panel__busy {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-weight: 600;
+    color: var(--gm-text-2);
+}
+
+.gm-mymap-panel__bad {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-weight: 700;
+    color: var(--gm-danger-text);
+}
+
+.gm-mymap-panel__share-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.gm-mymap-panel__sender {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--gm-text-muted);
+}
+
+.gm-panel .gm-mymap-panel__sub {
+    margin-top: 2px;
+    font-size: 10px;
+    line-height: 1.45;
+    color: var(--gm-text-muted);
+}
+
+/* 중립 한 줄(개수·사유 없음): 표시할 위치 없음 등 */
+.gm-panel .gm-mymap-panel__note {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 10.5px;
+    line-height: 1.45;
+    color: var(--gm-text-muted);
+}
+
+.gm-panel .gm-mymap-panel__note svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.gm-panel .gm-mymap-panel__btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.gm-panel .gm-mymap-panel__sbtn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 28px;
+    padding: 0 9px;
+    border: 1px solid var(--gm-border);
+    border-radius: 6px;
+    background: var(--gm-surface);
+    color: var(--gm-text-2);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.gm-panel .gm-mymap-panel__sbtn.gm-is-danger {
+    color: var(--gm-danger-text);
+}
+
+.gm-panel .gm-mymap-panel__sbtn--center {
+    margin-top: 10px;
+}
+
+/* 진행 막대(처리 중 · 지도에 그리는 중) 3px */
+.gm-panel .gm-mymap-panel__bar {
+    height: 3px;
+    margin-top: 5px;
+    border-radius: 2px;
+    background: var(--gm-surface-sunken);
+    overflow: hidden;
+}
+
+.gm-mymap-panel__bar-fill {
+    height: 100%;
+    background: var(--gm-primary);
+    transition: width .3s;
+}
+
+.gm-mymap-panel__bar-fill.gm-is-instant {
+    transition: none;
+}
+
+/* 오른쪽 단추(위치 이동 · ⋯): 32×32 */
+.gm-panel .gm-mymap-panel__acts .gm-mymap-panel__ib {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    color: var(--gm-text-muted);
+}
+
+/* 빈 화면 · 목록 오류 */
+.gm-panel .gm-mymap-panel__empty {
+    padding: 22px 14px 16px;
+    text-align: center;
+}
+
+.gm-panel .gm-mymap-panel__empty-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 10px;
+    border-radius: 50%;
+    background: var(--gm-primary-soft);
+    color: var(--gm-primary);
+}
+
+.gm-panel .gm-mymap-panel__empty-icon.gm-is-error {
+    background: var(--gm-danger-soft);
+    color: var(--gm-danger-text);
+}
+
+.gm-panel .gm-mymap-panel__empty-title {
+    margin: 0;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--gm-text);
+}
+
+.gm-panel .gm-mymap-panel__empty-text {
+    margin: 4px 0 0;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--gm-text-muted);
+}
+
+.gm-panel .gm-mymap-panel__kinds {
+    margin: 12px 0;
+    padding: 0;
+    border: 1px solid var(--gm-border);
+    border-radius: 8px;
+    list-style: none;
+    text-align: left;
+    overflow: hidden;
+}
+
+.gm-panel .gm-mymap-panel__kinds li {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 9px;
+    border-top: 1px solid var(--gm-border-subtle);
+    font-size: 11px;
+    color: var(--gm-text-muted);
+}
+
+.gm-panel .gm-mymap-panel__kinds li:first-child {
+    border-top: 0;
+}
+
+.gm-panel .gm-mymap-panel__kinds b {
+    font-weight: 700;
+    color: var(--gm-text);
+    white-space: nowrap;
+}
+
+.gm-panel .gm-mymap-panel__kinds span {
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+.gm-panel .gm-mymap-panel__samples {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    margin-top: 10px;
+    font-size: 10.5px;
+    color: var(--gm-text-muted);
+}
+
+.gm-panel .gm-mymap-panel__sample {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    height: 24px;
+    padding: 0 7px;
+    border: 1px solid var(--gm-border);
+    border-radius: 12px;
+    background: var(--gm-surface);
+    color: var(--gm-text-2);
+    font-size: 10.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.gm-panel .gm-mymap-panel__sample::after {
+    content: "";
+    position: absolute;
+    inset: -4px 0;
+}
+
+.gm-panel .gm-mymap-panel__sample:disabled {
+    opacity: .6;
+    cursor: default;
+}
+
+.gm-panel .gm-mymap-panel__empty-hint {
+    margin: 12px 0 0;
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: var(--gm-text-muted);
+}
+
+.gm-panel .gm-mymap-panel__empty-error {
+    margin-top: 8px;
+    font-size: 10.5px;
+    color: var(--gm-danger-text);
+}
+
+.gm-panel .gm-mymap-panel__list-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--gm-danger-line);
+    background: var(--gm-danger-soft);
+    color: var(--gm-danger-text);
+    font-size: 10.5px;
+    font-weight: 600;
+}
+
+/* 업로드 결과 창(MyMapImportReport): 한 줄 요약 · 처리 실패 이유 · 확인 단추 · 실패 0이면 중립 카드 */
+.gm-report:focus {
+    outline: none;
+}
+
+.gm-report .gm-report__headline {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 9px 11px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.gm-report .gm-report__headline > svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.gm-report .gm-report__headline--ok {
+    border-color: var(--gm-success-line);
+    background: var(--gm-success-softer);
+    color: var(--gm-success-deep);
+}
+
+.gm-report .gm-report__headline--warn {
+    border-color: var(--gm-warn-line-soft);
+    background: var(--gm-warn-soft);
+    color: var(--gm-warn-deep);
+}
+
+.gm-report .gm-report__headline--fail {
+    border-color: var(--gm-danger-line);
+    background: var(--gm-danger-soft);
+    color: var(--gm-danger-text);
+}
+
+.gm-report .gm-report__headline-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.gm-report .gm-report__headline-sub {
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.gm-report .gm-report__failmsg {
+    padding: 8px 10px;
+    border: 1px solid var(--gm-border);
+    border-radius: 6px;
+    background: var(--gm-surface-muted);
+    color: var(--gm-text-2);
+    font-size: 11.5px;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.gm-report .gm-report__card--zero {
+    background: var(--gm-surface-muted);
+    color: var(--gm-text-2);
+}
+
+.gm-report .gm-report__confirm {
+    height: 32px;
+    margin-top: 4px;
+    border: 1px solid var(--gm-border);
+    border-radius: 6px;
+    background: var(--gm-surface);
+    color: var(--gm-text-2);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
 }

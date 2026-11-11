@@ -47,7 +47,7 @@ export type { CreateOlLayerOptions } from './layers/createOlLayer'
 export { EMPTY_RASTER_OVERLAY_STATE, EMPTY_GEOTIFF_CATALOG_STATE } from './overlays/RasterOverlayController'
 export type { RasterOverlayController, RasterOverlayState, GeoTiffCatalog, GeoTiffCatalogState } from './overlays/RasterOverlayController'
 export { EMPTY_VECTOR_OVERLAY_STATE, EMPTY_MYMAP_CATALOG_STATE, myMapStyle } from './overlays/VectorOverlayController'
-export type { VectorOverlayController, VectorOverlayState, MyMapCatalog, MyMapCatalogState, MyMapFeatureHit } from './overlays/VectorOverlayController'
+export type { VectorOverlayController, FreshUploadMemory, VectorOverlayState, MyMapCatalog, MyMapCatalogState, MyMapFeatureHit } from './overlays/VectorOverlayController'
 // 큰 나만의지도(10만 피처): 나눠 불러오기·격자 묶음 설정과 순수 함수(config.myMap)
 export { DEFAULT_MYMAP_CLUSTER, DEFAULT_MYMAP_LOAD_CHUNK_MS, resolveMyMapCluster, resolveLoadChunkMs, gridCluster } from './overlays/myMapCluster'
 export type { GisMapMyMapConfig, GisMapMyMapClusterConfig, ResolvedMyMapClusterConfig } from './overlays/myMapCluster'

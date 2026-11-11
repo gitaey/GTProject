@@ -9,8 +9,8 @@
 // 스타일: gm-modal(공유·보고서와 공용), gm-upload-modal, gm-wizard(마법사 조각). 선택 상태에 따라 바뀌는 값은 gm-is-* 클래스
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
-import { X, Loader2, Layers, FileSpreadsheet, Download, AlertCircle, Info } from 'lucide-react'
-import type { ExcelPreviewResponse, MyMapConfirmResult, MyMapConvertResult, MyMapExportSrid, MyMapQuota, MyMapSampleKind, MyMapUploadMode } from '../../core'
+import { X, Loader2, Layers, FileSpreadsheet, AlertCircle, Info } from 'lucide-react'
+import type { ExcelPreviewResponse, MyMapConfirmResult, MyMapConvertResult, MyMapExportSrid, MyMapQuota, MyMapUploadMode } from '../../core'
 import { GisHttpError } from '../../core'
 import { useGisMap } from '../../react'
 import { cx } from '../cx'
@@ -18,8 +18,9 @@ import { ConvertOptions, DeliveryChoice } from './MyMapConvertForm'
 import MyMapConvertResultDialog from './MyMapConvertResultDialog'
 import { DEFAULT_CONVERT_FLAGS, toConvertInclude } from './convertModel'
 import type { ConvertFlags, Delivery } from './convertModel'
-import { describeCoverage, formatCount, sampleFileName } from './format'
+import { describeCoverage, formatCount } from './format'
 import { saveBlob } from './saveBlob'
+import SampleLinks from './SampleLinks'
 import { DEFAULT_EXPORT_SRID, SRID_OPTIONS } from './sridOptions'
 
 interface MyMapUploadModalProps {
@@ -40,45 +41,6 @@ const FALLBACK_CONVERT_ROWS = 5000
 const MODES: readonly MyMapUploadMode[] = Object.freeze(['PNU', 'ADDRESS', 'COORD'] as MyMapUploadMode[])
 const LEGACY_MODES: readonly MyMapUploadMode[] = Object.freeze(['COORD'] as MyMapUploadMode[])
 const MODE_LABELS: Readonly<Record<string, string>> = Object.freeze({ PNU: 'PNU (필지 폴리곤)', ADDRESS: '주소 (도로명·지번 → 필지 폴리곤)', COORD: '좌표 (위도·경도)' })
-/** 화면에서 받게 하는 샘플 */
-const SAMPLE_BUTTONS: readonly { kind: MyMapSampleKind; label: string }[] = Object.freeze([
-    Object.freeze({ kind: 'pnu' as MyMapSampleKind, label: 'PNU' }),
-    Object.freeze({ kind: 'address' as MyMapSampleKind, label: '주소' }),
-    Object.freeze({ kind: 'coord' as MyMapSampleKind, label: '좌표' }),
-])
-
-/** 샘플 받기 링크 줄. 소스에 downloadSample이 없으면 아무것도 그리지 않는다 */
-function SampleLinks({ onError }: { onError: (message: string | null) => void }) {
-    const myMap = useGisMap()?.sources.myMap
-    const [busy, setBusy] = useState<MyMapSampleKind | null>(null)
-    if (!myMap?.downloadSample) return null
-    const download = myMap.downloadSample.bind(myMap)
-
-    const handle = async (kind: MyMapSampleKind) => {
-        setBusy(kind)
-        onError(null)
-        try {
-            saveBlob(await download(kind), sampleFileName(kind))
-        } catch (e) {
-            onError(e instanceof Error ? e.message : '샘플을 받지 못했습니다')
-        } finally {
-            setBusy(null)
-        }
-    }
-
-    return (
-        <div className="gm-wizard__samples" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
-            <span className="gm-wizard__samples-label">샘플 받기</span>
-            {SAMPLE_BUTTONS.map(s => (
-                <button key={s.kind} type="button" className="gm-wizard__sample" disabled={busy !== null}
-                    onClick={() => handle(s.kind)}>
-                    {busy === s.kind ? <Loader2 size={11} className="gm-loader" /> : <Download size={11} />} {s.label}
-                </button>
-            ))}
-        </div>
-    )
-}
-
 type BannerTone = 'info' | 'warn' | 'error'
 const BANNER_CLASS: Readonly<Record<BannerTone, string>> = Object.freeze({
     info: 'gm-wizard__banner--info', warn: 'gm-wizard__banner--warn', error: 'gm-wizard__banner--error',
@@ -403,9 +365,9 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota }: MyMapUp
     const convertRows = limit !== null ? limit : FALLBACK_CONVERT_ROWS
 
     return (
-        <div className="gm-modal" onClick={onClose}>
+        // 바깥(어두운 배경)을 눌러도 닫지 않는다 — 올리는 도중 실수로 입력·진행이 날아가지 않게 X 단추로만 닫는다
+        <div className="gm-modal">
             <div
-                onClick={e => e.stopPropagation()}
                 className="gm-modal__dialog gm-upload-modal"
                 role="dialog" aria-label="나만의지도 업로드"
             >

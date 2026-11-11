@@ -1,6 +1,6 @@
 'use client'
 
-// 나만의지도 레이어 내보내기 — ⋯ 메뉴 `내보내기…`가 연다. 형식(엑셀·GeoJSON)·좌표계·(엑셀) 매칭 실패 행 포함을 골라 받는다.
+// 나만의지도 레이어 내보내기 — ⋯ 메뉴 `내보내기`가 연다. 형식(엑셀·GeoJSON)·좌표계·(엑셀) 매칭 실패 행 포함을 골라 받는다.
 // 스타일: gm-modal(공용 틀), gm-export-dialog, gm-delivery(형식 카드). 요청은 소스의 exportLayer가 보내고 저장(saveBlob)은 여기서 한다.
 // 내려받기 중에는 `내려받기` 단추만 잠그고(중복 클릭 방지) 취소·X·Esc는 열어 둔다 — 닫으면 진행 중 요청을 AbortSignal로 취소한다(소스가 signal을 지원하면 서버 연결도 끊김. 그 전에 온 응답은 어차피 버린다).
 import { useEffect, useRef, useState } from 'react'

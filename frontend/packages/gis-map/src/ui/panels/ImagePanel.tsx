@@ -103,6 +103,12 @@ export default function ImagePanel({ maxUploadBytes, slowUploadBytes }: ImagePan
           <span className="gm-image-panel__drop-text">
             {uploading ? '업로드 중...' : '.tif / .tiff 파일을 드래그하거나 클릭'}
           </span>
+          {hasHint && (
+            <div className="gm-image-panel__drop-hint">
+              {maxUploadBytes !== undefined && <p>파일당 최대 {formatLimit(maxUploadBytes)}까지 올릴 수 있습니다.</p>}
+              {slowUploadBytes !== undefined && <p>{formatLimit(slowUploadBytes)} 이상은 업로드와 변환에 시간이 오래 걸릴 수 있습니다.</p>}
+            </div>
+          )}
         </div>
         <input
           ref={fileInputRef}
@@ -111,14 +117,7 @@ export default function ImagePanel({ maxUploadBytes, slowUploadBytes }: ImagePan
           className="gm-file-input"
           onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = '' }}
         />
-        {sizeError && <p className="gm-image-panel__hint gm-image-panel__hint--error" role="alert">{sizeError}</p>}
-        {hasHint && (
-          <ul className="gm-image-panel__hint">
-            {maxUploadBytes !== undefined && <li>파일당 최대 {formatLimit(maxUploadBytes)}까지 올릴 수 있습니다.</li>}
-            {slowUploadBytes !== undefined && <li>{formatLimit(slowUploadBytes)} 이상은 업로드와 변환에 시간이 오래 걸릴 수 있습니다.</li>}
-            <li>업로드 뒤 '변환 중'이 끝나면 체크해서 지도에 올립니다.</li>
-          </ul>
-        )}
+        {sizeError && <p className="gm-image-panel__hint--error" role="alert">{sizeError}</p>}
       </div>
 
       {/* 목록 */}

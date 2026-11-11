@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 엑셀 샘플(PNU·주소·좌표) 내려받기. 파일은 앱에 포함된 {@code resources/mymap/samples/*.xlsx}다
- * (만드는 스크립트: _workspace/mymap/make-samples.cjs — 공공청사 7곳, 개인 주소 없음).
+ * (만드는 스크립트: _workspace/mymap/make-samples.cjs — 세종시청 인근 공공시설 10곳 + 일부러 틀린 3행, 개인 주소 없음).
  */
 @Service
 public class SampleService {
