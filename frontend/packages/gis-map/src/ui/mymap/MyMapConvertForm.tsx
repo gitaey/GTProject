@@ -1,43 +1,10 @@
 'use client'
 
-// 업로드 마법사 2단계의 주소 변환 조각 — `결과 받는 방법` 라디오(지도에 올리기 / 엑셀로만 받기)와
-// "엑셀로만 받기"일 때 보이는 `결과 엑셀에 붙일 열`·`좌표계`. 상태는 마법사(MyMapUploadModal)가 들고 있다. 스타일: gm-delivery, gm-convert-opts
-import { cx } from '../cx'
+// 업로드 창의 "엑셀로만 받기"(주소 변환) 모드 조각 — `결과 엑셀에 붙일 열`·`좌표계`. 상태는 업로드 창(MyMapUploadModal)이 들고 있다. 스타일: gm-convert-opts
+// (예전 `결과 받는 방법` 라디오 두 장은 없앴다 — 같은 미리보기를 쓰는 보조 길로 주소 방법 카드 아래에 [엑셀로만 받기]가 있다)
 import type { MyMapExportSrid } from '../../core'
-import type { ConvertFlags, Delivery } from './convertModel'
+import type { ConvertFlags } from './convertModel'
 import { EXPORT_SRID_OPTIONS, toExportSrid } from './sridOptions'
-
-interface DeliveryChoiceProps {
-    value: Delivery
-    onChange: (next: Delivery) => void
-    /** 변환 요청이 도는 동안 잠금 */
-    disabled?: boolean
-}
-
-const DELIVERY_ITEMS: readonly { value: Delivery; title: string; desc: string }[] = Object.freeze([
-    Object.freeze({ value: 'map' as Delivery, title: '지도에 올리기', desc: '레이어로 저장해 지도에서 보고 스타일·공유를 합니다.' }),
-    Object.freeze({ value: 'excel' as Delivery, title: '엑셀로만 받기', desc: '지도에 올리지 않고 변환 결과 엑셀만 받습니다. 서버에 남지 않습니다.' }),
-])
-
-export function DeliveryChoice({ value, onChange, disabled }: DeliveryChoiceProps) {
-    return (
-        <div className="gm-delivery">
-            <span className="gm-modal__label">결과 받는 방법</span>
-            <div className="gm-delivery__options" role="radiogroup" aria-label="결과 받는 방법">
-                {DELIVERY_ITEMS.map(it => (
-                    <label key={it.value} className={cx('gm-delivery__option', value === it.value && 'gm-is-active')}>
-                        <span className="gm-delivery__head">
-                            <input type="radio" name="gm-mymap-delivery" value={it.value} checked={value === it.value}
-                                disabled={disabled} onChange={() => onChange(it.value)} />
-                            <span className="gm-delivery__title">{it.title}</span>
-                        </span>
-                        <span className="gm-delivery__desc">{it.desc}</span>
-                    </label>
-                ))}
-            </div>
-        </div>
-    )
-}
 
 interface ConvertOptionsProps {
     flags: ConvertFlags

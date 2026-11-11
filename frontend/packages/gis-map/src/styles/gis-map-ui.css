@@ -2137,18 +2137,6 @@
     gap: 6px;
 }
 
-/* 옛 인라인: border 1.5px dashed #d1d5db, borderRadius 7, padding 14px 10px, textAlign center, cursor pointer, background #f9fafb, fontSize 11, color #9ca3af */
-.gm-upload-modal__drop {
-    border: 1.5px dashed var(--gm-border-strong);
-    border-radius: 7px;
-    padding: 14px 10px;
-    text-align: center;
-    cursor: pointer;
-    background: var(--gm-surface-muted);
-    font-size: 11px;
-    color: var(--gm-text-faint);
-}
-
 /* ── 바람지도 패널 (ui/panels/WindPanel) — 머리줄은 gm-panel__header·gm-panel__title, 슬라이더는 레이어 투명도 슬라이더(gm-layer-tree__opacity*)를 그대로 쓴다.
    값은 TIFF·나만의지도 패널(gm-panel__item 등)과 같은 글꼴 크기·색(#f3f4f6 구분선, #94a3b8 이름표, 브랜드색 var(--gm-primary)). 패널 폭은 .gm-side-panel(256px)이 정한다 ── */
 .gm-wind-panel__body {
@@ -2575,75 +2563,6 @@
     flex-shrink: 0;
 }
 
-/* 업로드 마법사 — 머리줄 단계 표시(① 종류 → ② 파일·컬럼 → ③ 이름) */
-.gm-wizard__steps {
-    display: flex;
-    gap: 10px;
-    flex: 1;
-    list-style: none;
-    margin: 0 8px 0 12px;
-    padding: 0;
-}
-
-.gm-wizard__step {
-    font-size: 11px;
-    color: var(--gm-text-faint);
-}
-
-.gm-wizard__step.gm-is-active {
-    color: var(--gm-primary);
-    font-weight: 700;
-}
-
-.gm-wizard__step.gm-is-done {
-    color: var(--gm-text-muted);
-}
-
-.gm-wizard__cards {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-}
-
-.gm-wizard__card {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 10px 12px;
-    border: 1px solid var(--gm-border);
-    border-radius: 8px;
-    background: var(--gm-surface);
-    cursor: pointer;
-}
-
-.gm-wizard__card:hover {
-    border-color: rgba(var(--gm-primary-rgb), .5);
-}
-
-.gm-wizard__card.gm-is-active {
-    padding: 9px 11px;
-    border: 2px solid var(--gm-primary);
-    background: rgba(var(--gm-primary-rgb), .05);
-}
-
-.gm-wizard__card-title {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--gm-text);
-}
-
-.gm-wizard__card.gm-is-active .gm-wizard__card-title {
-    color: var(--gm-primary);
-}
-
-.gm-wizard__card-desc {
-    font-size: 10.5px;
-    color: var(--gm-text-3);
-}
-
 .gm-wizard__samples {
     display: flex;
     align-items: center;
@@ -2712,40 +2631,6 @@
     color: var(--gm-danger-text);
 }
 
-.gm-wizard__file {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 8px;
-    border-radius: 6px;
-    background: var(--gm-surface-muted);
-    font-size: 11px;
-    color: var(--gm-text-2);
-}
-
-.gm-wizard__file-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 700;
-}
-
-.gm-wizard__file-meta {
-    flex: 1;
-    white-space: nowrap;
-}
-
-.gm-wizard__link {
-    background: none;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-    font-size: 11px;
-    color: var(--gm-primary);
-    text-decoration: underline;
-}
-
 /* 미리보기 표 — 가로로 넘치면 표 안에서만 스크롤 */
 .gm-wizard__table-wrap {
     max-height: 190px;
@@ -2785,35 +2670,6 @@
 }
 
 .gm-wizard__table th.gm-is-selected {
-    color: var(--gm-primary);
-}
-
-.gm-wizard__modes {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 14px;
-}
-
-.gm-wizard__mode {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 11.5px;
-    color: var(--gm-text-2);
-    cursor: pointer;
-}
-
-.gm-wizard__mode input {
-    margin: 0;
-    accent-color: var(--gm-primary);
-}
-
-.gm-wizard__mode.gm-is-active {
-    font-weight: 600;
-}
-
-.gm-wizard__recommend {
-    font-size: 10.5px;
     color: var(--gm-primary);
 }
 
@@ -7526,4 +7382,1054 @@
     font-size: 12px;
     font-weight: 700;
     cursor: pointer;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   나만의지도 레이어 올리기 (ui/mymap/MyMapUploadModal·UploadDropZone·UploadFileList·ExcelLocationCard) + 패널 끌어 놓기 덮개
+   종류를 묻지 않는 한 화면: 끌어 놓기 영역 → 파일 칩 → 판별 카드 → 이름 → 바닥줄. 창 껍데기는 gm-modal·gm-upload-modal(위)을 그대로 쓴다.
+   색은 의미 토큰만(다크 모드는 토큰이 처리 — 새 다크 선택자 없음). 새 class는 패키지 리셋(.gm-root :where([class*="gm-"]), 0,1,0)에 지지 않게
+   .gm-upload-modal(또는 .gm-panel)을 앞에 붙이고 padding·border를 명시한다. 작은 글은 --gm-text-muted(4.8:1), 오류는 --gm-danger-text, 주황 글은 --gm-orange-text.
+   ══════════════════════════════════════════════════════════════════════ */
+.gm-upload-modal {
+    position: relative;
+}
+
+/* 이 창(과 변환 결과 창)의 오류·안내 글자는 대비가 모자라던 옛 색(#ef4444·faint) 대신 */
+.gm-upload-modal .gm-modal__error {
+    color: var(--gm-danger-text);
+    font-size: 11.5px;
+}
+
+.gm-upload-modal .gm-modal__note {
+    color: var(--gm-text-muted);
+}
+
+/* 화면에서는 안 보이고 낭독만 되는 글(aria-live·설명) */
+.gm-upload-modal .gm-upload__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+/* 큰 끌어 놓기 영역(진짜 button) */
+.gm-upload-modal .gm-upload__drop {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 26px 16px 22px;
+    border: 1.5px dashed var(--gm-border-strong);
+    border-radius: 10px;
+    background: var(--gm-surface-muted);
+    color: var(--gm-text-2);
+    text-align: center;
+    cursor: pointer;
+}
+
+.gm-upload-modal .gm-upload__drop:focus-visible,
+.gm-upload-modal .gm-upload__more:focus-visible {
+    border-color: var(--gm-primary);
+    background: var(--gm-primary-soft);
+    outline: 2px solid var(--gm-primary);
+    outline-offset: 2px;
+}
+
+.gm-upload-modal .gm-upload__drop:disabled,
+.gm-upload-modal .gm-upload__more:disabled {
+    cursor: default;
+    opacity: .6;
+}
+
+.gm-upload-modal .gm-upload__drop-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin-bottom: 4px;
+    border: 1px solid var(--gm-primary-line);
+    border-radius: 50%;
+    background: var(--gm-primary-soft);
+    color: var(--gm-primary);
+}
+
+.gm-upload-modal .gm-upload__drop-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--gm-text);
+}
+
+.gm-upload-modal .gm-upload__drop-sub {
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--gm-text-muted);
+}
+
+.gm-upload-modal .gm-upload__kinds {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.gm-upload-modal .gm-upload__kind {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border: 1px solid var(--gm-border);
+    border-radius: 999px;
+    background: var(--gm-surface);
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--gm-text-2);
+}
+
+/* 파일이 있을 때의 얇은 "파일 더 끌어 놓기" 줄(이 줄 전체가 단추) */
+.gm-upload-modal .gm-upload__more {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 7px 10px;
+    border: 1.5px dashed var(--gm-border-strong);
+    border-radius: 8px;
+    background: var(--gm-surface-muted);
+    font-size: 11.5px;
+    color: var(--gm-text-muted);
+    text-align: left;
+    cursor: pointer;
+}
+
+.gm-upload-modal .gm-upload__more-title {
+    font-weight: 600;
+    color: var(--gm-text-2);
+}
+
+.gm-upload-modal .gm-upload__more-sub {
+    min-width: 0;
+}
+
+.gm-upload-modal .gm-upload__more-pick {
+    margin-left: auto;
+    font-weight: 600;
+    color: var(--gm-orange-text);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* 샘플 엑셀 받기 줄 */
+.gm-upload-modal .gm-upload__samples {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 11.5px;
+}
+
+.gm-upload-modal .gm-upload__samples-label {
+    color: var(--gm-text-muted);
+}
+
+.gm-upload-modal .gm-upload__sample {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--gm-border);
+    border-radius: 999px;
+    background: var(--gm-surface);
+    color: var(--gm-text-2);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.gm-upload-modal .gm-upload__sample:disabled {
+    cursor: default;
+    opacity: .6;
+}
+
+/* 접이식(<details>) — 무엇을 올릴 수 있나요 · 미리보기 · 주소 요령 · 좌표계 직접 정하기 */
+.gm-upload-modal .gm-upload__details {
+    border: 1px solid var(--gm-border);
+    border-radius: 8px;
+}
+
+.gm-upload-modal .gm-upload__details-sum {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--gm-text-2);
+    cursor: pointer;
+    list-style: none;
+}
+
+.gm-upload-modal .gm-upload__details-sum::-webkit-details-marker {
+    display: none;
+}
+
+.gm-upload-modal .gm-upload__details-sum:focus-visible {
+    outline: 2px solid var(--gm-primary);
+    outline-offset: -2px;
+    border-radius: 8px;
+}
+
+.gm-upload-modal .gm-upload__details-hint {
+    font-size: 10.5px;
+    font-weight: 400;
+    color: var(--gm-text-muted);
+}
+
+.gm-upload-modal .gm-upload__chev {
+    margin-left: auto;
+    flex-shrink: 0;
+    color: var(--gm-text-muted);
+    transition: transform .15s;
+}
+
+.gm-upload-modal .gm-upload__details[open] > .gm-upload__details-sum .gm-upload__chev {
+    transform: rotate(180deg);
+}
+
+.gm-upload-modal .gm-upload__details-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 12px 10px;
+    border-top: 1px solid var(--gm-border-subtle);
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--gm-text-2);
+}
+
+.gm-upload-modal .gm-upload__kl {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.gm-upload-modal .gm-upload__kl li {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.gm-upload-modal .gm-upload__kl svg {
+    margin-top: 3px;
+    color: var(--gm-text-muted);
+}
+
+.gm-upload-modal .gm-upload__hint {
+    font-size: 11px;
+    line-height: 1.55;
+    color: var(--gm-text-muted);
+}
+
+/* 파일 칩 목록 */
+.gm-upload-modal .gm-upload__files {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--gm-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.gm-upload-modal .gm-upload__file {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 4px 4px 4px 10px;
+    border-bottom: 1px solid var(--gm-border-subtle);
+}
+
+.gm-upload-modal .gm-upload__file:last-child {
+    border-bottom: 0;
+}
+
+.gm-upload-modal .gm-upload__file-icon {
+    display: flex;
+    flex-shrink: 0;
+    color: var(--gm-text-muted);
+}
+
+.gm-upload-modal .gm-upload__file-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--gm-text);
+}
+
+.gm-upload-modal .gm-upload__file-size {
+    flex-shrink: 0;
+    font-size: 11px;
+    color: var(--gm-text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.gm-upload-modal .gm-upload__file.gm-is-ignored .gm-upload__file-name {
+    color: var(--gm-text-muted);
+    text-decoration: line-through;
+    text-decoration-color: var(--gm-border-strong);
+}
+
+.gm-upload-modal .gm-upload__file.gm-is-bad .gm-upload__file-name,
+.gm-upload-modal .gm-upload__file.gm-is-bad .gm-upload__file-icon {
+    color: var(--gm-danger-text);
+}
+
+.gm-upload-modal .gm-upload__file.gm-is-missing {
+    background: var(--gm-danger-soft);
+    border-bottom: 0;
+}
+
+.gm-upload-modal .gm-upload__file.gm-is-missing .gm-upload__file-name {
+    color: var(--gm-danger-text);
+    font-style: italic;
+}
+
+.gm-upload-modal .gm-upload__file.gm-is-missing .gm-upload__file-icon {
+    color: var(--gm-danger-text);
+}
+
+.gm-upload-modal .gm-upload__role {
+    flex-shrink: 0;
+    padding: 1px 6px;
+    border: 1px solid var(--gm-border);
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.gm-upload-modal .gm-upload__role.gm-is-ok {
+    border-color: var(--gm-success-line);
+    background: var(--gm-success-soft);
+    color: var(--gm-success-deep);
+}
+
+.gm-upload-modal .gm-upload__role.gm-is-warn {
+    border-color: var(--gm-warn-line-soft);
+    background: var(--gm-warn-soft);
+    color: var(--gm-warn-deep);
+}
+
+.gm-upload-modal .gm-upload__role.gm-is-need {
+    border-color: var(--gm-danger-line);
+    background: var(--gm-danger-soft);
+    color: var(--gm-danger-text);
+}
+
+.gm-upload-modal .gm-upload__role.gm-is-ign {
+    background: var(--gm-surface);
+    color: var(--gm-text-muted);
+}
+
+.gm-upload-modal .gm-upload__file-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: var(--gm-text-muted);
+    cursor: pointer;
+}
+
+.gm-upload-modal .gm-upload__file-remove:focus-visible,
+.gm-upload-modal .gm-upload__small-btn:focus-visible,
+.gm-upload-modal .gm-upload__link:focus-visible,
+.gm-upload-modal .gm-upload__back:focus-visible,
+.gm-upload-modal .gm-upload__sample:focus-visible,
+.gm-upload-modal .gm-upload__opt:focus-visible,
+.gm-upload-modal .gm-upload__submit:focus-visible {
+    outline: 2px solid var(--gm-primary);
+    outline-offset: 1px;
+}
+
+.gm-upload-modal .gm-upload__file-remove:disabled {
+    cursor: default;
+    opacity: .5;
+}
+
+/* 엑셀 파일 줄 */
+.gm-upload-modal .gm-upload__filerow {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    padding: 9px 10px;
+    border: 1px solid var(--gm-border);
+    border-radius: 8px;
+}
+
+.gm-upload-modal .gm-upload__filerow-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    background: var(--gm-success-soft);
+    color: var(--gm-success-deep);
+}
+
+.gm-upload-modal .gm-upload__filerow-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.gm-upload-modal .gm-upload__filerow-text b {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12.5px;
+    color: var(--gm-text);
+}
+
+.gm-upload-modal .gm-upload__filerow-text span {
+    font-size: 11px;
+    color: var(--gm-text-muted);
+}
+
+/* 단추 조각: 작은 테두리 단추 · 밑줄 글 단추 · 되돌아가기 */
+.gm-upload-modal .gm-upload__small-btn {
+    flex-shrink: 0;
+    min-height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--gm-border);
+    border-radius: 6px;
+    background: var(--gm-surface);
+    color: var(--gm-text-2);
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.gm-upload-modal .gm-upload__small-btn:disabled,
+.gm-upload-modal .gm-upload__link:disabled,
+.gm-upload-modal .gm-upload__back:disabled {
+    cursor: default;
+    opacity: .5;
+}
+
+.gm-upload-modal .gm-upload__link {
+    min-height: 24px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--gm-orange-text);
+    font-size: 11px;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+
+.gm-upload-modal .gm-upload__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    align-self: flex-start;
+    min-height: 28px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--gm-orange-text);
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* 판별 결과 카드 */
+.gm-upload-modal .gm-upload__card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--gm-border);
+    border-radius: 9px;
+}
+
+.gm-upload-modal .gm-upload__card.gm-is-ok {
+    border-color: var(--gm-success-line);
+    background: var(--gm-success-softer);
+}
+
+.gm-upload-modal .gm-upload__card.gm-is-need {
+    border-color: var(--gm-primary-line);
+    background: var(--gm-primary-soft);
+}
+
+.gm-upload-modal .gm-upload__card.gm-is-err {
+    border-color: var(--gm-danger-line);
+    background: var(--gm-danger-soft);
+}
+
+.gm-upload-modal .gm-upload__card.gm-is-info {
+    background: var(--gm-surface-muted);
+}
+
+.gm-upload-modal .gm-upload__card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.gm-upload-modal .gm-upload__card-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: var(--gm-text-muted);
+}
+
+.gm-upload-modal .gm-upload__card.gm-is-ok .gm-upload__card-icon {
+    color: var(--gm-success);
+}
+
+.gm-upload-modal .gm-upload__card.gm-is-need .gm-upload__card-icon {
+    color: var(--gm-orange-text);
+}
+
+.gm-upload-modal .gm-upload__card.gm-is-err .gm-upload__card-icon {
+    color: var(--gm-danger-text);
+}
+
+.gm-upload-modal .gm-upload__card-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.gm-upload-modal .gm-upload__card-text b {
+    display: block;
+    font-size: 12.5px;
+    color: var(--gm-text);
+}
+
+.gm-upload-modal .gm-upload__card.gm-is-err .gm-upload__card-text b {
+    color: var(--gm-danger-text);
+}
+
+.gm-upload-modal .gm-upload__card-text span {
+    display: block;
+    margin-top: 1px;
+    font-size: 11.5px;
+    line-height: 1.55;
+    color: var(--gm-text-2);
+}
+
+.gm-upload-modal .gm-upload__side {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-top: 7px;
+    border-top: 1px dashed var(--gm-border);
+    font-size: 11px;
+    color: var(--gm-text-muted);
+}
+
+/* 위치 찾는 방법 라디오 3칸 */
+.gm-upload-modal .gm-upload__modes {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.gm-upload-modal .gm-upload__mode {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    min-height: 44px;
+    padding: 7px 8px;
+    border: 1px solid var(--gm-border);
+    border-radius: 7px;
+    background: var(--gm-surface);
+    cursor: pointer;
+}
+
+.gm-upload-modal .gm-upload__mode.gm-is-active {
+    border-color: var(--gm-primary);
+    box-shadow: inset 0 0 0 1px var(--gm-primary);
+}
+
+.gm-upload-modal .gm-upload__mode-head {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--gm-text-2);
+}
+
+.gm-upload-modal .gm-upload__mode-head input {
+    margin: 0;
+    accent-color: var(--gm-primary);
+}
+
+.gm-upload-modal .gm-upload__mode small {
+    font-size: 10.5px;
+    color: var(--gm-text-muted);
+}
+
+.gm-upload-modal .gm-upload__rec {
+    margin-left: 6px;
+    padding: 0 5px;
+    border-radius: 4px;
+    background: var(--gm-primary-soft);
+    color: var(--gm-orange-text);
+    font-weight: 700;
+}
+
+/* 열 고르기 줄(라벨 + select) */
+.gm-upload-modal .gm-upload__frow {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+}
+
+.gm-upload-modal .gm-upload__frow-label {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--gm-text-2);
+}
+
+.gm-upload-modal .gm-upload__need {
+    margin-left: 4px;
+    font-size: 10.5px;
+    font-style: normal;
+    font-weight: 700;
+    color: var(--gm-orange-text);
+}
+
+.gm-upload-modal .gm-upload__select {
+    min-width: 0;
+    min-height: 32px;
+    background: var(--gm-surface);
+    color: var(--gm-text);
+}
+
+.gm-upload-modal .gm-upload__select.gm-is-need {
+    border-color: var(--gm-primary-line);
+    box-shadow: 0 0 0 2px rgba(var(--gm-primary-rgb), .12);
+}
+
+/* 이름 칸 */
+.gm-upload-modal .gm-upload__namefield {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.gm-upload-modal .gm-upload__name-input {
+    width: 100%;
+    min-height: 32px;
+    padding: 7px 9px;
+    background: var(--gm-surface);
+    color: var(--gm-text);
+    font-size: 12.5px;
+}
+
+/* 고르기 단추(섞임·엑셀 여러 개·SHP 여러 벌) */
+.gm-upload-modal .gm-upload__choice {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.gm-upload-modal .gm-upload__choice.gm-is-col {
+    flex-direction: column;
+}
+
+.gm-upload-modal .gm-upload__opt {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    min-height: 40px;
+    padding: 7px 9px;
+    border: 1px solid var(--gm-border);
+    border-radius: 7px;
+    background: var(--gm-surface);
+    color: var(--gm-text-2);
+    text-align: left;
+    cursor: pointer;
+}
+
+.gm-upload-modal .gm-upload__opt.gm-is-active {
+    border-color: var(--gm-primary);
+    box-shadow: inset 0 0 0 1px var(--gm-primary);
+}
+
+.gm-upload-modal .gm-upload__opt input {
+    margin: 0;
+    accent-color: var(--gm-primary);
+}
+
+.gm-upload-modal .gm-upload__opt-text {
+    min-width: 0;
+}
+
+.gm-upload-modal .gm-upload__opt-text b {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--gm-text);
+}
+
+.gm-upload-modal .gm-upload__opt-text span {
+    font-size: 10.5px;
+    color: var(--gm-text-muted);
+}
+
+/* 읽는 중 뼈대 */
+.gm-upload-modal .gm-upload__skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    border: 1px solid var(--gm-border);
+    border-radius: 9px;
+    background: var(--gm-surface-muted);
+}
+
+.gm-upload-modal .gm-upload__skeleton b {
+    font-size: 12.5px;
+    color: var(--gm-text);
+}
+
+.gm-upload-modal .gm-upload__skeleton span {
+    font-size: 11.5px;
+    color: var(--gm-text-muted);
+}
+
+.gm-upload-modal .gm-upload__skeleton i {
+    display: block;
+    height: 10px;
+    border-radius: 5px;
+    background: var(--gm-surface-sunken);
+}
+
+.gm-upload-modal .gm-upload__skeleton i + i {
+    width: 60%;
+}
+
+/* 오류·안내 띠 */
+.gm-upload-modal .gm-upload__alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 7px 9px;
+    border: 1px solid var(--gm-border);
+    border-radius: 6px;
+    font-size: 11.5px;
+    line-height: 1.5;
+}
+
+.gm-upload-modal .gm-upload__alert svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.gm-upload-modal .gm-upload__alert.gm-is-info {
+    background: var(--gm-surface-muted);
+    color: var(--gm-text-2);
+}
+
+.gm-upload-modal .gm-upload__alert.gm-is-error {
+    border-color: var(--gm-danger-line);
+    background: var(--gm-danger-soft);
+    color: var(--gm-danger-text);
+}
+
+/* 보내는 중 3칸 진행 줄 */
+.gm-upload-modal .gm-upload__steps {
+    display: flex;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--gm-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.gm-upload-modal .gm-upload__step {
+    display: flex;
+    align-items: flex-start;
+    flex: 1;
+    gap: 6px;
+    min-width: 0;
+    padding: 7px 9px;
+    border-right: 1px solid var(--gm-border-subtle);
+    font-size: 11px;
+    color: var(--gm-text-muted);
+}
+
+.gm-upload-modal .gm-upload__step:last-child {
+    border-right: 0;
+}
+
+.gm-upload-modal .gm-upload__step b {
+    display: block;
+    font-size: 11.5px;
+    color: var(--gm-text-2);
+}
+
+.gm-upload-modal .gm-upload__step.gm-is-now {
+    background: var(--gm-primary-soft);
+    color: var(--gm-primary);
+}
+
+.gm-upload-modal .gm-upload__step.gm-is-now b {
+    color: var(--gm-orange-text);
+}
+
+.gm-upload-modal .gm-upload__step-n {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid var(--gm-border-strong);
+    border-radius: 50%;
+    font-size: 9.5px;
+    font-weight: 700;
+}
+
+/* 바닥줄: 상태 안내 한 줄 + 주 단추 */
+.gm-upload-modal .gm-upload__foot {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--gm-border);
+}
+
+.gm-upload-modal .gm-upload__foot-note {
+    flex: 1 1 220px;
+    min-width: 0;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--gm-text-muted);
+}
+
+.gm-upload-modal .gm-upload__foot-note.gm-is-need {
+    font-weight: 600;
+    color: var(--gm-orange-text);
+}
+
+.gm-upload-modal .gm-upload__submit {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    margin-left: auto;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 7px;
+    background: var(--gm-primary);
+    color: var(--gm-on-primary);
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.gm-upload-modal .gm-upload__submit:disabled {
+    background: var(--gm-primary-disabled);
+    cursor: default;
+}
+
+/* 끌고 있는 중 덮개(창 전체가 받는 곳 — 마우스 이벤트는 통과시켜 깜빡이지 않게) */
+.gm-upload-modal .gm-upload__overlay {
+    position: absolute;
+    inset: 44px 8px 8px;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px;
+    border: 2px dashed var(--gm-primary);
+    border-radius: 10px;
+    background: rgba(var(--gm-primary-rgb), .09);
+    text-align: center;
+    pointer-events: none;
+}
+
+.gm-upload-modal .gm-upload__overlay.gm-is-locked {
+    border-color: var(--gm-border-strong);
+    background: var(--gm-surface-sunken);
+}
+
+.gm-upload-modal .gm-upload__overlay-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--gm-primary);
+    color: var(--gm-on-primary);
+}
+
+.gm-upload-modal .gm-upload__overlay.gm-is-locked .gm-upload__overlay-icon {
+    background: var(--gm-text-muted);
+}
+
+.gm-upload-modal .gm-upload__overlay b {
+    font-size: 15px;
+    color: var(--gm-text);
+}
+
+.gm-upload-modal .gm-upload__overlay small {
+    font-size: 12px;
+    color: var(--gm-text-2);
+}
+
+/* 패널에 파일을 끌어 놓으면 보이는 덮개(패널 루트는 끌고 있는 동안만 인라인으로 position: relative) */
+.gm-panel .gm-mymap-panel__dropcover {
+    position: absolute;
+    inset: 40px 6px 6px;
+    z-index: 8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px;
+    border: 2px dashed var(--gm-primary);
+    border-radius: 8px;
+    background: rgba(var(--gm-primary-rgb), .1);
+    text-align: center;
+    pointer-events: none;
+}
+
+.gm-panel .gm-mymap-panel__dropcover.gm-is-full {
+    border-color: var(--gm-border-strong);
+    background: var(--gm-surface-sunken);
+}
+
+.gm-panel .gm-mymap-panel__dropcover-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--gm-primary);
+    color: var(--gm-on-primary);
+}
+
+.gm-panel .gm-mymap-panel__dropcover.gm-is-full .gm-mymap-panel__dropcover-icon {
+    background: var(--gm-text-muted);
+}
+
+.gm-panel .gm-mymap-panel__dropcover b {
+    font-size: 13px;
+    color: var(--gm-text);
+}
+
+.gm-panel .gm-mymap-panel__dropcover small {
+    font-size: 11px;
+    color: var(--gm-text-2);
+}
+
+/* 마우스를 올렸을 때(터치에서는 걸리지 않게) */
+@media (hover: hover) {
+    .gm-upload-modal .gm-upload__drop:hover:not(:disabled),
+    .gm-upload-modal .gm-upload__more:hover:not(:disabled) {
+        border-color: var(--gm-primary);
+        background: var(--gm-primary-soft);
+    }
+
+    .gm-upload-modal .gm-upload__sample:hover:not(:disabled),
+    .gm-upload-modal .gm-upload__small-btn:hover:not(:disabled),
+    .gm-upload-modal .gm-upload__opt:hover {
+        border-color: var(--gm-primary);
+        color: var(--gm-orange-text);
+    }
+
+    .gm-upload-modal .gm-upload__file-remove:hover:not(:disabled) {
+        background: var(--gm-surface-sunken);
+        color: var(--gm-text);
+    }
+}
+
+/* 좁은 화면: 방법 카드·열 줄이 한 줄씩 쌓이고, 바닥줄 문장이 단추 위로 감긴다 */
+@media (max-width: 30rem) {
+    .gm-upload-modal .gm-upload__drop {
+        padding: 18px 12px 16px;
+    }
+
+    .gm-upload-modal .gm-upload__modes {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .gm-upload-modal .gm-upload__frow {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 4px;
+    }
+
+    .gm-upload-modal .gm-upload__steps {
+        flex-direction: column;
+    }
+
+    .gm-upload-modal .gm-upload__step {
+        border-right: 0;
+        border-bottom: 1px solid var(--gm-border-subtle);
+    }
+
+    .gm-upload-modal .gm-upload__file-size {
+        display: none;
+    }
+
+    .gm-upload-modal .gm-upload__more-sub {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gm-upload-modal .gm-loader {
+        animation: none;
+    }
+
+    .gm-upload-modal .gm-upload__chev {
+        transition: none;
+    }
 }

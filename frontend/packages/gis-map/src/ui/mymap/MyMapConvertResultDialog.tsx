@@ -2,13 +2,15 @@
 
 // 주소 변환 결과 화면 — 업로드 마법사가 변환을 끝내면 같은 자리에서 이 화면으로 바뀐다.
 // 전체·성공·실패 카드 / 결과 파일(엑셀 다시 받기 = 메모리의 Blob을 다시 저장, 서버 재요청 없음) / 미리보기 표(붙은 열 주황, 실패 행 연한 빨강).
+// 바깥(어두운 배경) 클릭으로는 닫히지 않는다(업로드 창과 같은 규칙 — X·[닫기]만).
 // 스타일: gm-modal, gm-upload-modal(--result), gm-report 카드, gm-wizard 표·하단, gm-convert-result
-import { useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { X, Download } from 'lucide-react'
 import type { MyMapConvertResult } from '../../core'
 import { cx } from '../cx'
 import { appendedStart, CONVERT_PREVIEW_ROWS, FAILED_STATUS, formatBytes, isFailedRow } from './convertModel'
 import { formatCount } from './format'
+import { keepFocusOnBackdrop, trapTab } from './focusTrap'
 import { saveBlob } from './saveBlob'
 
 interface MyMapConvertResultDialogProps {
@@ -24,6 +26,17 @@ interface MyMapConvertResultDialogProps {
 
 export default function MyMapConvertResultDialog({ sourceName, result, notice, onRestart, onClose }: MyMapConvertResultDialogProps) {
     const [error, setError] = useState<string | null>(notice ?? null)
+    const titleId = useId()
+    const dialogRef = useRef<HTMLDivElement>(null)
+    const titleRef = useRef<HTMLSpanElement>(null)
+
+    // 변환이 끝나면 포커스가 있던 단추가 사라져 body로 떨어진다 — 제목으로 첫 포커스를 주고, 창이 열려 있는 동안 Tab이 창 밖으로 안 나가게 한다
+    useEffect(() => {
+        titleRef.current?.focus()
+        const onKey = (e: KeyboardEvent) => { if (dialogRef.current) trapTab(e, dialogRef.current) }
+        document.addEventListener('keydown', onKey)
+        return () => document.removeEventListener('keydown', onKey)
+    }, [])
     const { columns, rows } = result.preview
     const start = appendedStart(columns)
     const statusAt = start
@@ -41,12 +54,13 @@ export default function MyMapConvertResultDialog({ sourceName, result, notice, o
     }
 
     return (
-        <div className="gm-modal" onClick={onClose}>
-            <div onClick={e => e.stopPropagation()} className="gm-modal__dialog gm-upload-modal gm-upload-modal--result"
-                role="dialog" aria-label="주소 변환 결과">
+        // 바깥(어두운 배경)을 눌러도 닫지 않는다 — 결과(실패 행 사유 등)를 보다 실수로 사라지지 않게 X·[닫기]로만 닫는다
+        <div className="gm-modal" onMouseDown={keepFocusOnBackdrop}>
+            <div ref={dialogRef} className="gm-modal__dialog gm-upload-modal gm-upload-modal--result"
+                role="dialog" aria-modal="true" aria-labelledby={titleId}>
                 <div className="gm-modal__header">
-                    <span className="gm-modal__title gm-convert-result__title" title={sourceName}>주소 변환 결과 — {sourceName}</span>
-                    <button onClick={onClose} className="gm-modal__close" aria-label="닫기"><X size={16} /></button>
+                    <span id={titleId} ref={titleRef} tabIndex={-1} className="gm-modal__title gm-convert-result__title" title={sourceName}>주소 변환 결과 — {sourceName}</span>
+                    <button type="button" onClick={onClose} className="gm-modal__close" aria-label="닫기"><X size={16} /></button>
                 </div>
 
                 <div className="gm-modal__body">

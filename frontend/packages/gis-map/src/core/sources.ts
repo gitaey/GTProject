@@ -89,7 +89,8 @@ export interface MyMapSource {
     /** EPSG:4326 FeatureCollection */
     geojson(id: number): Promise<GeoJsonObject>
     remove(id: number): Promise<void>
-    uploadShp?(input: ShpUploadInput): Promise<void>
+    /** 새 서버는 { id, name, status }를 돌려준다(처리는 비동기). 옛 서버·옛 소스는 아무것도 안 돌려줘도 된다 — 돌려주면 패널이 목록 비교 없이 id로 "방금 올린 레이어"를 잡는다 */
+    uploadShp?(input: ShpUploadInput): Promise<void | MyMapConfirmResult>
     previewExcel?(file: File): Promise<ExcelPreviewResponse>
     /** 새 서버는 { id, parcelVersion? }을 돌려준다(처리는 비동기 — 목록 폴링으로 진행률). 옛 서버·옛 소스는 아무것도 안 돌려줘도 된다 */
     confirmExcel?(input: ExcelConfirmInput): Promise<void | MyMapConfirmResult>

@@ -8,9 +8,6 @@ export const FAILED_STATUS = '실패'
 /** 결과 화면 미리보기 행 수 */
 export const CONVERT_PREVIEW_ROWS = 5
 
-/** "결과 받는 방법" */
-export type Delivery = 'map' | 'excel'
-
 /** 화면의 체크 네 개(도로명·지번 주소는 한 체크로 같이 켜고 끈다) */
 export interface ConvertFlags {
     pnu: boolean

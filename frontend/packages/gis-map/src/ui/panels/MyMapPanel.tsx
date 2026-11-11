@@ -6,14 +6,17 @@
 // 목록 행에는 실패 개수·사유를 적지 않는다 — 처음 등록한 레이어의 처리가 끝나면 업로드 결과 창(MyMapImportReport)을 한 번 자동으로 띄우고(처음 한 번 규칙은
 // listModel.planFreshReports, 기억은 엔진 map.vector.freshUploads), 이후에는 ⋯ 메뉴 `업로드 결과 보기`로 다시 연다.
 // ⋯ 메뉴: 스타일·라벨 / 공유 / 속성 테이블 / 내보내기 / 업로드 결과 보기 / 삭제. 켜짐·진행률처럼 값에 따라 바뀌는 것만 인라인 style
+// 파일(엑셀·SHP)을 패널 위에 끌어 놓으면 업로드 창이 그 파일로 채워져 열린다(덮개 문구는 gm-mymap-panel__dropcover). 업로드할 수 없는 소스·창이 열려 있을 때는 무시, 한도가 가득 차면 덮개 문구만
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Trash2, Loader2, Share2, Palette, ClipboardList, Table2, Download, Plus, Search, X, AlertTriangle, Info } from 'lucide-react'
+import { Trash2, Loader2, Share2, Palette, ClipboardList, Table2, Download, Plus, Search, X, AlertTriangle, Info, Upload } from 'lucide-react'
 import { EMPTY_MYMAP_CATALOG_STATE } from '../../core'
 import type { MyMapCatalogState, MyMapConfirmResult, UserMapListItem, VectorOverlayState } from '../../core'
 import { useGisMap, useMyMapCatalog, useStoreValue, useVectorOverlayState } from '../../react'
 import { cx } from '../cx'
 import MyMapUploadModal from '../mymap/MyMapUploadModal'
+import { filesFromDataTransfer } from '../mymap/folderEntries'
+import { useFileDrop } from '../mymap/useFileDrop'
 import MyMapShareDialog from '../mymap/MyMapShareDialog'
 import MyMapImportReportDialog from '../mymap/MyMapImportReport'
 import MyMapStyleDialog from '../mymap/MyMapStyleDialog'
@@ -80,6 +83,9 @@ export default function MyMapPanel() {
     const clusteredIdList = useVectorOverlayState(selectClusteredIds)
     const clusteredIds = useMemo(() => new Set(clusteredIdList), [clusteredIdList])
     const [showUpload, setShowUpload] = useState(false)
+    // 패널에 끌어 놓아 연 업로드 창에 미리 채울 파일(폴더는 여기서 한 단계 펼쳐 준다) · 열기 단추(창이 닫히면 포커스를 돌려준다)
+    const [dropped, setDropped] = useState<{ files: File[]; notice: string | null } | null>(null)
+    const uploadBtnRef = useRef<HTMLButtonElement>(null)
     // 공유 대화상자에 넘길 레이어(하나면 단일, 둘 이상이면 일괄)
     const [shareItems, setShareItems] = useState<Array<{ id: number; name: string }> | null>(null)
     // 선택 모드의 공유 단추로 열었는지(1개만 골랐을 때 안내 한 줄)
@@ -133,6 +139,23 @@ export default function MyMapPanel() {
     const layerFull = maxLayers !== null && owned.length >= maxLayers
     const hasFailedOwned = owned.some(i => i.status === 'FAILED')
     const modalOpen = showUpload || !!shareItems || !!reportTarget || !!styleTarget || !!tableTarget || !!exportTarget || !!deleteTarget
+
+    // 패널에 파일 끌어 놓기 → 업로드 창이 채워진 채 열린다. 업로드 불가·한도 가득·다른 창이 열려 있으면 받지 않는다(브라우저가 파일을 여는 것만 막는다)
+    const dropOpen = (dt: DataTransfer) => {
+        void (async () => {
+            const r = await filesFromDataTransfer(dt)
+            if (r.files.length === 0 && r.folders.length === 0) return
+            let notice: string | null = null
+            if (r.files.length === 0) notice = r.unreadable.length > 0 ? '폴더는 열어서 안의 파일을 끌어 놓아 주세요.' : `'${r.folders[0]}' 안에 올릴 수 있는 파일이 없습니다.`
+            setDropped({ files: r.files, notice })
+            setShowUpload(true)
+        })()
+    }
+    const panelDrop = useFileDrop({ accepting: uploadAvailable && !layerFull && !modalOpen, onDropFiles: dropOpen })
+    const showDropCover = panelDrop.dragging && uploadAvailable && !modalOpen
+    // 창이 열리거나 닫히면 창이 가로챈 끌기 이벤트 때문에 계수가 어긋날 수 있다 — 0으로 되돌려 닫힌 뒤 덮개가 남지 않게
+    const resetPanelDrop = panelDrop.reset
+    useEffect(() => { resetPanelDrop() }, [modalOpen, resetPanelDrop])
 
     // 업로드 뒤 목록 다시 받기(옛 fetchList — loading 표시는 다시 켜지 않는다).
     // 방금 올린 레이어를 기억한다: 엑셀은 확정 응답의 id, SHP·옛 서버는 id가 없으니 올리기 전 목록과 비교해 새로 생긴 내 레이어
@@ -268,7 +291,7 @@ export default function MyMapPanel() {
     const reloadList = () => { void catalog?.load() }
 
     return (
-        <div className="gm-panel">
+        <div className="gm-panel" style={showDropCover ? { position: 'relative' } : undefined} {...panelDrop.bind}>
             <div className="gm-panel__header">
                 <span className="gm-panel__title">나만의지도</span>
                 <div className="gm-mymap-panel__header-actions">
@@ -279,7 +302,7 @@ export default function MyMapPanel() {
                         <Share2 size={12} aria-hidden="true" />{selecting ? '공유 취소' : '공유'}
                     </button>
                     {uploadAvailable && (
-                        <button type="button" onClick={() => setShowUpload(true)} disabled={layerFull}
+                        <button type="button" ref={uploadBtnRef} onClick={() => setShowUpload(true)} disabled={layerFull}
                             aria-describedby={layerFull && activeTab === 'owned' ? limitNoteId : undefined}
                             title={layerFull ? `나만의지도는 최대 ${maxLayers}개까지 만들 수 있습니다` : undefined}
                             className="gm-mymap-panel__primary">
@@ -374,7 +397,10 @@ export default function MyMapPanel() {
                 </div>
             )}
 
-            {showUpload && <MyMapUploadModal quota={quota} onClose={() => setShowUpload(false)} onUploaded={fetchList} />}
+            {showUpload && (
+                <MyMapUploadModal quota={quota} onClose={() => { setShowUpload(false); setDropped(null) }} onUploaded={fetchList}
+                    initialFiles={dropped?.files} initialNotice={dropped?.notice} returnFocusRef={uploadBtnRef} />
+            )}
             {shareItems && (
                 <MyMapShareDialog items={shareItems} fromSelection={shareFromSelection && bulkAvailable} onClose={() => setShareItems(null)}
                     onDone={() => {
@@ -401,6 +427,13 @@ export default function MyMapPanel() {
             {styleTarget && (
                 <MyMapStyleDialog key={styleTarget.id} id={styleTarget.id} name={styleTarget.name} catalog={catalog}
                     onClose={() => setStyleTarget(null)} onSavingChange={saving => { styleSavingRef.current = saving }} />
+            )}
+            {showDropCover && (
+                <div className={cx('gm-mymap-panel__dropcover', layerFull && 'gm-is-full')} aria-hidden="true">
+                    <span className="gm-mymap-panel__dropcover-icon">{layerFull ? <AlertTriangle size={20} /> : <Upload size={20} />}</span>
+                    <b>{layerFull ? `레이어가 가득 찼습니다(${owned.length}/${maxLayers})` : '놓으면 업로드 창이 열립니다'}</b>
+                    <small>{layerFull ? '안 쓰는 레이어를 지운 뒤 올려 주세요' : '올린 파일이 미리 채워집니다'}</small>
+                </div>
             )}
         </div>
     )

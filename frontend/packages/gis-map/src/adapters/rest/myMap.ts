@@ -65,6 +65,27 @@ function toSnapshot(wire: ShareWire | null | undefined): ShareSnapshot {
     return { users, roles }
 }
 
+/** 404 응답(올린 파일 uploadId가 없거나 만료)을 상태가 보이는 GisHttpError로 — 화면이 "다시 읽기"로 이어 준다. 본문이 JSON이 아니면 기본 문구 */
+async function notFound(res: Response): Promise<GisHttpError> {
+    let message = '올린 파일을 찾을 수 없습니다'
+    try {
+        const json = (await res.json()) as { message?: unknown }
+        if (typeof json.message === 'string' && json.message) message = json.message
+    } catch {
+        // 본문이 JSON이 아님 — 기본 문구
+    }
+    return new GisHttpError(404, message)
+}
+
+/** 업로드 확정·SHP 응답 읽기: 봉투 message는 그대로 두고 HTTP 상태를 붙여 화면이 "다시 눌러도 같은 오류"와 일시 오류를 가른다 */
+async function readUploadEnvelope<T>(res: Response, fallbackMessage: string): Promise<T> {
+    try {
+        return await readEnvelope<T>(res, fallbackMessage)
+    } catch (e) {
+        throw new GisHttpError(res.status, e instanceof Error ? e.message : fallbackMessage)
+    }
+}
+
 export function restMyMap(ctx: SourceContext): MyMapSource {
     const url = (path: string) => apiUrl(ctx.host(), '/api/mymap' + path)
 
@@ -122,12 +143,18 @@ export function restMyMap(ctx: SourceContext): MyMapSource {
         },
 
         /** files(여러 개) + name + sourceSrid */
-        async uploadShp(input: ShpUploadInput): Promise<void> {
+        async uploadShp(input: ShpUploadInput): Promise<void | MyMapConfirmResult> {
             const formData = new FormData()
             input.files.forEach(f => formData.append('files', f))
             formData.append('name', input.name)
             formData.append('sourceSrid', input.sourceSrid)
-            await readEnvelope<unknown>(await ctx.http.fetch(url('/upload/shp'), { method: 'POST', body: formData }), '업로드 실패')
+            const data = await readUploadEnvelope<{ id?: number; name?: string; status?: string } | null>(
+                await ctx.http.fetch(url('/upload/shp'), { method: 'POST', body: formData }),
+                '업로드 실패',
+            )
+            // 옛 서버는 data가 null — 호출하는 쪽이 올리기 전 목록과 비교해 방금 올린 레이어를 찾는다
+            if (!data || typeof data.id !== 'number') return undefined
+            return { id: data.id }
         },
 
         async previewExcel(file: File): Promise<ExcelPreviewResponse> {
@@ -140,10 +167,10 @@ export function restMyMap(ctx: SourceContext): MyMapSource {
         },
 
         async confirmExcel(input: ExcelConfirmInput): Promise<void | MyMapConfirmResult> {
-            const data = await readEnvelope<{ id: number; parcelVersion?: string | null } | null>(
-                await ctx.http.fetch(url('/upload/excel/confirm'), { method: 'POST', headers: JSON_HEADERS, body: confirmBody(input) }),
-                '업로드 실패',
-            )
+            const res = await ctx.http.fetch(url('/upload/excel/confirm'), { method: 'POST', headers: JSON_HEADERS, body: confirmBody(input) })
+            // 404 = 미리보기(uploadId)가 만료됐다 — 상태가 보이는 오류로 던져 화면이 "다시 읽기"를 보여 준다
+            if (res.status === 404) throw await notFound(res)
+            const data = await readUploadEnvelope<{ id: number; parcelVersion?: string | null } | null>(res, '업로드 실패')
             // 옛 서버는 data가 null
             if (!data || typeof data.id !== 'number') return undefined
             // PNU 모드의 "예정" 기준월(좌표 모드는 null). 옛 서버는 필드 없음
@@ -199,16 +226,7 @@ export function restMyMap(ctx: SourceContext): MyMapSource {
             const body = JSON.stringify({ uploadId: input.uploadId, addressColumn: input.addressColumn, include: input.include, srid: input.srid })
             const res = await ctx.http.fetch(url('/upload/excel/convert'), { method: 'POST', headers: JSON_HEADERS, body })
             // 404 = 올린 파일(uploadId)이 없거나 만료 — 상태가 보이는 GisHttpError로 던져 화면이 파일 고르기로 돌려보낸다. 그 밖의 오류는 봉투의 message
-            if (res.status === 404) {
-                let message = '올린 파일을 찾을 수 없습니다'
-                try {
-                    const json = (await res.json()) as { message?: unknown }
-                    if (typeof json.message === 'string' && json.message) message = json.message
-                } catch {
-                    // 본문이 JSON이 아님 — 기본 문구
-                }
-                throw new GisHttpError(404, message)
-            }
+            if (res.status === 404) throw await notFound(res)
             const data = await readEnvelope<ConvertWire | null>(res, '주소 변환에 실패했습니다')
             if (!data || !data.fileBase64) throw new Error('주소 변환에 실패했습니다')
             return {
