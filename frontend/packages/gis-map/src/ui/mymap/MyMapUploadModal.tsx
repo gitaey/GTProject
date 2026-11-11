@@ -45,9 +45,9 @@ export interface MyMapUploadModalProps {
     onUploaded: (result?: MyMapConfirmResult) => void
     /** 패널이 가진 한도·적재 범위. 없으면 한도 안내가 빠진다 */
     quota?: MyMapQuota | null
-    /** 패널에 끌어 놓아 연 경우 미리 채울 파일(폴더는 패널이 펼쳐서 준다) */
+    /** 패널에 끌어 놓아 연 경우 미리 채울 파일 */
     initialFiles?: File[]
-    /** 패널에서 폴더를 읽지 못했거나 비어 있을 때 첫 화면에 띄울 안내 */
+    /** 패널에서 폴더만 놓았을 때 첫 화면에 띄울 안내 */
     initialNotice?: string | null
     /** 닫힐 때 포커스를 돌려줄 곳(열기 전에 포커스가 있던 요소가 없을 때) */
     returnFocusRef?: RefObject<HTMLElement | null>
@@ -316,11 +316,12 @@ export default function MyMapUploadModal({ onClose, onUploaded, quota, initialFi
     const acceptDrop = async (dt: DataTransfer) => {
         const r = await filesFromDataTransfer(dt)
         if (r.files.length === 0) {
-            if (r.unreadable.length > 0) setNotice('폴더는 열어서 안의 파일을 끌어 놓아 주세요.')
-            else if (r.folders.length > 0) setNotice(`'${r.folders[0]}' 안에 올릴 수 있는 파일이 없습니다.`)
+            if (r.folders.length > 0) setNotice('폴더는 올릴 수 없습니다. 폴더를 열어 안의 파일을 직접 끌어 놓아 주세요.')
             return
         }
         acceptFiles(r.files)
+        // 파일과 폴더를 같이 놓았으면 파일만 쓰고 폴더는 뺐다고 알린다
+        if (r.folders.length > 0) setNotice('폴더는 올릴 수 없어 빼고 파일만 올렸습니다.')
     }
 
     const drop = useFileDrop({ accepting: !submitting && !reading && !converted, onDropFiles: dt => { void acceptDrop(dt) } })

@@ -4,7 +4,7 @@
 // 끌어다 놓기는 창 전체(MyMapUploadModal의 useFileDrop)가 받는다 — 이 컴포넌트는 눌러서 고르기만 맡는다. 스타일: gm-upload__drop·gm-upload__more
 import { forwardRef, useId, useRef } from 'react'
 import type { ChangeEvent } from 'react'
-import { FileSpreadsheet, FolderOpen, Layers, Plus, Upload } from 'lucide-react'
+import { FileSpreadsheet, Layers, Plus, Upload } from 'lucide-react'
 import { TEXT } from './uploadModel'
 
 /** 파일 선택창에 보이는 확장자(들어오면 안내할 .xls·.csv·.zip은 선택창에서 숨긴다 — 끌어다 놓으면 이유를 말해 준다) */
@@ -44,7 +44,6 @@ const UploadDropZone = forwardRef<HTMLButtonElement, UploadDropZoneProps>(functi
                     <span className="gm-upload__kinds" aria-hidden="true">
                         <span className="gm-upload__kind"><FileSpreadsheet size={11} />엑셀</span>
                         <span className="gm-upload__kind"><Layers size={11} />SHP</span>
-                        <span className="gm-upload__kind"><FolderOpen size={11} />폴더째도 됨</span>
                     </span>
                 </button>
                 {input}

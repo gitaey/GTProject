@@ -125,6 +125,10 @@ export default function ShareDialog({ target, directory, items, resourceNoun = '
     const toggleRole = (code: string) => update(s => ({
         ...s, roles: s.roles.includes(code) ? s.roles.filter(c => c !== code) : [...s.roles, code],
     }))
+    /** 역할과 그 세부권한을 한 번에 켜거나(checked) 끈다 — 역할 체크박스를 누르면 하위도 같이 바뀐다 */
+    const setRoles = (codes: readonly string[], checked: boolean) => update(s => ({
+        ...s, roles: checked ? [...s.roles, ...codes.filter(c => !s.roles.includes(c))] : s.roles.filter(c => !codes.includes(c)),
+    }))
 
     const closable = !saving
     const close = () => { if (closable) onClose() }
@@ -264,7 +268,7 @@ export default function ShareDialog({ target, directory, items, resourceNoun = '
                         <UserPicker directory={directory} selfUserId={selfUserId} entries={cur.users} disabled={saving}
                             onAdd={addUser} onRemove={removeUser} />
                         <div className="gm-modal__label">{removing ? '뺄 역할' : '공유할 역할'}</div>
-                        <GroupPicker directory={directory} selected={cur.roles} labels={labels} disabled={saving} onToggle={toggleRole} />
+                        <GroupPicker directory={directory} selected={cur.roles} labels={labels} disabled={saving} onToggle={toggleRole} onSetMany={setRoles} />
                     </>
                 )}
 

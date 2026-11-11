@@ -1,9 +1,9 @@
 // 나만의지도 항목 `⋯` 메뉴에 어떤 항목이 들어가는지 정하는 규칙(순수 함수 — React·DOM과 무관).
-// 순서(소유자): 스타일·라벨 / 공유 / 속성 테이블 / 내보내기 / 업로드 결과 보기 / 삭제. 공유받은 레이어: 속성 테이블 / 내보내기
+// 순서(소유자): 스타일·라벨 / 속성 테이블 / 내보내기 / 업로드 결과 보기 / 삭제(공유는 머리줄 [공유] 단추로만). 공유받은 레이어: 속성 테이블 / 내보내기
 // 목록 행에는 실패 개수·사유를 보이지 않으므로 `업로드 결과 보기`가 결과를 다시 보는 유일한 길이다(소유자만 — 서버도 403).
 import type { UserMapListItem } from '../../core'
 
-export type ItemMenuId = 'style' | 'share' | 'report' | 'table' | 'export' | 'delete'
+export type ItemMenuId = 'style' | 'report' | 'table' | 'export' | 'delete'
 
 export interface ItemMenuEnv {
     /** 소스가 스타일 저장(update)을 가졌다 */
@@ -12,8 +12,6 @@ export interface ItemMenuEnv {
     reportAvailable: boolean
     /** 소스가 내보내기(exportLayer)를 가졌다 */
     exportAvailable: boolean
-    /** 소스가 공유 저장소(shareTarget 또는 옛 getShare+setShare)를 가졌다 */
-    shareAvailable: boolean
 }
 
 type KindFields = Pick<UserMapListItem, 'sourceKind' | 'sourceType'>
@@ -44,8 +42,6 @@ export function itemMenuIds(item: UserMapListItem, env: ItemMenuEnv): ItemMenuId
     if (!item.owner) return !ready ? [] : env.exportAvailable ? ['table', 'export'] : ['table']
     const ids: ItemMenuId[] = []
     if (env.styleAvailable && ready) ids.push('style')
-    // 공유: 끝난(READY) 내 레이어만 — 목록 머리의 `공유`(여러 개 선택)를 거치지 않고 하나만 바로 공유
-    if (env.shareAvailable && ready) ids.push('share')
     if (ready) ids.push('table')
     // 내보내기: 끝난(READY) 항목만 — 처리 중·실패에는 내보낼 피처가 없다
     if (env.exportAvailable && ready) ids.push('export')

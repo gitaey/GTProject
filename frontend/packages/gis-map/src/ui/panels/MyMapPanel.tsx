@@ -5,7 +5,7 @@
 // 내 레이어 탭에만 `3 / 20`·한도 안내. 목록 전체(두 탭 합계)가 8개 이상이면 검색창(검색은 현재 탭 안에서만). 선택 모드(일괄 공유)는 내 레이어 탭에서만. 행은 ui/mymap/MyMapListRow(그리는 규칙은 mymap/listModel), 빈 화면·목록 오류는 mymap/MyMapEmptyState.
 // 목록 행에는 실패 개수·사유를 적지 않는다 — 처음 등록한 레이어의 처리가 끝나면 업로드 결과 창(MyMapImportReport)을 한 번 자동으로 띄우고(처음 한 번 규칙은
 // listModel.planFreshReports, 기억은 엔진 map.vector.freshUploads), 이후에는 ⋯ 메뉴 `업로드 결과 보기`로 다시 연다.
-// ⋯ 메뉴: 스타일·라벨 / 공유 / 속성 테이블 / 내보내기 / 업로드 결과 보기 / 삭제. 켜짐·진행률처럼 값에 따라 바뀌는 것만 인라인 style
+// ⋯ 메뉴: 스타일·라벨 / 속성 테이블 / 내보내기 / 업로드 결과 보기 / 삭제. 켜짐·진행률처럼 값에 따라 바뀌는 것만 인라인 style
 // 파일(엑셀·SHP)을 패널 위에 끌어 놓으면 업로드 창이 그 파일로 채워져 열린다(덮개 문구는 gm-mymap-panel__dropcover). 업로드할 수 없는 소스·창이 열려 있을 때는 무시, 한도가 가득 차면 덮개 문구만
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -37,7 +37,6 @@ import { SHARE_MAX_ITEMS } from '../share/shareModel'
 /** ⋯ 메뉴 항목의 글자·아이콘(어떤 항목이 들어가는지는 mymap/itemMenuModel이 정한다) */
 const MENU_DEF: Readonly<Record<ItemMenuId, { label: string; icon: ReactNode }>> = Object.freeze({
     style: { label: '스타일·라벨', icon: <Palette size={13} /> },
-    share: { label: '공유', icon: <Share2 size={13} /> },
     report: { label: '업로드 결과 보기', icon: <ClipboardList size={13} /> },
     table: { label: '속성 테이블', icon: <Table2 size={13} /> },
     export: { label: '내보내기', icon: <Download size={13} /> },
@@ -69,8 +68,6 @@ export default function MyMapPanel() {
     const styleAvailable = !!myMapSource?.update
     // 내보내기(exportLayer)가 있는 소스일 때만 ⋯ 메뉴에 `내보내기`를 보인다
     const exportAvailable = !!myMapSource?.exportLayer
-    // 공유 저장소가 있는 소스일 때만 ⋯ 메뉴에 `공유`를 보인다(공유 창이 쓰는 것과 같은 판단)
-    const shareAvailable = !!(myMapSource?.shareTarget || (myMapSource?.getShare && myMapSource?.setShare))
     // 업로드 단추·빈 화면의 첫 레이어 올리기는 올릴 수 있는 소스일 때만
     const uploadAvailable = !!(myMapSource?.uploadShp || myMapSource?.previewExcel)
     const catalog = useMyMapCatalog()
@@ -83,7 +80,7 @@ export default function MyMapPanel() {
     const clusteredIdList = useVectorOverlayState(selectClusteredIds)
     const clusteredIds = useMemo(() => new Set(clusteredIdList), [clusteredIdList])
     const [showUpload, setShowUpload] = useState(false)
-    // 패널에 끌어 놓아 연 업로드 창에 미리 채울 파일(폴더는 여기서 한 단계 펼쳐 준다) · 열기 단추(창이 닫히면 포커스를 돌려준다)
+    // 패널에 끌어 놓아 연 업로드 창에 미리 채울 파일(폴더는 읽지 않고 안내만 한다) · 열기 단추(창이 닫히면 포커스를 돌려준다)
     const [dropped, setDropped] = useState<{ files: File[]; notice: string | null } | null>(null)
     const uploadBtnRef = useRef<HTMLButtonElement>(null)
     // 공유 대화상자에 넘길 레이어(하나면 단일, 둘 이상이면 일괄)
@@ -134,7 +131,7 @@ export default function MyMapPanel() {
     const pickedIds = useMemo(() => pickableOwned.filter(i => selectedIds.has(i.id)).map(i => i.id), [pickableOwned, selectedIds])
     // 선택(공유) 모드로 들어가면 항목 버튼이 사라지므로 열린 메뉴도 닫는다(끝났을 때 다시 열려 있지 않게)
     useEffect(() => { if (selecting) setOpenMenuId(null) }, [selecting])
-    const menuEnv = useMemo(() => ({ styleAvailable, reportAvailable, exportAvailable, shareAvailable }), [styleAvailable, reportAvailable, exportAvailable, shareAvailable])
+    const menuEnv = useMemo(() => ({ styleAvailable, reportAvailable, exportAvailable }), [styleAvailable, reportAvailable, exportAvailable])
     const maxLayers = quota?.maxLayers ?? null
     const layerFull = maxLayers !== null && owned.length >= maxLayers
     const hasFailedOwned = owned.some(i => i.status === 'FAILED')
@@ -146,7 +143,8 @@ export default function MyMapPanel() {
             const r = await filesFromDataTransfer(dt)
             if (r.files.length === 0 && r.folders.length === 0) return
             let notice: string | null = null
-            if (r.files.length === 0) notice = r.unreadable.length > 0 ? '폴더는 열어서 안의 파일을 끌어 놓아 주세요.' : `'${r.folders[0]}' 안에 올릴 수 있는 파일이 없습니다.`
+            if (r.files.length === 0) notice = '폴더는 올릴 수 없습니다. 폴더를 열어 안의 파일을 직접 끌어 놓아 주세요.'
+            else if (r.folders.length > 0) notice = '폴더는 올릴 수 없어 빼고 파일만 올렸습니다.'
             setDropped({ files: r.files, notice })
             setShowUpload(true)
         })()
@@ -257,7 +255,6 @@ export default function MyMapPanel() {
     const selectMenu = (id: ItemMenuId, item: UserMapListItem) => {
         const target = { id: item.id, name: item.name }
         if (id === 'style') { if (!styleSavingRef.current) setStyleTarget(target) }
-        else if (id === 'share') { setShareFromSelection(false); setShareItems([target]) }
         else if (id === 'report') setReportTarget({ ...target, failure: item.status === 'FAILED' ? { message: item.errorMessage ?? null } : null })
         else if (id === 'table') setTableTarget(target)
         else if (id === 'export') setExportTarget({ ...target, featureCount: item.featureCount })

@@ -12,7 +12,7 @@ export type FileKind = 'xlsx' | 'shp' | 'shx' | 'dbf' | 'prj' | 'companion' | 'x
 
 /** 서버가 받는 SHP 구성 파일 확장자 */
 export const SHP_EXTS: readonly string[] = Object.freeze(['shp', 'shx', 'dbf', 'prj'])
-/** 같이 따라오지만 서버가 쓰지 않는 SHP 동반 파일(폴더째 놓아도 오류가 아니다 — 빼고 올린다) */
+/** 같이 따라오지만 서버가 쓰지 않는 SHP 동반 파일(SHP 묶음에 흔히 딸려 온다 — 오류가 아니라 빼고 올린다) */
 export const IGNORED_SHP_EXTS: readonly string[] = Object.freeze(['cpg', 'sbn', 'sbx', 'qix', 'fix', 'xml'])
 
 export type FileProblem = 'EMPTY' | 'XLS' | 'CSV' | 'ZIP' | 'OTHER' | 'COMPANION_ONLY' | 'SOURCE_EXCEL' | 'SOURCE_SHP' | 'NAME_MISMATCH'

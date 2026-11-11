@@ -1,7 +1,7 @@
 'use client'
 
 // 공유 상대(역할·세부권한) 고르기 — 한글 이름 체크 목록. 자원과 무관(ShareDialog가 쓴다).
-//   · 디렉터리의 listGroups()를 마운트 때 한 번 받는다. 역할 아래에 세부권한(부서)을 들여쓴다 — 체크는 서로 독립(역할 전체 ≠ 세부권한)
+//   · 디렉터리의 listGroups()를 마운트 때 한 번 받는다. 역할 아래에 세부권한(부서)을 들여쓴다 — onSetMany를 주면 역할 체크가 하위 전체를 함께 켜고 끈다(없으면 서로 독립)
 //   · 코드(`역할:세부`)는 회색 작은 글씨로만. 8개를 넘으면 위에 걸러보기 입력
 //   · 목록에 없는 선택값(옛 코드·삭제된 역할)은 맨 아래 "목록에 없는 역할" 칩 — 지울 수 있다
 //   · 디렉터리가 없거나 경로가 없는 서버(404·405)면 코드 직접 입력 + 칩
@@ -22,12 +22,14 @@ interface GroupPickerProps {
     /** 저장된 값의 이름(코드 → 한글 이름). 목록에 없는 코드 칩에 쓴다 */
     labels?: Readonly<Record<string, string | null>>
     onToggle: (code: string) => void
+    /** 역할과 세부권한을 한 번에 켜거나 끈다. 주면 역할(상위) 체크가 하위 전체를 함께 바꾼다. 없으면 체크는 서로 독립 */
+    onSetMany?: (codes: readonly string[], checked: boolean) => void
     disabled?: boolean
 }
 
 type Load = { status: 'loading' } | { status: 'ok'; groups: ShareGroup[] } | { status: 'error'; message: string } | { status: 'direct' }
 
-export default function GroupPicker({ directory, selected, labels, onToggle, disabled }: GroupPickerProps) {
+export default function GroupPicker({ directory, selected, labels, onToggle, onSetMany, disabled }: GroupPickerProps) {
     const [load, setLoad] = useState<Load>(() => (directory ? { status: 'loading' } : { status: 'direct' }))
     const [filter, setFilter] = useState('')
     const [text, setText] = useState('')
@@ -97,14 +99,28 @@ export default function GroupPicker({ directory, selected, labels, onToggle, dis
     const tree = buildGroupTree(load.groups)
     const shown = filterGroupTree(tree, filter)
     const unlisted = unlistedCodes(selected, load.groups)
-    const row = (g: ShareGroup, child: boolean) => (
-        <label key={g.code} className={cx('gm-share__group', child && 'gm-share__group--child')}>
-            <input type="checkbox" checked={selected.includes(g.code)} disabled={disabled}
-                onChange={() => onToggle(g.code)} className="gm-panel__item-check" />
-            <span className="gm-share__group-name">{g.label}</span>
-            <span className="gm-share__group-code">{g.code}</span>
-        </label>
-    )
+    // 역할(상위) 체크 → 하위 전체가 같이 켜지고 꺼진다. 상위가 켜진 채 하위 하나를 끄면 상위도 꺼진다(상위는 "전체"를 뜻하므로
+    // 한 명을 뺐는데 상위가 켜져 있으면 안 된다). 하위 일부만 켜져 있으면 상위 체크박스는 "일부 선택"(–)으로 보인다
+    const row = (g: ShareGroup, child: boolean, parent?: ShareGroup, kids: readonly ShareGroup[] = []) => {
+        const on = selected.includes(g.code)
+        const kidsOn = kids.filter(k => selected.includes(k.code)).length
+        const partial = !on && kidsOn > 0 && kidsOn < kids.length
+        const change = () => {
+            if (!onSetMany) { onToggle(g.code); return }
+            if (!child && kids.length > 0) onSetMany([g.code, ...kids.map(k => k.code)], !on)
+            else if (child && on && parent && selected.includes(parent.code)) onSetMany([parent.code, g.code], false)
+            else onToggle(g.code)
+        }
+        return (
+            <label key={g.code} className={cx('gm-share__group', child && 'gm-share__group--child')}>
+                <input type="checkbox" checked={on} disabled={disabled}
+                    ref={el => { if (el) el.indeterminate = partial }}
+                    onChange={change} className="gm-panel__item-check" />
+                <span className="gm-share__group-name">{g.label}</span>
+                <span className="gm-share__group-code">{g.code}</span>
+            </label>
+        )
+    }
     return (
         <div className="gm-share__picker">
             {load.groups.length > FILTER_THRESHOLD && (
@@ -116,8 +132,8 @@ export default function GroupPicker({ directory, selected, labels, onToggle, dis
                 {load.groups.length > 0 && shown.length === 0 && <div className="gm-share__empty">일치하는 역할이 없습니다.</div>}
                 {shown.map(n => (
                     <div key={n.group.code} className="gm-share__group-block">
-                        {row(n.group, false)}
-                        {n.children.map(c => row(c, true))}
+                        {row(n.group, false, undefined, n.children)}
+                        {n.children.map(c => row(c, true, n.group))}
                     </div>
                 ))}
             </div>

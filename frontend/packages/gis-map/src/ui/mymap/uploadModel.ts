@@ -173,7 +173,7 @@ export const TEXT = Object.freeze({
     otherDrop: '다른 파일 끌어 놓기',
     pick: '고르기',
     overlay: '여기에 놓으세요',
-    overlaySub: '엑셀 1개 또는 SHP 묶음 · 폴더도 됩니다',
+    overlaySub: '엑셀 1개 또는 SHP 묶음',
     overlayLocked: '지금은 놓을 수 없습니다',
     overlayLockedSub: '처리 중입니다. 끝난 뒤에 놓아 주세요.',
     canUpload: '무엇을 올릴 수 있나요?',
