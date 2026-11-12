@@ -249,9 +249,11 @@ public class LostarkService {
                 HttpMethod.GET, authEntity(), new ParameterizedTypeReference<List<CalendarContent>>() {}
             );
             List<CalendarContent> all = response.getBody() != null ? response.getBody() : new ArrayList<>();
-            all.forEach(c -> log.info("[Calendar] code={} name={} contents={}", c.getCategoryCode(), c.getCategoryName(), c.getContentsName()));
+            String today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).toString();
             return all.stream()
                     .filter(c -> "모험 섬".equals(c.getCategoryName()))
+                    .filter(c -> c.getStartTimes() != null &&
+                                 c.getStartTimes().stream().anyMatch(t -> t.startsWith(today)))
                     .toList();
         } catch (Exception e) {
             log.error("LostArk 모험섬 조회 오류: {}", e.getMessage());
