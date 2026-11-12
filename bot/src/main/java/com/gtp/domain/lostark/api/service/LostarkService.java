@@ -249,8 +249,9 @@ public class LostarkService {
                 HttpMethod.GET, authEntity(), new ParameterizedTypeReference<List<CalendarContent>>() {}
             );
             List<CalendarContent> all = response.getBody() != null ? response.getBody() : new ArrayList<>();
+            all.forEach(c -> log.info("[Calendar] code={} name={} contents={}", c.getCategoryCode(), c.getCategoryName(), c.getContentsName()));
             return all.stream()
-                    .filter(c -> c.getCategoryCode() != null && c.getCategoryCode() == 40000)
+                    .filter(c -> "모험 섬".equals(c.getCategoryName()))
                     .toList();
         } catch (Exception e) {
             log.error("LostArk 모험섬 조회 오류: {}", e.getMessage());
