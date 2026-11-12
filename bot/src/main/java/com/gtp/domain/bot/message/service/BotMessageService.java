@@ -11,6 +11,8 @@ import com.gtp.domain.bot.room.entity.BotRoomStatus;
 import com.gtp.domain.bot.room.repository.BotRoomRepository;
 import com.gtp.domain.bot.room.service.BotRoomService;
 import com.gtp.domain.lostark.api.dto.armory.*;
+import com.gtp.domain.lostark.api.dto.calendar.CalendarContent;
+import com.gtp.domain.lostark.api.dto.calendar.CalendarRewardItem;
 import com.gtp.domain.lostark.api.service.LostarkService;
 import com.gtp.domain.lostark.raid.dto.CharacterScheduleItem;
 import com.gtp.domain.lostark.raid.dto.ExpeditionScheduleResponse;
@@ -97,6 +99,7 @@ public class BotMessageService {
         if (text.startsWith("/로펙 "))        return cmd(room, sender, "/로펙",             text.substring(4).trim(),  () -> handleLopec(text.substring(4).trim()));
         if (text.startsWith("/원정대 "))      return cmd(room, sender, "/원정대",           text.substring(5).trim(),  () -> handleSiblings(text.substring(5).trim()));
         if (text.startsWith("/가능성 "))      return cmd(room, sender, "/가능성",           text.substring(5).trim(),  () -> handleChance(text.substring(5).trim()));
+        if (text.equals("/모험섬"))            return cmd(room, sender, "/모험섬",          "",                        () -> handleAdventureIsland());
         if (text.equals("/기빵봇"))           return BotMessageResult.of(buildHelp(room));
         if (text.equals("/오늘파티테스트"))   return cmd(room, sender, "/오늘파티테스트",   "",                        () -> handleTodayPartyTest());
 
@@ -681,6 +684,37 @@ public class BotMessageService {
         return sb.toString().trim();
     }
 
+    private String handleAdventureIsland() throws Exception {
+        List<CalendarContent> islands = lostarkService.getAdventureIslands();
+        if (islands.isEmpty()) return "오늘의 모험섬 정보가 없습니다.";
+
+        StringBuilder sb = new StringBuilder("【 오늘의 모험섬 】\n");
+        for (CalendarContent island : islands) {
+            sb.append("───────────────\n");
+            sb.append("◆ ").append(island.getContentsName());
+            if (island.getMinItemLevel() != null && island.getMinItemLevel() > 0)
+                sb.append("  (").append(String.format("%,d", island.getMinItemLevel())).append("+)");
+            sb.append("\n");
+
+            if (island.getStartTimes() != null && !island.getStartTimes().isEmpty()) {
+                List<String> times = island.getStartTimes().stream()
+                        .map(t -> t.length() >= 16 ? t.substring(11, 16) : t)
+                        .toList();
+                sb.append("   시간: ").append(String.join(" / ", times)).append("\n");
+            }
+
+            if (island.getRewardItems() != null && !island.getRewardItems().isEmpty()) {
+                List<String> rewards = island.getRewardItems().stream()
+                        .filter(r -> r.getName() != null)
+                        .map(CalendarRewardItem::getName)
+                        .toList();
+                if (!rewards.isEmpty())
+                    sb.append("   보상: ").append(String.join(", ", rewards)).append("\n");
+            }
+        }
+        return sb.toString().trim();
+    }
+
     private String buildHelp(String room) {
         StringBuilder sb = new StringBuilder("""
                 【 기빵봇 도움말 】
@@ -713,7 +747,8 @@ public class BotMessageService {
                       /일정새로고침
                     """);
         }
-        sb.append("───────────────\n◆ 경매\n  /분배금 금액");
+        sb.append("───────────────\n◆ 게임 정보\n  /모험섬");
+        sb.append("\n───────────────\n◆ 경매\n  /분배금 금액");
         sb.append("\n───────────────\n◆ 재미\n  /가능성 캐릭명");
         return sb.toString().trim();
     }

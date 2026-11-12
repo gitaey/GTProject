@@ -3,6 +3,7 @@ package com.gtp.domain.lostark.api.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gtp.domain.lostark.api.dto.armory.*;
+import com.gtp.domain.lostark.api.dto.calendar.CalendarContent;
 import com.gtp.global.exception.CustomException;
 import com.gtp.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -236,6 +237,24 @@ public class LostarkService {
         } catch (Exception e) {
             log.error("스킬코드 조회 오류: {}", e.getMessage());
             return null;
+        }
+    }
+
+    // /모험섬 - 오늘의 모험섬 목록
+    public List<CalendarContent> getAdventureIslands() {
+        RestTemplate restTemplate = restTemplate();
+        try {
+            ResponseEntity<List<CalendarContent>> response = restTemplate.exchange(
+                BASE_URL + "/gamecontents/calendar",
+                HttpMethod.GET, authEntity(), new ParameterizedTypeReference<List<CalendarContent>>() {}
+            );
+            List<CalendarContent> all = response.getBody() != null ? response.getBody() : new ArrayList<>();
+            return all.stream()
+                    .filter(c -> c.getCategoryCode() != null && c.getCategoryCode() == 40000)
+                    .toList();
+        } catch (Exception e) {
+            log.error("LostArk 모험섬 조회 오류: {}", e.getMessage());
+            throw new CustomException(ErrorCode.LOSTARK_API_ERROR);
         }
     }
 
