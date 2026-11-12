@@ -690,19 +690,27 @@ public class BotMessageService {
 
         StringBuilder sb = new StringBuilder("【 오늘의 모험섬 】\n───────────────\n");
         for (CalendarContent island : islands) {
-            sb.append(island.getContentsName()).append("\n");
-            if (island.getRewardItems() != null && !island.getRewardItems().isEmpty()) {
-                List<String> rewards = island.getRewardItems().stream()
-                        .filter(r -> r.getItems() != null)
-                        .flatMap(r -> r.getItems().stream())
-                        .filter(e -> e.getName() != null)
-                        .map(CalendarRewardEntry::getName)
-                        .toList();
-                if (!rewards.isEmpty())
-                    sb.append("   보상: ").append(String.join(", ", rewards)).append("\n");
-            }
+            String reward = pickKeyReward(island);
+            sb.append(island.getContentsName());
+            if (reward != null) sb.append("  [").append(reward).append("]");
+            sb.append("\n");
         }
         return sb.toString().trim();
+    }
+
+    /** 골드 → 카드 → 실링 우선순위로 핵심 보상 하나 반환. 없으면 null. */
+    private String pickKeyReward(CalendarContent island) {
+        if (island.getRewardItems() == null) return null;
+        List<String> names = island.getRewardItems().stream()
+                .filter(r -> r.getItems() != null)
+                .flatMap(r -> r.getItems().stream())
+                .map(CalendarRewardEntry::getName)
+                .filter(n -> n != null)
+                .toList();
+        if (names.stream().anyMatch(n -> n.equals("골드"))) return "골드";
+        if (names.stream().anyMatch(n -> n.contains("카드 팩"))) return "카드";
+        if (names.stream().anyMatch(n -> n.equals("실링"))) return "실링";
+        return null;
     }
 
     private String buildHelp(String room) {
