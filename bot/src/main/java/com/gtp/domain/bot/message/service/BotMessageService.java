@@ -12,7 +12,6 @@ import com.gtp.domain.bot.room.repository.BotRoomRepository;
 import com.gtp.domain.bot.room.service.BotRoomService;
 import com.gtp.domain.lostark.api.dto.armory.*;
 import com.gtp.domain.lostark.api.dto.calendar.CalendarContent;
-import com.gtp.domain.lostark.api.dto.calendar.CalendarRewardItem;
 import com.gtp.domain.lostark.api.service.LostarkService;
 import com.gtp.domain.lostark.raid.dto.CharacterScheduleItem;
 import com.gtp.domain.lostark.raid.dto.ExpeditionScheduleResponse;
@@ -688,29 +687,9 @@ public class BotMessageService {
         List<CalendarContent> islands = lostarkService.getAdventureIslands();
         if (islands.isEmpty()) return "오늘의 모험섬 정보가 없습니다.";
 
-        StringBuilder sb = new StringBuilder("【 오늘의 모험섬 】\n");
+        StringBuilder sb = new StringBuilder("【 오늘의 모험섬 】\n───────────────\n");
         for (CalendarContent island : islands) {
-            sb.append("───────────────\n");
-            sb.append("◆ ").append(island.getContentsName());
-            if (island.getMinItemLevel() != null && island.getMinItemLevel() > 0)
-                sb.append("  (").append(String.format("%,d", island.getMinItemLevel())).append("+)");
-            sb.append("\n");
-
-            if (island.getStartTimes() != null && !island.getStartTimes().isEmpty()) {
-                List<String> times = island.getStartTimes().stream()
-                        .map(t -> t.length() >= 16 ? t.substring(11, 16) : t)
-                        .toList();
-                sb.append("   시간: ").append(String.join(" / ", times)).append("\n");
-            }
-
-            if (island.getRewardItems() != null && !island.getRewardItems().isEmpty()) {
-                List<String> rewards = island.getRewardItems().stream()
-                        .filter(r -> r.getName() != null)
-                        .map(CalendarRewardItem::getName)
-                        .toList();
-                if (!rewards.isEmpty())
-                    sb.append("   보상: ").append(String.join(", ", rewards)).append("\n");
-            }
+            sb.append(island.getContentsName()).append("\n");
         }
         return sb.toString().trim();
     }
