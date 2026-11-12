@@ -12,6 +12,7 @@ import com.gtp.domain.bot.room.repository.BotRoomRepository;
 import com.gtp.domain.bot.room.service.BotRoomService;
 import com.gtp.domain.lostark.api.dto.armory.*;
 import com.gtp.domain.lostark.api.dto.calendar.CalendarContent;
+import com.gtp.domain.lostark.api.dto.calendar.CalendarRewardItem;
 import com.gtp.domain.lostark.api.service.LostarkService;
 import com.gtp.domain.lostark.raid.dto.CharacterScheduleItem;
 import com.gtp.domain.lostark.raid.dto.ExpeditionScheduleResponse;
@@ -690,6 +691,14 @@ public class BotMessageService {
         StringBuilder sb = new StringBuilder("【 오늘의 모험섬 】\n───────────────\n");
         for (CalendarContent island : islands) {
             sb.append(island.getContentsName()).append("\n");
+            if (island.getRewardItems() != null && !island.getRewardItems().isEmpty()) {
+                List<String> rewards = island.getRewardItems().stream()
+                        .filter(r -> r.getName() != null)
+                        .map(CalendarRewardItem::getName)
+                        .toList();
+                if (!rewards.isEmpty())
+                    sb.append("   보상: ").append(String.join(", ", rewards)).append("\n");
+            }
         }
         return sb.toString().trim();
     }
