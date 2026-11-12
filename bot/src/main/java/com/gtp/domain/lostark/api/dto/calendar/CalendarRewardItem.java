@@ -4,11 +4,13 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 
+import java.util.List;
+
 @Getter
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class CalendarRewardItem {
-    @JsonProperty("Name")
-    private String name;
-    @JsonProperty("Grade")
-    private String grade;
+    @JsonProperty("ItemLevel")
+    private Integer itemLevel;
+    @JsonProperty("Items")
+    private List<CalendarRewardEntry> items;
 }
