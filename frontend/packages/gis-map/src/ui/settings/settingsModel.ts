@@ -1,5 +1,5 @@
 // 설정 패널의 순수 함수: 날짜·요약·상태 문구·칩 계산(React 없음 — node로 시험한다).
-import type { BasemapMode, GisDataInfoItem, GisMapStartView, StartViewState } from '../../core'
+import type { BasemapMode, GisDataInfoItem, GisMapLayerState, GisMapStartView, StartViewState } from '../../core'
 
 // ── 시작 화면 ─────────────────────────────────────────────────────────
 
@@ -34,6 +34,18 @@ export interface StartViewPaneSummary {
     detail: string
     /** 마우스를 올리면 보이는 좌표 */
     title: string
+    /** '레이어 3 · 나만의지도 2 · TIFF 1' · 레이어를 저장했는데 하나도 안 켰으면 '켜 둔 레이어 없음' · 레이어를 저장하지 않았으면 '' */
+    layers: string
+}
+
+/** 저장한 레이어 한 줄 요약. state가 없으면(옛 저장값·레이어 저장 안 함) '' */
+export function layersText(state: GisMapLayerState | undefined): string {
+    if (!state) return ''
+    const parts: string[] = []
+    if (state.on.length > 0) parts.push('레이어 ' + state.on.length)
+    if (state.mymap.length > 0) parts.push('나만의지도 ' + state.mymap.length)
+    if (state.tiff.length > 0) parts.push('TIFF ' + state.tiff.length)
+    return parts.length > 0 ? parts.join(' · ') : '켜 둔 레이어 없음'
 }
 
 export interface StartViewSummary {
@@ -67,6 +79,7 @@ export function summarizeStartView(view: GisMapStartView, savedAt: string | null
         name: i === view.split.activeIndex && region !== null && nearCurrent ? region : '지도 ' + (i + 1),
         detail: '줌 ' + zoomText(p.zoom) + ' · ' + basemapLabel(p.basemap),
         title: p.center[0].toFixed(4) + ', ' + p.center[1].toFixed(4),
+        layers: layersText(p.layers),
     }))
     return { head: parts.join(' · '), panes }
 }

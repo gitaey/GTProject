@@ -82,6 +82,20 @@ export interface LayerTreeController {
     opacityOf(layer: LayerDef): number
     /** 이 레이어 정의로 만든 OL 레이어(트리가 아직 없거나 없는 id면 null) */
     getOlLayer(layerId: number): BaseLayer | null
+    /** 시작 화면 저장용: 체크된 레이어 id(배경지도 레이어 제외)와 기본값이 아닌 투명도. 트리가 없으면 빈 값 */
+    captureState(): LayerTreeSnapshot
+    /**
+     * 시작 화면 복원용: 배경지도 레이어를 뺀 모든 레이어의 체크를 snapshot에 맞추고(없는 것은 끔), 투명도도 snapshot 값으로 맞춘다(그 밖의 사용자 값은 기본값으로).
+     * 트리에 없는 id는 건너뛰고 그 개수를 돌려준다. 트리가 아직 없으면 아무것도 안 하고 null
+     */
+    applyState(snapshot: LayerTreeSnapshot): { missing: number } | null
+}
+
+/** 레이어 목록 체크·투명도 스냅샷(시작 화면에 저장하는 모양과 같다) */
+export interface LayerTreeSnapshot {
+    on: number[]
+    /** [레이어 id, 투명도] — 레이어 기본 투명도와 다른 것만 */
+    opacity: Array<[number, number]>
 }
 
 export interface LayerTreeControllerOptions {
@@ -233,6 +247,46 @@ export class LayerTreeControllerImpl implements LayerTreeController {
 
     getOlLayer(layerId: number): BaseLayer | null {
         return this.byId.get(layerId) ?? null
+    }
+
+    captureState(): LayerTreeSnapshot {
+        const s = this.state.getState()
+        const on: number[] = []
+        const opacity: Array<[number, number]> = []
+        for (const layer of this.allLayers()) {
+            if (isBasemapLayer(layer, this.opts.basemapModes)) continue
+            if (getLayerVisible(s.visible, layer)) on.push(layer.id)
+            const value = getLayerOpacity(s.opacity, layer)
+            if (value !== layer.opacity) opacity.push([layer.id, Math.round(value * 100) / 100])
+        }
+        return { on, opacity }
+    }
+
+    applyState(snapshot: LayerTreeSnapshot): { missing: number } | null {
+        if (this.destroyed) return null
+        const s = this.state.getState()
+        if (!s.tree) return null
+        const layers = this.allLayers()
+        const known = new Set(layers.map(l => l.id))
+        const on = new Set(snapshot.on)
+        const wanted = new Map(snapshot.opacity)
+        const visible: Record<number, boolean> = { ...s.visible }
+        const opacity: Record<number, number> = {}
+        for (const layer of layers) {
+            if (isBasemapLayer(layer, this.opts.basemapModes)) continue // 배경지도는 basemap 모드가 맡는다
+            visible[layer.id] = on.has(layer.id)
+            const value = wanted.get(layer.id)
+            if (value !== undefined) opacity[layer.id] = value
+        }
+        // 배경지도 레이어의 투명도 값은 건드리지 않는다
+        for (const layer of layers) {
+            if (isBasemapLayer(layer, this.opts.basemapModes) && layer.id in s.opacity) opacity[layer.id] = s.opacity[layer.id]
+        }
+        const missing = new Set<number>()
+        for (const id of on) if (!known.has(id)) missing.add(id)
+        for (const id of wanted.keys()) if (!known.has(id) && !on.has(id)) missing.add(id)
+        this.state.setState({ visible, opacity })
+        return { missing: missing.size }
     }
 
     // ── 펼침 상태 ─────────────────────────────────────────────────────

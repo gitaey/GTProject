@@ -15,12 +15,15 @@ export type { CopyMapStateOptions } from './split/paneState'
 
 // 시작 화면(저장소 sources.startView · map.startView) — 순수 함수(화면 상태 읽기·적용·저장 JSON 만들기·검사)도 공개
 export { captureViewState, applyViewState, buildStartView, parseStartView, START_VIEW_VERSION } from './startView/viewState'
+export type { CaptureViewOptions } from './startView/viewState'
+export { captureLayerState, restoreLayerState, hasLayerState } from './startView/layerState'
+export type { LayerRestoreResult } from './startView/layerState'
 export type { BuildStartViewSplit } from './startView/viewState'
 export { startViewErrorKind, DEFAULT_START_VIEW_WAIT_MS } from './startView/StartViewController'
 export type { StartViewController } from './startView/StartViewController'
 export { EMPTY_START_VIEW_STATE } from './startView/types'
 export type {
-    GisMapViewState, GisMapStartView, StoredStartView, StartViewSource, GisMapStartViewConfig, StartViewStatus, StartViewOp,
+    GisMapViewState, GisMapLayerState, GisMapStartView, StoredStartView, StartViewSource, GisMapStartViewConfig, StartViewStatus, StartViewOp,
     StartViewErrorKind, StartViewState,
 } from './startView/types'
 // 화면 밝기 모드
@@ -35,7 +38,7 @@ export { DEFAULT_TOOL_HINTS, resolveToolHints } from './tools/toolHint'
 export type { ToolHints } from './tools/toolHint'
 // 레이어 트리(컨트롤러·순수 함수·OL 레이어 생성)
 export { EMPTY_LAYER_TREE_STATE } from './layers/LayerTreeController'
-export type { LayerTreeController, LayerTreeState, LayerExpandedStorage } from './layers/LayerTreeController'
+export type { LayerTreeController, LayerTreeState, LayerExpandedStorage, LayerTreeSnapshot } from './layers/LayerTreeController'
 export { flattenGroupLayers, allTreeLayers, filterTreeByIds, getLayerVisible, getLayerOpacity } from './layers/treeUtils'
 export { DEFAULT_BASEMAP_MODES, resolveBasemapModes, isBasemapLayer, getBasemapVisibility, deriveBasemapMode } from './layers/basemap'
 export type { BasemapModeNames } from './layers/basemap'

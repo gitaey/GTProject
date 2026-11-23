@@ -1,9 +1,9 @@
 'use client'
 
-// 시작 화면 카드: 지도를 열 때 처음 보일 위치·배경지도·화면 분할을 저장소(sources.startView — 계정 또는 브라우저)에 저장·되돌린다.
+// 시작 화면 카드: 지도를 열 때 처음 보일 위치·배경지도·화면 분할·켜 둔 레이어를 저장소(sources.startView — 계정 또는 브라우저)에 저장·되돌린다.
 // 상태는 엔진 map.startView.store(1번 지도). 저장 = 지금 화면(분할이면 칸마다) → buildStartView → startView.save.
 // 상태별 화면은 settingsModel.startViewCardModel(F3 표). confirm()을 쓰지 않고 그 자리에서 확인 줄을 펼친다.
-import { Clock, Cloud, Database, LocateFixed, Lock, MapPin, RotateCcw, Save, TriangleAlert, CircleCheck, CircleX } from 'lucide-react'
+import { Clock, Cloud, Database, Layers, LocateFixed, Lock, MapPin, RotateCcw, Save, TriangleAlert, CircleCheck, CircleX } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
 import { EMPTY_REGION_STATE, EMPTY_START_VIEW_STATE, buildStartView, captureViewState } from '../../core'
@@ -45,6 +45,8 @@ export default function StartViewCard({ map, open, onToggle }: StartViewCardProp
     const region = useStoreValue(active?.region.store, selectRegion, EMPTY_REGION_STATE)
     const [confirming, setConfirming] = useState(false)
     const [message, setMessage] = useState<LocalMessage | null>(null)
+    // 켜 둔 레이어도 함께 저장할지(기본 켬). 끄면 위치·배경지도·분할만 저장하고 열 때 레이어는 그대로 둔다
+    const [withLayers, setWithLayers] = useState(true)
 
     const model = startViewCardModel(state)
     const scope = scopeText(map.startView.scope)
@@ -79,7 +81,12 @@ export default function StartViewCard({ map, open, onToggle }: StartViewCardProp
         if (maps.length === 0) maps.push(map)
         let view
         try {
-            view = buildStartView(maps, { count: maps.length, sync: split && split.available ? split.sync : false, activeIndex: split && split.available ? split.activeIndex : 0 })
+            view = buildStartView(
+                maps,
+                { count: maps.length, sync: split && split.available ? split.sync : false, activeIndex: split && split.available ? split.activeIndex : 0 },
+                new Date(),
+                { layers: withLayers },
+            )
         } catch {
             setMessage('unreadable')
             return
@@ -88,7 +95,7 @@ export default function StartViewCard({ map, open, onToggle }: StartViewCardProp
         // 다른 요청에 밀려 끊긴 저장이면 문구를 바꾸지 않는다: 지금 store가 이 저장의 결과(같은 savedAt의 값, 오류 없음, 요청 끝)일 때만
         const after = map.startView.store.getState()
         if (!after.saving && after.errorOp === null && after.value?.view.savedAt === view.savedAt) setMessage('saved')
-    }, [map, split])
+    }, [map, split, withLayers])
 
     const go = useCallback(() => {
         const value = map.startView.store.getState().value
@@ -131,7 +138,7 @@ export default function StartViewCard({ map, open, onToggle }: StartViewCardProp
     const hasSummary = summary !== null
 
     return (
-        <SettingsCard id="start-view" icon={MapPin} title="시작 화면" description="지도를 열 때 이 위치·배경지도·분할로" open={open} onToggle={toggle}>
+        <SettingsCard id="start-view" icon={MapPin} title="시작 화면" description="지도를 열 때 이 위치·배경지도·레이어로" open={open} onToggle={toggle}>
             <div className="gm-settings-scope">
                 <Cloud size={12} />
                 <span><b>{scope.strong}</b>{scope.rest}</span>
@@ -149,12 +156,24 @@ export default function StartViewCard({ map, open, onToggle }: StartViewCardProp
                 <div className="gm-settings-sum">
                     <div className="gm-settings-sum__head">{summary.head}</div>
                     {summary.panes.map(p => (
-                        <div key={p.index} className="gm-settings-sum__pane" title={p.title}>
-                            <i className="gm-settings-sum__num">{p.index}</i>
-                            <span className="gm-settings-sum__name">{p.name}</span>
-                            <span className="gm-settings-sum__detail">· {p.detail}</span>
+                        <div key={p.index} className="gm-settings-sum__block">
+                            <div className="gm-settings-sum__pane" title={p.title}>
+                                <i className="gm-settings-sum__num">{p.index}</i>
+                                <span className="gm-settings-sum__name">{p.name}</span>
+                                <span className="gm-settings-sum__detail">· {p.detail}</span>
+                            </div>
+                            {p.layers && (
+                                <div className="gm-settings-sum__layers"><Layers size={11} />{p.layers}</div>
+                            )}
                         </div>
                     ))}
+                </div>
+            )}
+
+            {model.showSummary && state.layersSkipped > 0 && (
+                <div className="gm-settings-box gm-settings-box--warn" role="status">
+                    <TriangleAlert size={12} />
+                    <span>저장한 레이어 {state.layersSkipped}개는 지워졌거나 쓸 수 없어 켜지 못했습니다.</span>
                 </div>
             )}
 
@@ -174,6 +193,14 @@ export default function StartViewCard({ map, open, onToggle }: StartViewCardProp
                     </div>
                 )
             })}
+
+            {model.showButtons && (
+                <label className="gm-settings-check">
+                    <input type="checkbox" checked={withLayers} disabled={disabled}
+                        onChange={e => setWithLayers(e.target.checked)} />
+                    <span>켜 둔 레이어(레이어 목록·나만의지도·TIFF)도 함께 저장</span>
+                </label>
+            )}
 
             {model.showButtons && !hasSummary && (
                 <button type="button" className="gm-settings-btn gm-settings-btn--pri" disabled={disabled} onClick={() => void save()}>

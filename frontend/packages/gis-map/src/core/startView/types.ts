@@ -1,6 +1,21 @@
 // 시작 화면(지도를 열 때 처음 보이는 위치·배경지도·분할) 타입. React 없음 — UMD에서도 쓴다.
 import type { BasemapMode } from '../types/layer'
 
+/**
+ * 지도 하나에 켜 둔 레이어(번호만 저장한다 — 이름·스타일은 열 때 서버에서 다시 받는다).
+ * 서버가 JSON을 8KB까지만 받으므로 번호 목록만 담는다.
+ */
+export interface GisMapLayerState {
+    /** 레이어 목록에서 체크된 레이어 id(배경지도 레이어는 basemap이 맡으므로 뺀다) */
+    on: number[]
+    /** 기본값(1)이 아닌 투명도만: [레이어 id, 0~1] */
+    opacity: Array<[number, number]>
+    /** 켜 둔 나만의지도 레이어 id */
+    mymap: number[]
+    /** 켜 둔 GeoTIFF 레이어 id */
+    tiff: number[]
+}
+
 /** 지도 하나의 화면 상태 */
 export interface GisMapViewState {
     /** [lon, lat] EPSG:4326 */
@@ -9,6 +24,8 @@ export interface GisMapViewState {
     /** 라디안 */
     rotation: number
     basemap: BasemapMode
+    /** 켜 둔 레이어. 없으면(옛 저장값·"레이어는 저장 안 함") 열 때 레이어를 건드리지 않는다 */
+    layers?: GisMapLayerState
 }
 
 /** 저장하는 시작 화면(JSON 그대로 서버·브라우저 저장소에 들어간다) */
@@ -81,6 +98,8 @@ export interface StartViewState {
     /** 마지막 오류가 난 작업·종류(성공하면 둘 다 null) */
     errorOp: StartViewOp | null
     errorKind: StartViewErrorKind | null
+    /** 저장한 레이어를 켜다가 없어졌거나 쓸 수 없어 건너뛴 개수(모든 지도 칸의 합) */
+    layersSkipped: number
 }
 
 export const EMPTY_START_VIEW_STATE: Readonly<StartViewState> = Object.freeze({
@@ -94,4 +113,5 @@ export const EMPTY_START_VIEW_STATE: Readonly<StartViewState> = Object.freeze({
     lastError: null,
     errorOp: null,
     errorKind: null,
+    layersSkipped: 0,
 })

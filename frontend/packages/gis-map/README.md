@@ -75,7 +75,7 @@ export default function MapPage() {
 }
 ```
 
-- 설정 패널(`settings`, 기본 켬 — 화면 테마·시작 화면·데이터 기준 정보): **`settings={false}`는 UI만 끈다.** 시작 화면 자동 적용(저장한 위치로 열기)을 끄려면 `config.startView.autoApply:false`를 따로 준다.
+- 설정 패널(`settings`, 기본 켬 — 화면 테마·시작 화면·데이터 기준 정보): **`settings={false}`는 UI만 끈다.** 시작 화면 자동 적용(저장한 위치로 열기)을 끄려면 `config.startView.autoApply:false`를 따로 준다. 시작 화면은 위치·배경지도·분할에 더해 켜 둔 레이어(레이어 목록 체크·투명도·나만의지도·TIFF의 id)도 저장·복원한다(카드의 "켜 둔 레이어도 함께 저장", 서버·DB 변경 없음 — 같은 JSON에 선택 필드 `layers`가 더해질 뿐이다).
 - `MapShell` 주요 props: `brand`(false면 숨김), `panels`(기본 레이어·TIFF·나만의지도, 호스트 패널을 더함), `defaultPanel`·`onPanelChange`,
   `show*`(Header·Search·BasemapSwitcher·User·NavRail·Toolbar·RegionBadge·MobileLayerButton·WindLegend·StatusBar), `statusBarProjection`(기본 EPSG:5186).
 - **머리줄 사용자 메뉴** `userMenuItems`(옵션): `{ id, label, icon?: ReactNode, onSelect }[]`를 주면 머리줄의 사용자 표시(원·이름·역할)가 단추가 되어 누르면 드롭다운으로 항목을 보여 준다

@@ -26,6 +26,11 @@ export interface StartViewController {
     clear(): Promise<void>
     /** 저장한 시작 화면의 1번 지도 상태를 지금 지도에 적용한다(분할은 화면 분할 Provider의 applyStartView) */
     applyNow(): void
+    /**
+     * 지도 칸(0부터)에 저장한 레이어를 켜다가 건너뛴 개수를 알린다 — state.layersSkipped는 칸별 값의 합.
+     * 같은 칸을 다시 알리면 덮어쓴다. 분할 Provider가 1번 외 칸의 결과를 알릴 때 쓴다
+     */
+    noteLayerResult(paneIndex: number, skipped: number): void
 }
 
 export interface StartViewControllerOptions {
@@ -79,6 +84,8 @@ export class StartViewControllerImpl implements StartViewController {
     private holding = false
     private timer: ReturnType<typeof setTimeout> | null = null
     private seq = 0
+    /** 칸마다 건너뛴 레이어 수(state.layersSkipped의 재료) */
+    private readonly skippedByPane = new Map<number, number>()
     private abort: AbortController | null = null
     private owner: string | null
     private destroyed = false
@@ -161,7 +168,10 @@ export class StartViewControllerImpl implements StartViewController {
         }
         // 동기 값이거나 아직 기다리는 중이면 적용한다(그 뒤에 지도 그림이 시작된다)
         const apply = initial && this.opts.autoApply && value !== null && (sync || this.holding)
-        if (apply && value) applyViewState(this.opts.getMap(), value.view.panes[0])
+        if (apply && value) {
+            this.skippedByPane.clear()
+            applyViewState(this.opts.getMap(), value.view.panes[0], r => this.noteLayerResult(0, r.skipped))
+        }
         const prev = this.state.getState()
         this.state.setState({
             status: 'ready', value, invalid, lastError: null, errorOp: null, errorKind: null,
@@ -208,9 +218,10 @@ export class StartViewControllerImpl implements StartViewController {
             const stored = await source.save(view, ac.signal)
             if (this.destroyed || my !== this.seq) return
             const parsed = parseStartView(stored?.view) ?? view
+            this.skippedByPane.clear()
             this.state.setState({
                 saving: false, status: 'ready', value: { view: parsed, updatedAt: stored?.updatedAt ?? null },
-                invalid: false, late: false, lastError: null, errorOp: null, errorKind: null,
+                invalid: false, late: false, lastError: null, errorOp: null, errorKind: null, layersSkipped: 0,
             })
         } catch (err) {
             if (this.destroyed || my !== this.seq) return
@@ -227,8 +238,9 @@ export class StartViewControllerImpl implements StartViewController {
         try {
             await source.clear(ac.signal)
             if (this.destroyed || my !== this.seq) return
+            this.skippedByPane.clear()
             this.state.setState({
-                saving: false, status: 'ready', value: null, invalid: false, late: false, lastError: null, errorOp: null, errorKind: null,
+                saving: false, status: 'ready', value: null, invalid: false, late: false, lastError: null, errorOp: null, errorKind: null, layersSkipped: 0,
             })
         } catch (err) {
             if (this.destroyed || my !== this.seq) return
@@ -248,8 +260,16 @@ export class StartViewControllerImpl implements StartViewController {
     applyNow(): void {
         const value = this.state.getState().value
         if (!value || this.destroyed) return
-        applyViewState(this.opts.getMap(), value.view.panes[0])
+        applyViewState(this.opts.getMap(), value.view.panes[0], r => this.noteLayerResult(0, r.skipped))
         this.state.setState({ late: false })
+    }
+
+    noteLayerResult(paneIndex: number, skipped: number): void {
+        if (this.destroyed) return
+        this.skippedByPane.set(paneIndex, skipped)
+        let sum = 0
+        this.skippedByPane.forEach(n => { sum += n })
+        if (sum !== this.state.getState().layersSkipped) this.state.setState({ layersSkipped: sum })
     }
 
     private userOf(host: GisMapHost): string | null {
@@ -270,6 +290,7 @@ export class StartViewControllerImpl implements StartViewController {
         this.abort?.abort()
         this.abort = null
         this.release()
+        this.skippedByPane.clear()
         this.state.setState({ ...EMPTY_START_VIEW_STATE, status: 'idle' })
     }
 

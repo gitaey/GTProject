@@ -152,7 +152,9 @@ export function GisMapSplitProvider({ defaultCount, onCountChange, defaultSync, 
     const applyStartView = useCallback((view: GisMapStartView) => {
         const cur = latest.current
         const first = cur.maps[0]
-        if (first) applyViewState(first, view.panes[0])
+        // 레이어를 켜다 건너뛴 개수는 1번 지도의 시작 화면 상태에 칸별로 모아 둔다(설정 카드가 안내한다)
+        const report = (index: number) => (r: { skipped: number }): void => first?.startView.noteLayerResult(index, r.skipped)
+        if (first) applyViewState(first, view.panes[0], report(0))
         if (!cur.available) return
         const pending = pendingPanesRef.current
         pending.clear()
@@ -161,7 +163,7 @@ export function GisMapSplitProvider({ defaultCount, onCountChange, defaultSync, 
             const m = i < cur.count ? cur.maps[i] : null
             if (m) {
                 initedPanes.add(m) // 이미 있는 지도는 지금 맞춘다(처음 상태 복사가 덮어쓰지 않게)
-                applyViewState(m, view.panes[i])
+                applyViewState(m, view.panes[i], report(i))
             } else {
                 pending.set(i, view.panes[i])
             }
@@ -229,7 +231,7 @@ export function GisMapSplitProvider({ defaultCount, onCountChange, defaultSync, 
             }
             pendingPanesRef.current.delete(i)
             try {
-                applyViewState(m, saved)
+                applyViewState(m, saved, r => maps[0]?.startView.noteLayerResult(i, r.skipped))
             } catch (err) {
                 console.error('[gis-map] 저장한 시작 화면을 지도 ' + (i + 1) + '에 적용하지 못했다', err)
             }
