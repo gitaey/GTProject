@@ -245,6 +245,8 @@ function myMapSource(data: MemoryData, opts: MemorySourcesOptions): MyMapSource 
         },
         exportLayer: async (id, o, signal) => {
             if (signal?.aborted) throw new Error('취소됨')
+            // shp는 서버가 압축 파일로 만든다 — 서버 없는 데모에서는 만들 수 없다
+            if (o.format === 'shp') throw new Error('shp 내보내기는 서버가 있는 환경에서만 됩니다. 이 데모에서는 엑셀·GeoJSON을 받을 수 있습니다.')
             const l = find(id)
             const code = 'EPSG:' + o.srid
             const fc = transformGeoJson(geojsonOf(l), 'EPSG:4326', code)

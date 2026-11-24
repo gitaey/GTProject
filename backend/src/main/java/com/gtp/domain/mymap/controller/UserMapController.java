@@ -115,7 +115,7 @@ public class UserMapController {
     }
 
     /**
-     * 레이어 내보내기(스트리밍 바이너리). format = xlsx | geojson, srid = 4326 | 5186 | 5179 | 3857, includeFailed(엑셀만).
+     * 레이어 내보내기(스트리밍 바이너리). format = xlsx | geojson | shp(zip 한 벌), srid = 4326 | 5186 | 5179 | 3857, includeFailed(엑셀만).
      * 권한은 geojson과 같다(소유자·공유받은 사람). 검사는 본문을 쓰기 전에 끝내 오류가 JSON 봉투로 나간다.
      * 보관 기간이 지나 실패 행을 못 붙였으면 응답 헤더 X-Export-Failed-Skipped: true.
      */

@@ -246,7 +246,7 @@ export function restMyMap(ctx: SourceContext): MyMapSource {
             const blob = await readBlob(res, '내보내기에 실패했습니다')
             return {
                 blob,
-                fileName: dispositionFileName(res.headers.get('Content-Disposition'), `나만의지도_${id}.${opts.format}`),
+                fileName: dispositionFileName(res.headers.get('Content-Disposition'), `나만의지도_${id}.${opts.format === 'shp' ? 'zip' : opts.format}`),
                 failedSkipped: res.headers.get('X-Export-Failed-Skipped') === 'true',
             }
         },

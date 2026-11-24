@@ -3976,6 +3976,34 @@
     background: rgba(var(--gm-primary-rgb), 0.1);
 }
 
+/* 떠 있는 창: 뒷배경을 없애고 클릭을 통과시켜(지도를 계속 쓸 수 있게) 창만 클릭을 받는다 */
+.gm-modal.gm-table-modal {
+    background: transparent;
+    pointer-events: none;
+    /* 화면 왼쪽 위 기준: 처음 자리(지도 영역의 왼쪽 위)와 끌어 옮긴 값은 JS가 translate로 준다 */
+    align-items: flex-start;
+    justify-content: flex-start;
+}
+
+.gm-modal.gm-table-modal > .gm-table-dialog {
+    pointer-events: auto;
+    outline: none;
+}
+
+/* 머리줄을 잡아 끌어 옮긴다(글자 선택·터치 스크롤 방지). 단추는 눌리는 손 모양을 지킨다 */
+.gm-table-dialog .gm-table-dialog__drag {
+    cursor: move;
+    user-select: none;
+    touch-action: none;
+}
+
+.gm-table-dialog__actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
 /* 접힌 상태: 마운트는 유지(필터·정렬·쪽 보존)하고 화면에서만 뺀다 */
 .gm-modal.gm-is-min {
     display: none;
@@ -4039,6 +4067,11 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
+}
+
+/* 형식이 셋인 내보내기 창 — 카드 셋을 한 줄로 */
+.gm-delivery__options.gm-delivery__options--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .gm-delivery__option {
@@ -4226,7 +4259,7 @@
 .gm-export-dialog {
     display: flex;
     flex-direction: column;
-    width: 440px;
+    width: 480px;
     max-width: calc(100vw - 24px);
     max-height: 85vh;
     overflow: hidden;

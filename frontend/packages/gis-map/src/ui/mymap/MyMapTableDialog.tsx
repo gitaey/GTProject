@@ -4,11 +4,14 @@
 // 데이터: 이 레이어가 지도에 올라와 있으면 그 피처(서버 응답 순서 그대로, vector.featuresInOrder)를 그대로 쓴다 — 큰 레이어에서 같은 GeoJSON을 두 번 받지 않는다.
 // 꺼져 있으면 소스의 geojson(id)(EPSG:4326 FeatureCollection)을 한 번 받아 한 번만 파싱한다(useMemo). 큰 레이어(shp 최대 10만 피처)에서도
 // 멈추지 않게 현재 쪽(100행)만 그리고, 필터·정렬은 행 번호 배열(tableModel)만 만든다. 공유받은 레이어도 연다(서버가 권한을 판단).
-// 행을 누르면 그 피처의 좌표 범위로 지도를 옮기고(레이어가 꺼져 있으면 켠다) 모달을 작은 막대로 접는다 — 막대를 누르면 필터·정렬·쪽 그대로 다시 펼쳐진다.
-// 스타일: gm-modal(업로드·공유와 공용), gm-table-dialog
-import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
-import { X, Loader2, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Search, Table2 } from 'lucide-react'
+// 행을 누르면 그 피처의 좌표 범위로 지도를 옮기고(레이어가 꺼져 있으면 켠다) 창은 그대로 둔다(접지 않는다).
+// 처음에는 지도 영역의 왼쪽 위에 열린다(가운데가 아니다 — 지도를 가리지 않게).
+// 창은 지도를 막지 않는 떠 있는 창이다: 뒷배경이 클릭을 통과시키고(지도를 계속 움직일 수 있다), 머리줄을 끌어 옮길 수 있다.
+// 직접 접고 싶으면 머리줄의 접기 단추 — 막대를 누르면 필터·정렬·쪽 그대로 다시 펼쳐진다.
+// 스타일: gm-modal(업로드·공유와 공용) + gm-table-modal(막지 않는 변형), gm-table-dialog
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
+import { X, Loader2, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Search, Table2, Minus } from 'lucide-react'
 import type Feature from 'ol/Feature'
 import type Geometry from 'ol/geom/Geometry'
 import { useGisMap } from '../../react'
@@ -28,6 +31,26 @@ interface MyMapTableDialogProps {
 
 /** 필터 입력이 멈춘 뒤 이만큼(ms) 기다렸다가 걸러 낸다(10만 행에서 글자마다 걸러 내지 않게) */
 const FILTER_DELAY_MS = 250
+
+/** 끌어서 옮길 때 화면 밖으로 나가도 남겨 두는 최소 길이(px) — 머리줄을 다시 잡을 수 있게 */
+const DRAG_KEEP_X = 96
+const DRAG_KEEP_Y = 40
+/** 처음 열 때 지도 영역의 왼쪽·위 모서리에서 띄우는 거리(px) */
+const OPEN_GAP = 16
+
+interface Offset { x: number; y: number }
+interface DragStart { px: number; py: number; ox: number; oy: number; baseLeft: number; baseTop: number; width: number }
+
+/** 창 기준 위치(가운데, 옮기기 전)에서 x·y만큼 옮긴 값을 화면 안으로 되돌린다 */
+function clampOffset(x: number, y: number, baseLeft: number, baseTop: number, width: number): Offset {
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const minX = DRAG_KEEP_X - width - baseLeft
+    const maxX = vw - DRAG_KEEP_X - baseLeft
+    const minY = -baseTop
+    const maxY = vh - DRAG_KEEP_Y - baseTop
+    return { x: Math.min(Math.max(x, minX), Math.max(minX, maxX)), y: Math.min(Math.max(y, minY), Math.max(minY, maxY)) }
+}
 
 interface SortState { key: string; dir: SortDir }
 
@@ -51,6 +74,29 @@ export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialog
     const [picked, setPicked] = useState<number | null>(null)
     const [minimized, setMinimized] = useState(false)
     const pillOpenRef = useRef<HTMLButtonElement>(null)
+    // 창을 끌어 옮긴 만큼(가운데 기준) · 끌기 시작 때의 값(끄는 동안만)
+    const dialogRef = useRef<HTMLDivElement>(null)
+    const [offset, setOffset] = useState<Offset>({ x: 0, y: 0 })
+    const dragRef = useRef<DragStart | null>(null)
+    // 처음 열 때의 최대 높이(px) — 위쪽에 붙어 열리므로 아래가 화면 밖으로 잘리지 않게 남은 높이로 줄인다
+    const [openMaxHeight, setOpenMaxHeight] = useState<number | null>(null)
+
+    // 처음 놓을 자리: 지도 영역의 왼쪽 위(없으면 화면 왼쪽 위). 첫 그림 전에 정해 가운데에서 깜빡이며 옮겨 가지 않는다.
+    // 오버레이가 왼쪽 위 기준(flex-start)이라 이 값이 곧 화면 좌표다. 창이 화면보다 크면 화면 안으로 당긴다
+    useLayoutEffect(() => {
+        const el = dialogRef.current
+        if (!el) return
+        const r = el.getBoundingClientRect()
+        const area = map?.olMap.getTargetElement()?.getBoundingClientRect()
+        const vw = window.innerWidth
+        const vh = window.innerHeight
+        const x = Math.max(OPEN_GAP, Math.min((area ? area.left : 0) + OPEN_GAP, vw - r.width - OPEN_GAP))
+        const y = Math.max(OPEN_GAP, Math.min((area ? area.top : 0) + OPEN_GAP, vh - r.height - OPEN_GAP))
+        setOffset({ x, y })
+        setOpenMaxHeight(Math.max(240, vh - y - OPEN_GAP))
+        // 처음 한 번만(map은 엔진마다 하나)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     // 요청 도중 닫거나 다른 레이어로 바뀌면 늦게 온 응답은 버린다
     useEffect(() => {
@@ -85,14 +131,45 @@ export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialog
         }
     }, [id, myMap, map])
 
-    // Esc로 닫기(부모가 매번 새 콜백을 줘도 리스너를 다시 달지 않는다)
-    const closeRef = useRef(onClose)
-    closeRef.current = onClose
+    // 창이 지도를 막지 않으므로 Esc는 창 안에 포커스가 있을 때만 닫는다(지도에서 그리기를 취소하는 Esc까지 먹지 않게).
+    // 열릴 때 창으로 포커스를 옮겨 열자마자 Esc가 되게 한다
+    useEffect(() => { dialogRef.current?.focus({ preventScroll: true }) }, [])
+
+    // 화면 크기가 줄어 창이 밖으로 밀려나면 다시 안으로 당긴다
     useEffect(() => {
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeRef.current() }
-        document.addEventListener('keydown', onKey)
-        return () => document.removeEventListener('keydown', onKey)
+        const onResize = () => {
+            const el = dialogRef.current
+            if (!el) return
+            setOffset(cur => {
+                if (cur.x === 0 && cur.y === 0) return cur
+                const r = el.getBoundingClientRect()
+                const next = clampOffset(cur.x, cur.y, r.left - cur.x, r.top - cur.y, r.width)
+                return next.x === cur.x && next.y === cur.y ? cur : next
+            })
+        }
+        window.addEventListener('resize', onResize)
+        return () => window.removeEventListener('resize', onResize)
     }, [])
+
+    // 머리줄 끌기: 포인터를 잡아 두고(setPointerCapture) 움직인 만큼 옮긴다. 머리줄의 단추(접기·닫기)는 끌기를 시작하지 않는다
+    const onDragStart = (e: ReactPointerEvent<HTMLDivElement>) => {
+        if (e.button !== 0 || (e.target as HTMLElement).closest('button')) return
+        const el = dialogRef.current
+        if (!el) return
+        const r = el.getBoundingClientRect()
+        dragRef.current = { px: e.clientX, py: e.clientY, ox: offset.x, oy: offset.y, baseLeft: r.left - offset.x, baseTop: r.top - offset.y, width: r.width }
+        e.currentTarget.setPointerCapture(e.pointerId)
+    }
+    const onDragMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+        const d = dragRef.current
+        if (!d) return
+        setOffset(clampOffset(d.ox + e.clientX - d.px, d.oy + e.clientY - d.py, d.baseLeft, d.baseTop, d.width))
+    }
+    const onDragEnd = (e: ReactPointerEvent<HTMLDivElement>) => {
+        if (!dragRef.current) return
+        dragRef.current = null
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+    }
 
     // 접히면 펼치기 단추로 포커스를 옮긴다(키보드 사용자가 길을 잃지 않게)
     useEffect(() => { if (minimized) pillOpenRef.current?.focus() }, [minimized])
@@ -128,7 +205,7 @@ export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialog
         })
     }
 
-    // 행 → 지도: 피처 범위로 이동. 레이어가 꺼져 있으면 켜서 피처가 보이게 하고, 점 하나면 너무 확대되지 않게 17까지만
+    // 행 → 지도: 피처 범위로 이동(창은 그대로 둔다). 레이어가 꺼져 있으면 켜서 피처가 보이게 하고, 점 하나면 너무 확대되지 않게 17까지만
     const rowHasGeometry = (ri: number): boolean =>
         data === null ? false : data.kind === 'raw' ? hasFeatureGeometry(data.raw, ri) : !!data.features[ri]?.getGeometry()
     const rowExtent = (ri: number) => {
@@ -144,7 +221,6 @@ export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialog
         if (!map.vector.isVisible(id)) Promise.resolve(map.vector.show(id)).catch(() => {})
         const isPoint = extent[0] === extent[2] && extent[1] === extent[3]
         map.fitLonLatExtent(extent, { maxZoom: isPoint ? 17 : 18 })
-        setMinimized(true)
     }
 
     const commitPage = () => {
@@ -199,14 +275,23 @@ export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialog
 
     return (
         <>
-        <div className={cx('gm-modal', minimized && 'gm-is-min')} onClick={onClose}>
-            <div onClick={e => e.stopPropagation()} className="gm-modal__dialog gm-table-dialog" role="dialog" aria-modal="true" aria-label={`속성 테이블 — ${name}`}>
-                <div className="gm-modal__header">
+        <div className={cx('gm-modal', 'gm-table-modal', minimized && 'gm-is-min')}>
+            <div ref={dialogRef} tabIndex={-1} className="gm-modal__dialog gm-table-dialog" role="dialog" aria-modal="false" aria-label={`속성 테이블 — ${name}`}
+                style={{
+                    transform: `translate(${offset.x}px, ${offset.y}px)`,
+                    ...(openMaxHeight !== null ? { maxHeight: `min(85vh, ${openMaxHeight}px)` } : null),
+                }}
+                onKeyDown={e => { if (e.key === 'Escape') onClose() }}>
+                <div className="gm-modal__header gm-table-dialog__drag" title="끌어서 옮길 수 있습니다"
+                    onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd}>
                     <span className="gm-modal__title gm-table-dialog__title">
                         <span className="gm-table-dialog__name">속성 테이블 — {name}</span>
                         {table && <span className="gm-table-dialog__dims">{formatCount(table.rows.length)}행 · {formatCount(table.totalColumns)}열</span>}
                     </span>
-                    <button onClick={onClose} className="gm-modal__close" aria-label="닫기"><X size={16} /></button>
+                    <span className="gm-table-dialog__actions">
+                        <button type="button" onClick={() => setMinimized(true)} className="gm-modal__close" aria-label="접기" title="접기"><Minus size={16} /></button>
+                        <button type="button" onClick={onClose} className="gm-modal__close" aria-label="닫기" title="닫기"><X size={16} /></button>
+                    </span>
                 </div>
 
                 {loading ? (
@@ -282,7 +367,8 @@ export default function MyMapTableDialog({ id, name, onClose }: MyMapTableDialog
             </div>
         </div>
         {minimized && (
-            <div className="gm-table-dialog__pill" role="region" aria-label="속성 테이블(접힘)">
+            <div className="gm-table-dialog__pill" role="region" aria-label="속성 테이블(접힘)"
+                onKeyDown={e => { if (e.key === 'Escape') onClose() }}>
                 <button type="button" ref={pillOpenRef} className="gm-table-dialog__pill-open" onClick={() => setMinimized(false)}>
                     <Table2 size={12} /> 속성 테이블 — {name} · 펼치기
                 </button>

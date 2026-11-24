@@ -1,6 +1,6 @@
 'use client'
 
-// 나만의지도 레이어 내보내기 — ⋯ 메뉴 `내보내기`가 연다. 형식(엑셀·GeoJSON)·좌표계·(엑셀) 매칭 실패 행 포함을 골라 받는다.
+// 나만의지도 레이어 내보내기 — ⋯ 메뉴 `내보내기`가 연다. 형식(엑셀·GeoJSON·Shapefile zip)·좌표계·(엑셀) 매칭 실패 행 포함을 골라 받는다.
 // 스타일: gm-modal(공용 틀), gm-export-dialog, gm-delivery(형식 카드). 요청은 소스의 exportLayer가 보내고 저장(saveBlob)은 여기서 한다.
 // 내려받기 중에는 `내려받기` 단추만 잠그고(중복 클릭 방지) 취소·X·Esc는 열어 둔다 — 닫으면 진행 중 요청을 AbortSignal로 취소한다(소스가 signal을 지원하면 서버 연결도 끊김. 그 전에 온 응답은 어차피 버린다).
 import { useEffect, useRef, useState } from 'react'
@@ -23,6 +23,7 @@ interface MyMapExportDialogProps {
 const FORMAT_ITEMS: readonly { value: MyMapExportFormat; title: string; desc: string }[] = Object.freeze([
     Object.freeze({ value: 'xlsx' as MyMapExportFormat, title: '엑셀 (.xlsx)', desc: '속성 + 대표점 좌표 열' }),
     Object.freeze({ value: 'geojson' as MyMapExportFormat, title: 'GeoJSON', desc: '면 모양 그대로' }),
+    Object.freeze({ value: 'shp' as MyMapExportFormat, title: 'Shapefile', desc: 'shp·dbf·prj 한 벌 (.zip)' }),
 ])
 
 export default function MyMapExportDialog({ id, name, featureCount, onClose }: MyMapExportDialogProps) {
@@ -94,7 +95,7 @@ export default function MyMapExportDialog({ id, name, featureCount, onClose }: M
                 <div className="gm-modal__body">
                     <div className="gm-delivery">
                         <span className="gm-modal__label">형식</span>
-                        <div className="gm-delivery__options" role="radiogroup" aria-label="형식">
+                        <div className="gm-delivery__options gm-delivery__options--3" role="radiogroup" aria-label="형식">
                             {FORMAT_ITEMS.map(it => (
                                 <label key={it.value} className={cx('gm-delivery__option', format === it.value && 'gm-is-active')}>
                                     <span className="gm-delivery__head">
@@ -122,8 +123,14 @@ export default function MyMapExportDialog({ id, name, featureCount, onClose }: M
                                 onChange={e => setIncludeFailed(e.target.checked)} />
                             매칭 실패 행도 포함 (사유 열 추가)
                         </label>
-                        {!isXlsx && (
+                        {format === 'geojson' && (
                             <span className="gm-modal__note">GeoJSON에는 위치가 있는 피처만 담깁니다 — 위치를 찾지 못한 행은 포함되지 않습니다.</span>
+                        )}
+                        {format === 'shp' && (
+                            <span className="gm-modal__note">
+                                위치가 있는 피처만 담깁니다. 점·선·면이 섞여 있으면 종류별 파일로 나뉩니다. 한글(CP949)로 저장하고,
+                                열 이름은 10바이트(한글 5자)까지라 길면 줄어들며(대응표 동봉) 값은 모두 글자로 저장됩니다.
+                            </span>
                         )}
                     </div>
 

@@ -12,11 +12,13 @@ import com.gtp.domain.mymap.port.AddressResolver;
 import com.gtp.domain.mymap.repository.UserMapImportFailureRepository;
 import com.gtp.domain.mymap.util.CoordinateTransformUtil;
 import com.gtp.domain.mymap.util.ResultXlsx;
+import com.gtp.domain.mymap.util.ShpZipWriter;
 import com.gtp.global.exception.CustomException;
 import com.gtp.global.gis.GisErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.geotools.geojson.geom.GeometryJSON;
+import org.locationtech.jts.geom.CoordinateFilter;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
 import org.springframework.data.domain.Page;
@@ -40,7 +42,7 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 
 /**
- * 나만의지도 레이어 내보내기(엑셀·GeoJSON). 권한은 geojson 보기와 같다({@link UserMapService#loadExportable} — 소유자·공유받은 사람, 처리 끝난 레이어만).
+ * 나만의지도 레이어 내보내기(엑셀·GeoJSON·shp zip). 권한은 geojson 보기와 같다({@link UserMapService#loadExportable} — 소유자·공유받은 사람, 처리 끝난 레이어만).
  *
  * <b>메모리에 전부 올리지 않는다</b>: 피처는 JDBC 커서(fetchSize 500)로 한 행씩 읽어 바로 쓰고(엑셀은 SXSSF 100행 창, GeoJSON은 JsonGenerator),
  * 실패 행은 1,000건씩 페이지로 읽는다. 호출 순서: {@link #prepare}(검사·헤더 재료) → 응답 헤더 설정 → {@link #stream}(본문). 본문을 쓰기 시작하면
@@ -69,7 +71,9 @@ public class UserMapExportService {
 
     public enum Format {
         XLSX("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-        GEOJSON("geojson", "application/geo+json");
+        GEOJSON("geojson", "application/geo+json"),
+        /** shp 한 벌(.shp .shx .dbf .prj .cpg)을 zip으로 묶어 내려준다 */
+        SHP("zip", "application/zip");
 
         final String ext;
         final String contentType;
@@ -108,7 +112,7 @@ public class UserMapExportService {
         boolean xlsxFailed = includeFailed && format == Format.XLSX;
         // 실패 행을 붙이라고 했는데 보관 기간(30일)이 지나 지워졌으면 건너뛰고 알린다. 처음부터 실패가 없던 레이어는 해당 없음.
         boolean skipped = xlsxFailed && map.getFailedCount() > 0 && failureRepository.countByUserMapId(map.getId()) == 0;
-        List<String> columns = format == Format.XLSX ? attributeColumns(map) : List.of();
+        List<String> columns = format == Format.XLSX || format == Format.SHP ? attributeColumns(map) : List.of();
         return new Prepared(map, format, srid, xlsxFailed && !skipped, skipped, fileName(map.getName(), format),
                 format.contentType, columns);
     }
@@ -118,6 +122,7 @@ public class UserMapExportService {
         return switch (f) {
             case "xlsx" -> Format.XLSX;
             case "geojson" -> Format.GEOJSON;
+            case "shp" -> Format.SHP;
             default -> throw new CustomException(GisErrorCode.MYMAP_EXPORT_FORMAT_INVALID);
         };
     }
@@ -138,11 +143,16 @@ public class UserMapExportService {
 
     /** 레이어 이름 → 안전한 파일 이름 "{이름}_yyyyMMdd.{확장자}". 제어문자·따옴표·경로·헤더에 쓰이는 글자를 지운다. */
     static String fileName(String layerName, Format format) {
+        return safeBase(layerName) + "_" + LocalDate.now().format(DAY) + "." + format.ext;
+    }
+
+    /** 레이어 이름 → 파일 이름 바탕(확장자·날짜 없음). 제어문자·따옴표·경로·헤더에 쓰이는 글자를 지우고 80자까지 */
+    static String safeBase(String layerName) {
         String base = UNSAFE_NAME.matcher(layerName == null ? "" : layerName).replaceAll("_");
         base = DOTS_SPACES.matcher(base).replaceAll("");
         if (base.codePointCount(0, base.length()) > 80) base = base.substring(0, base.offsetByCodePoints(0, 80));   // 서로게이트 쌍을 가르지 않는다
         if (base.isEmpty()) base = "layer";
-        return base + "_" + LocalDate.now().format(DAY) + "." + format.ext;
+        return base;
     }
 
     private List<String> attributeColumns(UserMap map) {
@@ -168,6 +178,7 @@ public class UserMapExportService {
         try {
             beforeBody.run();
             if (p.format() == Format.GEOJSON) streamGeoJson(p, out);
+            else if (p.format() == Format.SHP) streamShp(p, out);
             else streamXlsx(p, out);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -262,6 +273,65 @@ public class UserMapExportService {
             for (JsonNode child : n) writeCoordinates(gen, child, t);
         }
         gen.writeEndArray();
+    }
+
+    // ---------- shp (zip) ----------
+
+    /**
+     * shp 한 벌을 zip으로 내려준다. 도형 종류별 파일·열 이름 규칙은 {@link ShpZipWriter}.
+     * 열 길이를 정하려고 피처를 두 번 읽는다(1차: 값의 최대 바이트 수, 2차: 쓰기) — 모든 열을 254바이트로 잡으면 10만 행에서 파일이 수백 MB가 된다.
+     */
+    private void streamShp(Prepared p, OutputStream out) throws IOException {
+        List<String> attrs = p.columns();
+        int[] bytes = new int[attrs.size()];
+        forEachFeature(p.map().getId(), (pnu, geometryJson, propertiesJson) -> {
+            JsonNode props = parse(propertiesJson);
+            if (props == null) return;
+            for (int i = 0; i < bytes.length; i++) {
+                JsonNode v = props.get(attrs.get(i));
+                if (v != null && !v.isNull()) bytes[i] = Math.max(bytes[i], ShpZipWriter.byteLength(v.asText()));
+            }
+        });
+        CoordinateTransformUtil.FromWgs84 projector = p.srid() == 4326 ? null : CoordinateTransformUtil.buildFromWgs84("EPSG:" + p.srid());
+        try (ShpZipWriter w = new ShpZipWriter(safeBase(p.map().getName()), p.srid(), attrs, bytes)) {
+            forEachFeature(p.map().getId(), (pnu, geometryJson, propertiesJson) -> {
+                Geometry g = readGeometry(geometryJson);
+                if (g == null) return;
+                if (projector != null) g = project(g, projector);
+                JsonNode props = parse(propertiesJson);
+                List<String> values = new ArrayList<>(attrs.size());
+                for (String col : attrs) {
+                    JsonNode v = props == null ? null : props.get(col);
+                    values.add(v == null || v.isNull() ? "" : v.asText());
+                }
+                w.add(g, values);
+            });
+            w.writeTo(out);
+        }
+        out.flush();
+    }
+
+    private Geometry readGeometry(String json) {
+        if (json == null || json.isBlank()) return null;
+        try {
+            synchronized (geometryReader) {
+                return geometryReader.read(new StringReader(json));
+            }
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** 4326 도형의 사본을 대상 좌표계로 바꾼다(원본은 건드리지 않는다) */
+    private static Geometry project(Geometry g, CoordinateTransformUtil.FromWgs84 t) {
+        Geometry c = g.copy();
+        c.apply((CoordinateFilter) coord -> {
+            double[] xy = t.toXy(coord.x, coord.y);
+            coord.x = xy[0];
+            coord.y = xy[1];
+        });
+        c.geometryChanged();
+        return c;
     }
 
     // ---------- 엑셀 ----------

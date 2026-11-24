@@ -323,13 +323,14 @@ export interface MyMapConvertResult {
     preview: MyMapConvertPreview
 }
 
-export type MyMapExportFormat = 'xlsx' | 'geojson'
+/** shp = 압축(zip) 한 벌(.shp·.shx·.dbf·.prj·.cpg, 도형 종류가 섞이면 점·선·면 파일로 나뉨) */
+export type MyMapExportFormat = 'xlsx' | 'geojson' | 'shp'
 
 /** 레이어 내보내기 옵션 */
 export interface MyMapExportOptions {
     format: MyMapExportFormat
     srid: number
-    /** 엑셀에 매칭 실패 행도 담는다(GeoJSON은 무시) */
+    /** 엑셀에 매칭 실패 행도 담는다(GeoJSON·shp는 무시) */
     includeFailed?: boolean
 }
 
