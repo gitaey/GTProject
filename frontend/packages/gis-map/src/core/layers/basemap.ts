@@ -33,7 +33,9 @@ export function isBasemapLayer(layer: LayerDef, modes: BasemapModeNames): boolea
 
 /**
  * 배경지도 레이어면 그 모드에서 켜져야 하는지(true/false), 배경지도 레이어가 아니면 null.
- * 지도(OL)에 실제로 보이는지는 이 값이 체크박스 상태보다 우선한다(옛 resolveVisible).
+ * 모드를 고르는 순간 체크박스를 이 값으로 맞추는 데 쓴다(setBasemapMode·트리 도착 때 초기 정렬).
+ * 지도에 실제로 보이는지는 레이어마다 자기 체크박스를 따른다 — 위성·하이브리드를 따로 켜고 끌 수 있게
+ * (옛 resolveVisible은 모드가 체크박스보다 우선해서 둘을 같이 켜야만 보였다).
  */
 export function getBasemapVisibility(layer: LayerDef, mode: BasemapMode, modes: BasemapModeNames): boolean | null {
     if (layer.type !== 'XYZ') return null
@@ -42,8 +44,9 @@ export function getBasemapVisibility(layer: LayerDef, mode: BasemapMode, modes: 
 }
 
 /**
- * 체크박스 상태에서 배경지도 모드를 거꾸로 정한다(옛 toggleLayer의 역방향 동기화).
- * 일반 목록만 전부 켜짐 → normal, 위성 목록만 전부 켜짐 → satellite, 그 밖 → none.
+ * 체크박스 상태에서 배경지도 모드(상단 일반·위성·없음 단추의 표시)를 거꾸로 정한다.
+ * 일반 목록 레이어가 하나라도 켜지고 위성 목록은 모두 꺼짐 → normal, 반대 → satellite
+ * (위성 또는 하이브리드 하나만 켜도 satellite), 둘 다 꺼짐이거나 양쪽이 섞임 → none.
  * 이름마다 "그 layerName을 가진 첫 XYZ 레이어"의 체크 상태를 본다(없으면 꺼짐).
  */
 export function deriveBasemapMode(
@@ -56,13 +59,10 @@ export function deriveBasemapMode(
         if (!l) return false
         return getLayerVisible(visibleMap, l)
     }
-    const names = allBasemapNames(modes)
-    const only = (mode: Exclude<BasemapMode, 'none'>): boolean => {
-        const own = modes[mode]
-        if (own.length === 0) return false
-        return names.every(n => (own.includes(n) ? isOn(n) : !isOn(n)))
-    }
-    if (only('normal')) return 'normal'
-    if (only('satellite')) return 'satellite'
+    const anyOn = (mode: Exclude<BasemapMode, 'none'>): boolean => modes[mode].some(isOn)
+    const normal = anyOn('normal')
+    const satellite = anyOn('satellite')
+    if (normal && !satellite) return 'normal'
+    if (satellite && !normal) return 'satellite'
     return 'none'
 }

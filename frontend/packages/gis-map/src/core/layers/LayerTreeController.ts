@@ -154,6 +154,7 @@ export class LayerTreeControllerImpl implements LayerTreeController {
             const tree = await source.loadTree()
             if (this.destroyed) return
             this.state.setState({ tree, loading: false, error: null })
+            this.alignBasemapChecks()
         } catch (err) {
             if (this.destroyed) return
             this.state.setState({ loading: false, error: errorMessage(err) })
@@ -164,6 +165,7 @@ export class LayerTreeControllerImpl implements LayerTreeController {
         if (this.destroyed) return
         if (this.state.getState().tree === tree) return
         this.state.setState({ tree, loading: false, error: null })
+        this.alignBasemapChecks()
     }
 
     allLayers(): LayerDef[] {
@@ -196,7 +198,13 @@ export class LayerTreeControllerImpl implements LayerTreeController {
         const allVisible = layers.length > 0 && layers.every(l => getLayerVisible(s.visible, l))
         const updates: Record<number, boolean> = {}
         for (const l of layers) updates[l.id] = !allVisible
-        this.state.setState({ visible: { ...s.visible, ...updates } })
+        const visible = { ...s.visible, ...updates }
+        // 배경지도 레이어가 들어 있는 그룹이면 상단 일반·위성·없음 표시도 체크 상태에 맞춘다
+        if (layers.some(l => isBasemapLayer(l, this.opts.basemapModes))) {
+            this.state.setState({ visible, basemapMode: deriveBasemapMode(this.allLayers(), visible, this.opts.basemapModes) })
+            return
+        }
+        this.state.setState({ visible })
     }
 
     setOpacity(layerId: number, opacity: number): void {
@@ -234,11 +242,23 @@ export class LayerTreeControllerImpl implements LayerTreeController {
         return getLayerVisible(this.state.getState().visible, layer)
     }
 
+    /** 지도에 그려야 하는가 — 배경지도 레이어도 자기 체크박스를 따른다(위성·하이브리드를 따로 켜고 끈다) */
     isRendered(layer: LayerDef): boolean {
+        return getLayerVisible(this.state.getState().visible, layer)
+    }
+
+    /**
+     * 지금 배경지도 모드에 맞춰 배경지도 레이어의 체크박스를 한 번 정렬한다(트리가 도착했을 때).
+     * 옛날에는 모드가 체크박스를 덮어써서 서버 기본 체크와 상관없이 일반(Base)만 보였다 — 그 첫 화면을 그대로 지킨다.
+     */
+    private alignBasemapChecks(): void {
         const s = this.state.getState()
-        const override = getBasemapVisibility(layer, s.basemapMode, this.opts.basemapModes)
-        if (override !== null) return override
-        return getLayerVisible(s.visible, layer)
+        const updates: Record<number, boolean> = {}
+        for (const layer of this.allLayers()) {
+            const want = getBasemapVisibility(layer, s.basemapMode, this.opts.basemapModes)
+            if (want !== null && getLayerVisible(s.visible, layer) !== want) updates[layer.id] = want
+        }
+        if (Object.keys(updates).length > 0) this.state.setState({ visible: { ...s.visible, ...updates } })
     }
 
     opacityOf(layer: LayerDef): number {
